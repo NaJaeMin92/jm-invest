@@ -292,7 +292,7 @@ let editingWatchlist = false;
 watchEdit.addEventListener("click", () => {
   editingWatchlist = !editingWatchlist;
   watchForm.hidden = !editingWatchlist;
-  watchEdit.textContent = editingWatchlist ? "완료" : "편집";
+  watchEdit.textContent = editingWatchlist ? "Done" : "Edit";
   watchEdit.setAttribute("aria-expanded", String(editingWatchlist));
   renderWatchlist();
 });
@@ -306,7 +306,7 @@ function readWatchlist() {
 function renderWatchlist() {
   const symbols = readWatchlist();
   watchList.replaceChildren();
-  watchStatus.textContent = symbols.length ? "이 기기에 저장된 관심종목" : "관심종목을 추가해 주세요.";
+  watchStatus.textContent = symbols.length ? "Saved on this device" : "Add symbols to your watchlist.";
   for (const symbol of symbols) {
     const row = document.createElement("li");
     const badge = document.createElement("span");
@@ -327,18 +327,23 @@ function renderWatchlist() {
     const subtitle = document.createElement("small");
     subtitle.textContent = stockDirectory?.find((item) => item.symbol === symbol)?.name || "Price unavailable";
     identity.append(name, subtitle);
-    const quote = document.createElement("span");
-    quote.className = "watch-unavailable";
+    const quote = document.createElement("div");
+    quote.className = "watch-quote";
+    const priceLabel = document.createElement("strong");
+    const priceNote = document.createElement("small");
     const holding = watchHoldings.find((item) => item.symbol === symbol);
     const price = holding?.current_price;
-    quote.textContent = price != null && price !== "" && Number.isFinite(Number(price))
+    const hasPrice = price != null && price !== "" && Number.isFinite(Number(price));
+    priceLabel.textContent = hasPrice
       ? new Intl.NumberFormat("en-US", { style:"currency", currency:"USD" }).format(Number(price))
       : "—";
+    priceNote.textContent = hasPrice ? "Last account sync" : "Price unavailable";
+    quote.append(priceLabel, priceNote);
     const remove = document.createElement("button");
     name.textContent = symbol;
-    remove.textContent = "삭제";
+    remove.textContent = "Remove";
     remove.type = "button";
-    remove.setAttribute("aria-label", `${symbol} 삭제`);
+    remove.setAttribute("aria-label", `Remove ${symbol}`);
     remove.addEventListener("click", () => {
       try {
         localStorage.setItem(watchKey, JSON.stringify(readWatchlist().filter((item) => item !== symbol)));
