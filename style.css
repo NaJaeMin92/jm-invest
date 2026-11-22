@@ -302,3 +302,5 @@ button.broker-row:hover { background:#2a2c31; }
 .watch-list li { grid-template-columns:44px minmax(0,1fr) auto; border-bottom:1px solid #25324a; }
 .watch-unavailable { min-width:68px; padding:7px 12px; text-align:center; border-radius:7px; background:#26364b; color:#a5b5ce; }
 #bottom-nav button { font-size:clamp(.55rem,2.5vw,.72rem); }
+
+#bottom-nav button { min-width:0; white-space:nowrap; font-size:clamp(.58rem,2.4vw,.72rem); letter-spacing:-.02em; }
