@@ -1,5 +1,5 @@
 const sigmaSnapshot = "./assets/market/sigma.json?v=47";
-const sigmaFeed = "https://raw.githubusercontent.com/NaJaeMin92/jm-invest/market-data/sigma.json";
+const sigmaFeed = "https://raw.githubusercontent.com/NaJaeMin92/jm-invest/refs/heads/market-data/sigma.json";
 const cnnSnapshot = "./assets/market/fear-and-greed.json?v=47";
 const cnnFeed = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata";
 const inTimeZone = new Intl.DateTimeFormat("en-US", {
