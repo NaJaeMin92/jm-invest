@@ -309,3 +309,6 @@ button.broker-row:hover { background:#2a2c31; }
 .watch-results li { border-bottom:1px solid var(--line); }
 .watch-results button { display:grid; width:100%; text-align:left; gap:4px; background:transparent; border:0; border-radius:0; }
 .watch-results small { color:var(--muted); overflow-wrap:anywhere; }
+
+.watch-ticker-icon { position:relative; overflow:hidden; }
+.watch-ticker-icon img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; padding:5px; background:white; }

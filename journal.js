@@ -282,6 +282,7 @@ function showProfit(data) {
   }
 }
 
+let watchHoldings = [];
 const watchKey = "jm-invest:watchlist:v1";
 const watchList = document.querySelector("#home-holdings");
 const watchStatus = document.querySelector("#home-value");
@@ -310,7 +311,16 @@ function renderWatchlist() {
     const row = document.createElement("li");
     const badge = document.createElement("span");
     badge.className = "watch-ticker-icon";
+    const logoFiles = { NVDA:"nvda", GOOGL:"goog", GOOG:"goog", AMZN:"amzn", AVGO:"avgo", NBIS:"nbis", AMZU:"amzu", SOXX:"soxx", SOXL:"soxl" };
     badge.textContent = symbol.slice(0, 2);
+    if (logoFiles[symbol]) {
+      const image = document.createElement("img");
+      image.src = `./assets/companies/${logoFiles[symbol]}.png?v=29`;
+      image.alt = "";
+      image.addEventListener("load", () => { badge.firstChild?.remove(); });
+      image.addEventListener("error", () => image.remove());
+      badge.append(image);
+    }
     const identity = document.createElement("div");
     identity.className = "watch-identity";
     const name = document.createElement("strong");
@@ -319,7 +329,11 @@ function renderWatchlist() {
     identity.append(name, subtitle);
     const quote = document.createElement("span");
     quote.className = "watch-unavailable";
-    quote.textContent = "—";
+    const holding = watchHoldings.find((item) => item.symbol === symbol);
+    const price = holding?.current_price;
+    quote.textContent = price != null && price !== "" && Number.isFinite(Number(price))
+      ? new Intl.NumberFormat("en-US", { style:"currency", currency:"USD" }).format(Number(price))
+      : "—";
     const remove = document.createElement("button");
     name.textContent = symbol;
     remove.textContent = "삭제";
@@ -388,6 +402,13 @@ watchForm.addEventListener("submit", async (event) => {
 });
 
 renderWatchlist();
+fetch("./assets/symbols.json").then((response) => {
+  if (!response.ok) throw new Error("directory unavailable");
+  return response.json();
+}).then((items) => {
+  stockDirectory = items;
+  renderWatchlist();
+}).catch(() => {});
 
 async function loadValuation(accessToken) {
   const value = document.querySelector("#portfolio-value");
@@ -457,6 +478,8 @@ async function loadValuation(accessToken) {
     allocationReturn.dataset.direction = performance.dataset.direction;
     allocation.hidden = false;
     showHoldings(balance);
+    watchHoldings = Array.isArray(balance.holdings) ? balance.holdings : [];
+    renderWatchlist();
 
     showProfit(balance.realized_profit);
   } catch (error) {
