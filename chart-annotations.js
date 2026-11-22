@@ -20,14 +20,24 @@ export function renderAnnotations(ctx, drawings, view) {
     else if (drawing.type === "note") {
       ctx.fillRect(x - 2, y - 2, 4, 4);
       ctx.fillText(drawing.text, x + 5, y - 6);
-    } else if (drawing.type === "fibonacci" && second) {
-      const [endX] = second;
-      for (const level of [0, .236, .382, .5, .618, .786, 1]) {
-        const [first, last] = drawing.points;
-        const price = first.price + level * (last.price - first.price);
+    } else if (drawing.type === "extended" && second) {
+      const [endX, endY] = second;
+      if (x === endX) line([[x,view.top],[x,view.bottom]]);
+      else {
+        const slope = (endY-y)/(endX-x);
+        line([[0,y-x*slope],[view.width,y+(view.width-x)*slope]]);
+      }
+    } else if (second && (drawing.type === "fibonacci" || (drawing.type === "extension" && third))) {
+      const isExtension = drawing.type === "extension";
+      const levels = isExtension ? [.618,1,1.272,1.618,2,2.618] : [0,.236,.382,.5,.618,.786,1];
+      const begin = isExtension ? third[0] : Math.min(x, second[0]);
+      for (const level of levels) {
+        const [first, last, pivot] = drawing.points;
+        const price = (isExtension ? pivot.price : first.price) + level * (last.price-first.price);
         const levelY = view.y(price);
-        line([[Math.min(x, endX), levelY], [view.width, levelY]]);
-        ctx.fillText((level * 100).toFixed(1) + "%  " + price.toFixed(2), Math.max(8, Math.min(x, endX) + 4), levelY - 4);
+        if (!Number.isFinite(levelY)) continue;
+        line([[begin, levelY], [view.width, levelY]]);
+        ctx.fillText((level * 100).toFixed(1) + "%  " + price.toFixed(2), Math.max(8,begin+4), levelY-4);
       }
     } else if (drawing.type === "parallel" && third) {
       const [endX, endY] = second;

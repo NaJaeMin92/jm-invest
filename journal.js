@@ -1,6 +1,6 @@
 import {setupWatchEditor} from "./watch-editor.js?v=49";
 import {setupOrders} from "./orders.js?v=55";
-import { publicQuote, setupInstrument, sparkline } from "./instrument.js?v=55";
+import { publicQuote, setupInstrument, sparkline } from "./instrument.js?v=56";
 
 const service = "https://mfycpprqyaidoixytdim.supabase.co";
 const publicKey = "sb_publishable_KIxbzozNkk50oEZ9GehtZA_E484E5Lr";

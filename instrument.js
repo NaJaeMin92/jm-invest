@@ -1,7 +1,7 @@
-import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=49";
+import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=56";
 import {showMarketPanel} from "./market-panels.js?v=50";
 
-import {setupChartTools} from "./chart-tools.js?v=49";
+import {setupChartTools} from "./chart-tools.js?v=56";
 
 const get = id => document.getElementById(id);
 const savedQuotes = new Set("ANT SKHY SPCX MRVL BZMAIN CLMAIN AAL UAL DAL NVDA AMZN".split(" "));

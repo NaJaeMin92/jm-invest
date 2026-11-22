@@ -599,3 +599,20 @@ body.instrument-open { overflow:hidden; }
 
 #stock-order-bar { position:fixed; z-index:5; left:50%; transform:translateX(-50%); display:grid; grid-template-columns:1fr; }
 #stock-order { display:grid; place-items:center; align-content:center; gap:3px; min-height:53px; padding:4px 0; border-radius:32px; background:#142440c9; color:#35bfff; font:650 12px/14px "Geist",system-ui,sans-serif; }
+
+#chart-tool-dialog {
+  position:fixed; inset:auto 0 max(8px,env(safe-area-inset-bottom)); margin:0 auto;
+  width:min(calc(100% - 16px),480px); max-height:min(70dvh,620px);
+  padding:12px 14px 16px; border-radius:20px;
+  background:linear-gradient(156deg,#1c304b 0,#111c2f 52%);
+}
+#chart-tool-dialog::backdrop { background:#070d197d; }
+.chart-tool-head { position:sticky; top:-12px; padding:8px 0; z-index:1; background:#192943; }
+.chart-tool-head h3 { letter-spacing:-.025em; }
+#chart-tool-body .chart-tool-grid { gap:8px; }
+#chart-tool-body .chart-tool-grid button { display:flex; align-items:center; gap:9px; min-height:56px; padding:7px 9px; background:#172741; }
+#chart-tool-body .chart-tool-grid button[aria-pressed="true"] { background:#233c60; box-shadow:inset 3px 0 #8cceff; }
+#chart-tool-body .chart-tool-grid button:disabled { opacity:.45; }
+.chart-tile-icon { display:grid; place-items:center; width:28px; height:28px; flex:none; border:1px solid #516e8d; border-radius:7px; color:#9bd6ff; font-size:18px; }
+#chart-tool-dialog[data-section="draw"] .chart-tile-icon { color:#f4cf96; }
+#chart-tool-dialog[data-section="indicators"] .chart-tool-grid button { min-height:46px; }

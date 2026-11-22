@@ -1,5 +1,5 @@
 import {study} from "./technical-indicators.js";
-import {renderAnnotations} from "./chart-annotations.js";
+import {renderAnnotations} from "./chart-annotations.js?v=56";
 
 // Bars are ordered [timestamp, open, high, low, close, volume].
 export function isIntraday(interval) {
@@ -162,15 +162,17 @@ export function drawChart(canvas, chart, frame, start, options) {
   const bodyWidth = Math.min(10,Math.max(1,step * .55));
   const volumeMax = Math.max(1,...shown.map(bar=>bar[5]));
   const [gain, loss] = options.greenUp ? ["#57c49e","#eb4e79"] : ["#eb4e79","#57c49e"];
+  const continuous = ["line","area","baseline"].includes(options.type);
   for (let i=0;i<priceBars.length;i+=1) {
     const [,open,high,low,close,volume] = priceBars[i];
     const color = close >= open ? gain : loss;
     const mid = x(i);
-    if (options.type === "ohlc") {
-      line([[mid-bodyWidth/2,y(open)],[mid,y(open)]],color);
-      line([[mid,y(high)],[mid,y(low)]],color);
-      line([[mid,y(close)],[mid+bodyWidth/2,y(close)]],color);
-    } else if (options.type !== "line" && options.type !== "area") {
+    if (options.type === "ohlc" || options.type === "mono") {
+      const barColor = options.type === "mono" ? "#c0d1e7" : color;
+      line([[mid-bodyWidth/2,y(open)],[mid,y(open)]],barColor);
+      line([[mid,y(high)],[mid,y(low)]],barColor);
+      line([[mid,y(close)],[mid+bodyWidth/2,y(close)]],barColor);
+    } else if (!continuous) {
       line([[mid,y(high)],[mid,y(low)]],color);
       const height = Math.max(1,Math.abs(y(open)-y(close)));
       const upper = Math.min(y(open),y(close));
@@ -184,7 +186,7 @@ export function drawChart(canvas, chart, frame, start, options) {
       ctx.fillRect(mid-bodyWidth/2,axis-height,bodyWidth,height);
     }
   }
-  if (options.type === "line" || options.type === "area") {
+  if (continuous) {
     const points = pointsFor(shown.map(bar => bar[4]), y);
     if (options.type === "area") {
       const gradient = ctx.createLinearGradient(0, top, 0, bottom);
@@ -197,7 +199,31 @@ export function drawChart(canvas, chart, frame, start, options) {
       ctx.lineTo(points[0][0],bottom);
       ctx.fill();
     }
-    line(points,"#68b7ff",1.6);
+    if (options.type === "baseline") {
+      const baseline = y(shown[0][4]);
+      for (const [startY,endY,color,fill] of [
+        [top,baseline,"#5bdcc2","#5bdcc22e"],
+        [baseline,bottom,"#f291a8","#f291a82e"]
+      ]) {
+        if (endY <= startY) continue;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0,startY,width,endY-startY);
+        ctx.clip();
+        ctx.fillStyle = fill;
+        ctx.beginPath();
+        for (const [px,py] of points) ctx.lineTo(px,py);
+        ctx.lineTo(points.at(-1)[0],baseline);
+        ctx.lineTo(points[0][0],baseline);
+        ctx.fill();
+        line(points,color,1.6);
+        ctx.restore();
+      }
+      ctx.setLineDash([3,3]);
+      line([[pad,baseline],[width,baseline]],"#8696b1");
+      ctx.setLineDash([]);
+      label("Base " + shown[0][4].toFixed(2),pad,baseline-4,"#aab8d0");
+    } else line(points,"#68b7ff",1.6);
   }
   for (const overlay of overlayLines) line(pointsFor(overlay.values,y),overlay.color);
   if (options.overlays.includes("VP")) {

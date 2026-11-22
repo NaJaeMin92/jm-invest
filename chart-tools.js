@@ -1,18 +1,31 @@
 import {indicatorNames, signalsAt} from "./technical-indicators.js";
 
 const get = id => document.getElementById(id);
-const types = { candle:"Candles", hollow:"Hollow candles", ohlc:"OHLC bars", line:"Close line", area:"Area", heikin:"Heikin-Ashi" };
+const types = {
+  line:["Close line","⌁"], area:["Area","◩"], baseline:["Baseline","⇵"],
+  candle:["Candles","▥"], hollow:["Hollow candles","▯"], heikin:["Heikin-Ashi","▤"],
+  mono:["OHLC bars","┤"], ohlc:["Colored bars","╫"]
+};
 const overlays = ["EMA","MA","BOLL","IC","VWAP","VP"];
 const lower = ["RSI","VOL","MACD","ROC","DMA","FSTO","none"];
 const drawings = {
-  trend:["Trendline",2], horizontal:["Horizontal line",1], vertical:["Vertical line",1],
-  parallel:["Parallel channel",3], fibonacci:["Fibonacci retracement",2],
-  polyline:["Polyline",Infinity], measure:["Measure",2], freehand:["Freehand",Infinity], note:["Note",1]
+  trend:["Trendline",2,"↗"], horizontal:["Horizontal line",1,"━"], vertical:["Vertical line",1,"┃"], extended:["Extended line",2,"⤢"],
+  parallel:["Parallel channel",3,"∥"], fibonacci:["Fibonacci retracement",2,"≡"], extension:["Fibonacci extension",3,"⋮"],
+  polyline:["Polyline",Infinity,"⌁"], measure:["Measure",2,"↔"], freehand:["Freehand",Infinity,"✎"], note:["Note",1,"T"]
 };
 const toolbox = {
   indicators:"Indicators", draw:"Draw", layers:"Chart layers", signals:"Indicator signals",
   compare:"Compare", dual:"Dual charts", replay:"Replay", settings:"Settings"
 };
+const toolSymbols = {
+  indicators:"∿", draw:"✎", layers:"▱", signals:"⋈",
+  compare:"⇄", dual:"◫", replay:"▷", settings:"⚙"
+};
+const drawGroups = [
+  ["Lines", ["trend","horizontal","vertical","extended"]],
+  ["Patterns and Fibonacci", ["parallel","polyline","fibonacci","extension"]],
+  ["Notes and markup", ["measure","freehand","note"]]
+];
 const layers = { volume:"Volume bars", grid:"Price grid", price:"Last price line", drawings:"Drawings" };
 const initialOptions = () => ({
   type:"candle", lower:"RSI", overlays:["EMA"],
@@ -29,6 +42,23 @@ function button(label, run, selected) {
   control.onclick = run;
   if (selected != null) control.setAttribute("aria-pressed",String(selected));
   return control;
+}
+
+function tile(label, symbol, run, selected) {
+  const control = button(label, run, selected);
+  if (symbol) {
+    const icon = element("span", symbol);
+    icon.className = "chart-tile-icon";
+    icon.setAttribute("aria-hidden","true");
+    control.prepend(icon);
+  }
+  return control;
+}
+
+function grid() {
+  const list = element("div", "");
+  list.className = "chart-tool-grid";
+  return list;
 }
 
 export function setupChartTools({redraw,moveTo,getView,alternatives,loadComparison}) {
@@ -117,50 +147,72 @@ export function setupChartTools({redraw,moveTo,getView,alternatives,loadComparis
   };
   const sections = {
     root() {
-      const list = element("div","");
-      list.className = "chart-tool-grid";
-      for (const [id,label] of Object.entries(toolbox)) list.append(button(label,()=>render(id)));
+      const list = grid();
+      for (const [id,label] of Object.entries(toolbox)) list.append(tile(label,toolSymbols[id],()=>render(id)));
       body.append(list);
     },
     types() {
-      for (const [id,label] of Object.entries(types)) body.append(button(label,()=>{
-        options.type = id;
-        dialog.close();
-        update();
-      },options.type === id));
+      const list = grid();
+      for (const [id,[label,symbol]] of Object.entries(types)) {
+        list.append(tile(label,symbol,()=>{
+          options.type = id;
+          dialog.close();
+          update();
+        },options.type === id));
+      }
+      body.append(list);
     },
     indicators() {
-      body.append(element("h4","On the price chart"));
-      for (const name of overlays) body.append(button(indicatorNames[name],()=>{
-        options.overlays = options.overlays.includes(name) ? options.overlays.filter(value=>value!==name) : [...options.overlays,name];
-        render("indicators"); update();
+      const onPrice = grid(), below = grid();
+      for (const name of overlays) onPrice.append(button(indicatorNames[name], event => {
+        const selected = !options.overlays.includes(name);
+        options.overlays = selected ? [...options.overlays,name] : options.overlays.filter(value=>value!==name);
+        event.currentTarget.setAttribute("aria-pressed",String(selected));
+        update();
       },options.overlays.includes(name)));
-      body.append(element("h4","Below the chart"));
-      for (const name of lower) body.append(button(indicatorNames[name] || "None",()=>{
-        options.lower = name;
-        render("indicators"); update();
+      for (const name of lower) below.append(button(indicatorNames[name] || "None",()=>{
+        options.lower = options.lower === name ? "none" : name;
+        [...below.children].forEach((control,index) => control.setAttribute("aria-pressed",String(lower[index]===options.lower)));
+        update();
       },options.lower===name));
+      body.append(element("h4","On the price chart"),onPrice,element("h4","Below the chart"),below);
     },
     draw() {
       const note = document.createElement("input");
       note.placeholder = "Note text";
       note.setAttribute("aria-label","Note text");
       note.maxLength = 50;
-      for (const [id,[label]] of Object.entries(drawings)) body.append(button(label,()=>{
-        const text = note.value.trim();
-        if (id === "note" && !text) {
-          note.focus();
-          return;
+      for (const [heading,ids] of drawGroups) {
+        const list = grid();
+        for (const id of ids) {
+          const [label,,symbol] = drawings[id];
+          list.append(tile(label,symbol,()=>{
+            const text = note.value.trim();
+            if (id === "note" && !text) {
+              note.focus();
+              return;
+            }
+            dialog.close();
+            replay = null; stopTimer();
+            options.layers.drawings = true;
+            pending = {type:id, points:[], text};
+            update();
+          }));
         }
-        dialog.close();
-        replay = null; stopTimer();
-        options.layers.drawings = true;
-        pending = {type:id, points:[], text};
-        update();
-      }));
-      body.append(note,button("Undo last drawing",()=>{
-        saved.pop();store();update();
-      }));
+        body.append(element("h4",heading),list);
+      }
+      function removeDrawing(clear) {
+        if (clear) saved = [];
+        else saved.pop();
+        store();update();
+        render("draw");
+      }
+      const actions = grid();
+      const undo = button("Undo last drawing",()=>removeDrawing(false));
+      const clear = button("Clear drawings",()=>removeDrawing(true));
+      undo.disabled = clear.disabled = !saved.length;
+      actions.append(undo,clear);
+      body.append(note,actions);
     },
     layers() {
       for (const [id,label] of Object.entries(layers)) body.append(button(label,()=>{
@@ -222,7 +274,8 @@ export function setupChartTools({redraw,moveTo,getView,alternatives,loadComparis
   }
   function render(next) {
     section = next;
-    get("chart-tool-title").textContent = toolbox[next] || (next === "types" ? "Chart type" : "Chart Toolbox");
+    dialog.dataset.section = next;
+    get("chart-tool-title").textContent = toolbox[next] || (next === "types" ? "Line Type" : "Chart Toolbox");
     body.replaceChildren();
     if (!["types","root"].includes(next)) body.append(button("‹ Toolbox",()=>render("root")));
     sections[next]();
