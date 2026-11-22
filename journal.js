@@ -142,10 +142,20 @@ holdingsDialog.addEventListener("click", (event) => {
   if (event.target === holdingsDialog) holdingsDialog.close();
 });
 
+function formatStockProfit(balance, won) {
+  const holdings = balance.holdings;
+  if (!Array.isArray(holdings) || balance.return_pct == null) return "평가손익 동기화 필요";
+  const profits = holdings.map((holding) => holding.profit_krw);
+  if (profits.some((amount) => amount == null || amount === "" || !Number.isFinite(Number(amount)))) {
+    return "평가손익 동기화 필요";
+  }
+  const total = profits.reduce((sum, amount) => sum + Number(amount), 0);
+  return `${total > 0 ? "+" : ""}${won.format(total)} (${Math.abs(Number(balance.return_pct)).toFixed(2)}%)`;
+}
+
 function showHoldings(balance) {
   const won = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" });
-  document.querySelector("#holdings-summary").textContent =
-    won.format(balance.value_krw) + (balance.return_pct == null ? "" : ` · ${Number(balance.return_pct).toFixed(2)}%`);
+  document.querySelector("#holdings-summary").textContent = formatStockProfit(balance, won);
   holdingsList.replaceChildren();
   const holdings = balance.holdings;
   if (!Array.isArray(holdings)) {
@@ -328,7 +338,7 @@ async function loadValuation(accessToken) {
     performance.textContent = balance.return_pct == null ? "" : "평가수익률 " + Number(balance.return_pct).toFixed(2) + "%";
     const allocationReturn = document.querySelector("#allocation-return");
     document.querySelector("#allocation-value").textContent = won.format(stocks);
-    allocationReturn.textContent = performance.textContent;
+    allocationReturn.textContent = formatStockProfit(balance, won);
     allocationReturn.dataset.direction = performance.dataset.direction;
     allocation.hidden = false;
     showHoldings(balance);
