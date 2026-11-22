@@ -55,3 +55,8 @@ footer { margin: 22px 0 36px; font-size: .875rem; }
   .layout { grid-template-columns: minmax(0, 1fr); }
   .intro { padding-top: 24px; }
 }
+
+[hidden] { display: none !important; }
+#private h2 { margin-top: 24px; }
+#private li { white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 8px; }
+#entry textarea { font: inherit; padding: 10px; border: 1px solid var(--line); border-radius: 10px; resize: vertical; }

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>매매일지 · JM Invest</title>
+<link rel="stylesheet" href="./style.css">
+<script src="./journal.js" defer></script>
+</head>
+<body>
+<header><div class="head"><a href="./">JM Invest</a></div></header>
+<main>
+<section class="intro"><h1>내 매매일지</h1></section>
+<section class="panel">
+<form id="login">
+<label>이메일<input name="email" type="email" autocomplete="username" required></label>
+<label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label>
+<button class="primary">로그인</button>
+</form>
+<div id="private" hidden>
+<button id="logout" type="button">로그아웃</button>
+<h2>일지 작성</h2>
+<form id="entry">
+<label>종목<input name="symbol" maxlength="20" required></label>
+<label>거래일<input name="trade_date" type="date" required></label>
+<label>메모<textarea name="note" rows="5" maxlength="5000" required></textarea></label>
+<button class="primary">저장</button>
+</form>
+<h2>저장한 일지</h2><ul id="entries"></ul>
+<h2>키움 체결 내역</h2><ul id="fills"></ul>
+</div>
+<p id="status" role="status"></p>
+</section>
+</main>
+</body>
+</html>
