@@ -13,6 +13,26 @@ let token = null;
 const storageKey = "jm-invest:private-refresh:v1";
 const ownerId = "9fc22c69-b253-406a-be2b-eb8ad9526a3c";
 
+const market = document.querySelector("#market");
+const account = document.querySelector("#account");
+const accountLink = document.querySelector("#account-link");
+
+function showAccount(show) {
+  account.hidden = !show;
+  market.hidden = show;
+  accountLink.hidden = show;
+  accountLink.textContent = token ? "내 계좌" : "로그인";
+  document.body.classList.toggle("trade-page", show);
+}
+
+accountLink.addEventListener("click", () => {
+  setDetail(false);
+  showAccount(true);
+  if (!token) login.elements.email.focus();
+});
+document.querySelector("#market-link").addEventListener("click", () => showAccount(false));
+document.querySelector("#cancel-login").addEventListener("click", () => showAccount(false));
+
 function storedSession() {
   try { return localStorage.getItem(storageKey); } catch { return null; }
 }
@@ -179,7 +199,8 @@ document.querySelector("#logout").addEventListener("click", () => {
   fills.replaceChildren();
   login.reset();
   login.hidden = false;
-  message.textContent = "로그아웃했습니다.";
+  message.textContent = "";
+  showAccount(false);
   request("/auth/v1/logout?scope=local", { method: "POST", accessToken }).catch(() => {});
 });
 
@@ -197,11 +218,13 @@ async function openWorkspace(session, remember) {
   setDetail(false);
   workspace.hidden = false;
   logout.hidden = false;
+  showAccount(true);
   message.textContent = remember && !stored ? "이 브라우저에서는 로그인 상태를 저장할 수 없습니다." : "";
 }
 
 async function restoreSession() {
   if (!storedSession()) return;
+  showAccount(true);
   login.hidden = true;
   message.textContent = "로그인 확인 중…";
   try {

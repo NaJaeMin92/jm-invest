@@ -98,3 +98,7 @@ button.broker-row:hover { background:#2a2c31; }
 .account-nav { display:flex; align-items:center; justify-content:center; border-top:1px solid var(--line); }
 .account-nav>* { text-align:center; padding:15px 0; width:50%; font-size:.9rem; }
 .account-nav a { color:var(--muted); }
+
+.head #account-link { margin-left:auto; }
+.account-nav button { border:0; border-radius:0; background:transparent; color:var(--muted); }
+#cancel-login { justify-self:start; }
