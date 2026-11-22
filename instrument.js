@@ -28,11 +28,10 @@ export function sparkline(values) {
   return svg;
 }
 const signed = n => (n>=0?"+":"")+n.toFixed(2);
-const quoteSymbol = s => ({BZMAIN:"BZ=F",CLMAIN:"CL=F"}[s] || s);
 const displaySymbol = s => ({BZMAIN:"BZmain",CLMAIN:"CLmain"}[s] || s);
 const validSymbol = /^[A-Z][A-Z0-9.\-]{0,11}$/;
 
-export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
+export function setupInstrument({search,nameFor,readList,saveList}) {
   const dialog=get("stock-detail"), canvas=get("market-chart"), reference=get("daily-reference");
   let current="", quote=null, frame="day", afterClose=null;
   function setFavorite() {
@@ -203,9 +202,6 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
       if (id === requestId) chartStatus.textContent = "Intraday history is temporarily unavailable. Select another interval.";
     }
   }
-  function link(id, href) {
-    const anchor=get(id);anchor.href=href;anchor.target="_blank";anchor.rel="noopener noreferrer";
-  }
   function renderQuote() {
     const pct=quote.percent, change=quote.price-quote.price/(1+pct/100);
     get("stock-price").textContent=quote.price.toFixed(2);
@@ -246,8 +242,6 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     get("stock-name").textContent=nameFor(symbol);
     for (const id of ["stock-price","stock-range","stock-volume","stock-cap"]) get(id).textContent="—";
     get("stock-change").textContent="";get("stock-time").textContent="Loading quote…";
-    const url="https://finance.yahoo.com/quote/"+encodeURIComponent(quoteSymbol(symbol))+"/";
-    link("company-link", url + "profile/");
     get("external-chart").replaceChildren();get("external-chart").hidden=true;
     canvas.hidden=true;reference.hidden=true;get("stock-frames").hidden=true;
     setFavorite();setFrame("day");
@@ -279,7 +273,6 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
   get("stock-back").onclick=()=>back();
   dialog.addEventListener("cancel",e=>{e.preventDefault();back();});
   get("stock-search").onclick=()=>back(search);
-  get("symbol-feed").onclick=()=>back(()=>navigate("profit"));
   get("stock-star").onclick=()=>{
     const items=readList();
     if(saveList(items.includes(current)?items.filter(v=>v!==current):[...items,current]))setFavorite();
