@@ -2,37 +2,50 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0b0f17">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1629">
 <title>TradeInSight</title>
 <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=40">
-<script type="module" src="./journal.js?v=42"></script>
+<link rel="stylesheet" href="./style.css?v=43">
+<script type="module" src="./journal.js?v=43"></script>
 </head>
-<body class="trade-page">
+<body class="trade-page" data-view="home">
 <header><div class="head"><a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
 <main id="account">
 <div class="page-title"><button type="button" id="back-accounts" aria-label="계좌 목록으로 돌아가기" hidden>‹</button><h1 id="page-heading">내 계좌</h1></div>
 <section class="panel">
-<form id="login">
+<form id="login" hidden>
 <label>이메일<input name="email" type="email" autocomplete="username" required></label>
 <label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label>
 <label class="remember"><input type="checkbox" name="remember">이 기기에서 로그인 유지</label>
 <button class="primary">로그인</button>
 </form>
-<div id="private" hidden>
-<section id="tab-home" class="tab-panel" hidden>
-<div class="watch-heading"><h2>My Watchlist</h2><button id="watch-edit" type="button" aria-expanded="false" aria-controls="watch-form">Edit</button></div>
-<p id="home-value" class="watch-status"></p>
-<form id="watch-form" class="watch-form" hidden>
-<label for="watch-symbol">Search stocks and ETFs</label>
-<div><input id="watch-symbol" maxlength="80" placeholder="Symbol or company name" autocomplete="off" required><button type="submit">Search</button></div><ul id="watch-results" class="watch-results" aria-live="polite"></ul>
-</form>
+<div id="private">
+<section id="tab-home" class="tab-panel" lang="en" aria-labelledby="watch-title">
+<div class="watch-heading">
+<h2 id="watch-title"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M2 4h12M2 20h12M9 12h5"/><path d="m2 9 4 3-4 3z" fill="currentColor" stroke="none"/></svg>My Watchlist</h2>
+<button type="button" id="watch-manage" aria-label="Manage watchlist"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><circle cx="4" cy="6" r="2.4"/><circle cx="4" cy="18" r="2.4"/><path d="M11 6h11M11 18h11"/></svg></button>
+<button type="button" id="watch-settings" aria-label="Watchlist display settings" aria-expanded="false" aria-controls="watch-display"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="m7 3 10 0 5 9-5 9H7l-5-9z"/><circle cx="12" cy="12" r="3"/></svg></button>
+</div>
+<div id="watch-display" hidden><label><input type="checkbox" id="watch-charts" checked>Show charts</label></div>
+<div class="watch-toolbar">
+<button id="watch-edit" type="button" aria-expanded="false" aria-controls="watch-tools"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M10 4H4v16h16v-7M11 13l9-9"/></svg><span>Edit Watchlist</span></button>
+<button id="watch-source" type="button" aria-expanded="false" aria-controls="watch-source-note">Snapshot</button>
+<button id="watch-sort" type="button" aria-label="Sort by percentage change">%Change <svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="m5 10 7-7 7 7zm0 4h14l-7 7z" fill="currentColor" stroke="none"/></svg></button>
+</div>
+<p id="watch-source-note" hidden>The nine featured quotes and charts are from the supplied watchlist screenshot. The percentages show the change at the time of capture.</p>
+<div id="watch-edit-slot"></div>
 <ul id="home-holdings" class="watch-list"></ul>
 </section>
+<section id="tab-markets" class="tab-panel" lang="en" hidden><h2>Markets</h2><div id="market-search-slot"></div></section>
+<div id="watch-tools" hidden>
+<form id="watch-form" class="watch-form"><label for="watch-symbol">Search stocks and ETFs</label>
+<div><input id="watch-symbol" maxlength="80" placeholder="Symbol or company name" autocomplete="off" required><button type="submit">Search</button></div>
+<ul id="watch-results" class="watch-results" aria-live="polite"></ul></form>
+<p id="home-value" class="watch-status" role="status"></p></div>
 <section id="tab-profit" class="tab-panel" hidden>
 <h2>미국주식 실현손익</h2>
 <p id="profit-period"></p>
@@ -44,7 +57,7 @@
 <h2>설정</h2>
 <button id="logout" type="button">로그아웃</button>
 </section>
-<div id="tab-account">
+<div id="tab-account" hidden>
 <section id="account-home" aria-label="투자 계좌">
 <div class="total-row">
 <span class="ledger-icon" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -92,11 +105,12 @@
 <ul id="holdings-list"></ul>
 <button id="close-holdings" class="sheet-close" type="button">닫기</button>
 </dialog>
-<nav id="bottom-nav" aria-label="Main navigation" hidden>
-<button type="button" data-view="home"><span aria-hidden="true">♡</span>Watchlists</button>
-<button type="button" data-view="account" aria-current="page"><span aria-hidden="true">▤</span>Accounts</button>
-<button type="button" data-view="profit"><span aria-hidden="true">◫</span>Realized P&L</button>
-<button type="button" data-view="more"><span aria-hidden="true">☰</span>More</button>
+<nav id="bottom-nav" lang="en" aria-label="Main navigation">
+<button type="button" data-view="home" aria-current="page"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path fill="currentColor" stroke="none" d="M12 21 2.7 12A5.8 5.8 0 0 1 12 5 5.8 5.8 0 0 1 21.3 12Z"/></svg><span>Watchlists</span></button>
+<button type="button" data-view="markets"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M1 16c6 2 17-4 22-10"/></svg><span>Markets</span></button>
+<button type="button" data-view="account"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="m3 8 15-5v5M3 8h18v13H3z"/><circle cx="17" cy="14" r="1" fill="currentColor"/></svg><span>Open Account</span></button>
+<button type="button" data-view="profit" title="Realized P&amp;L"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M2 4h17v12H6l-4 3zM9 19h9l4 3V8"/></svg><span>Feeds</span></button>
+<button type="button" data-view="more"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg><span>Menu</span></button>
 </nav>
 <p id="status" role="status"></p>
 </section>

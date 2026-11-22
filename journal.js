@@ -45,14 +45,26 @@ const logout = document.querySelector("#logout");
 const navigation = document.querySelector("#bottom-nav");
 const navButtons = [...navigation.querySelectorAll("button")];
 function selectView(view) {
+  const publicView = view === "home" || view === "markets";
+  const needsLogin = !publicView && !token;
+  document.body.dataset.view = view;
   setDetail(false);
+  login.hidden = !needsLogin;
+  workspace.hidden = needsLogin;
+  message.textContent = "";
   for (const button of navButtons) {
     const active = button.dataset.view === view;
-    document.querySelector(`#tab-${button.dataset.view}`).hidden = !active;
+    document.querySelector(`#tab-${button.dataset.view}`).hidden = !active || needsLogin;
     if (active) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
   }
-  document.querySelector("#page-heading").textContent = {home:"Watchlists", account:"내 계좌", profit:"실현손익 조회", more:"더보기"}[view];
+  document.querySelector("#page-heading").textContent = {
+    home:"My Watchlist", markets:"Markets", account:"Accounts", profit:"Realized P&L", more:"Menu"
+  }[view];
+  const tools = document.querySelector("#watch-tools");
+  const searchSlot = view === "markets" ? "#market-search-slot" : "#watch-edit-slot";
+  document.querySelector(searchSlot).append(tools);
+  tools.hidden = !(view === "markets" || (view === "home" && editingWatchlist));
   window.scrollTo(0, 0);
 }
 for (const button of navButtons) {
@@ -125,12 +137,11 @@ document.querySelector("#logout").addEventListener("click", () => {
   document.querySelector("#portfolio-value").textContent = "";
   document.querySelector("#valuation-note").textContent = "";
   document.querySelector("#kiwoom-return").textContent = "";
-  navigation.hidden = true;
+  watchHoldings = [];
   renderWatchlist();
   setDetail(false);
   login.reset();
-  login.hidden = false;
-  message.textContent = "";
+  selectView("home");
   request("/auth/v1/logout?scope=local", { method: "POST", accessToken }).catch(() => {});
 });
 
@@ -289,15 +300,53 @@ const watchStatus = document.querySelector("#home-value");
 const watchForm = document.querySelector("#watch-form");
 const watchEdit = document.querySelector("#watch-edit");
 let editingWatchlist = false;
-watchEdit.addEventListener("click", () => {
+function toggleEdit() {
   editingWatchlist = !editingWatchlist;
-  watchForm.hidden = !editingWatchlist;
-  watchEdit.textContent = editingWatchlist ? "Done" : "Edit";
+  document.querySelector("#watch-tools").hidden = !editingWatchlist;
+  watchEdit.querySelector("span").textContent = editingWatchlist ? "Done" : "Edit Watchlist";
   watchEdit.setAttribute("aria-expanded", String(editingWatchlist));
   renderWatchlist();
+  if (editingWatchlist) document.querySelector("#watch-symbol").focus();
+}
+watchEdit.addEventListener("click", toggleEdit);
+document.querySelector("#watch-manage").addEventListener("click", toggleEdit);
+for (const id of ["watch-source", "watch-settings"]) {
+  const button = document.getElementById(id);
+  const panel = document.getElementById(button.getAttribute("aria-controls"));
+  button.addEventListener("click", () => {
+    panel.hidden = !panel.hidden;
+    button.setAttribute("aria-expanded", String(!panel.hidden));
+  });
+}
+document.querySelector("#watch-charts").addEventListener("change", (event) => {
+  watchList.classList.toggle("without-charts", !event.target.checked);
 });
 
-const suggestedWatchlist = ["ANT", "SKHY", "SPCX", "MRVL", "BZMAIN", "CLMAIN", "AAL", "UAL", "DAL"];
+// These display values and plots belong to the supplied reference snapshot.
+const featured = [
+  ["ANT", "Anthropic PBC", -8.50, "After: -1.25%"],
+  ["SKHY", "SK Hynix Inc", -13.11, "After: +2.81%"],
+  ["SPCX", "Space Exploration Technologies", -7.69, "After: +1.39%"],
+  ["MRVL", "Marvell Technology", -11.69, "After: +2.55%"],
+  ["BZMAIN", "Brent Last Day Main", 0.48, "89.87 +0.43"],
+  ["CLMAIN", "Crude Oil Main", 1.43, "83.62 +1.18"],
+  ["AAL", "American Airlines", -6.45, "After: +1.82%"],
+  ["UAL", "United Airlines Holdings", -4.26, "After: +1.84%"],
+  ["DAL", "Delta Air Lines Inc.", -3.80, "After: +1.18%"],
+];
+const suggestedWatchlist = featured.map(([symbol]) => symbol);
+const snapshots = new Map(featured.map(([symbol, name, change, after], index) =>
+  [symbol, {name, change, after, index}]
+));
+let sortDirection = 0;
+document.querySelector("#watch-sort").addEventListener("click", (event) => {
+  sortDirection = sortDirection === 0 ? -1 : sortDirection === -1 ? 1 : 0;
+  event.currentTarget.dataset.direction = String(sortDirection);
+  event.currentTarget.setAttribute("aria-label", sortDirection === -1
+    ? "Highest change first. Show lowest first" : sortDirection === 1
+    ? "Lowest change first. Restore saved order" : "Sort by percentage change");
+  renderWatchlist();
+});
 const watchSeedKey = "jm-invest:watchlist:reference-added:v1";
 try {
   if (!localStorage.getItem(watchSeedKey)) {
@@ -317,15 +366,25 @@ function readWatchlist() {
 }
 function renderWatchlist() {
   const symbols = readWatchlist();
+  if (sortDirection) symbols.sort((a, b) => {
+    const left = snapshots.get(a), right = snapshots.get(b);
+    if (!left || !right) return Number(Boolean(right)) - Number(Boolean(left));
+    return sortDirection * (left.change - right.change);
+  });
   watchList.replaceChildren();
-  watchStatus.textContent = symbols.length ? "Saved on this device" : "Add symbols to your watchlist.";
+  watchStatus.textContent = symbols.length ? "" : "Add symbols to your watchlist.";
   for (const symbol of symbols) {
     const row = document.createElement("li");
     const badge = document.createElement("span");
     badge.className = "watch-ticker-icon";
     const logoFiles = { NVDA:"nvda", GOOGL:"goog", GOOG:"goog", AMZN:"amzn", AVGO:"avgo", NBIS:"nbis", AMZU:"amzu", SOXX:"soxx", SOXL:"soxl" };
     badge.textContent = symbol.slice(0, 2);
-    if (logoFiles[symbol]) {
+    const snapshot = snapshots.get(symbol);
+    if (snapshot) {
+      row.style.setProperty("--sprite-position", `${snapshot.index * 12.5}%`);
+      badge.classList.add("reference-logo");
+      badge.textContent = "";
+    } else if (logoFiles[symbol]) {
       const image = document.createElement("img");
       image.src = `./assets/companies/${logoFiles[symbol]}.png?v=29`;
       image.alt = "";
@@ -337,9 +396,28 @@ function renderWatchlist() {
     identity.className = "watch-identity";
     const name = document.createElement("strong");
     const subtitle = document.createElement("small");
-    const referenceNames = { ANT: "Anthropic PBC", SKHY: "SK Hynix Inc", SPCX: "Space Exploration", MRVL: "Marvell Technology", BZMAIN: "Brent crude futures", CLMAIN: "Crude oil futures", AAL: "American Airlines", UAL: "United Airlines", DAL: "Delta Air Lines" };
-    subtitle.textContent = stockDirectory?.find((item) => item.symbol === symbol)?.name || referenceNames[symbol] || "Price unavailable";
-    identity.append(name, subtitle);
+    subtitle.textContent = snapshot?.name || stockDirectory?.find((item) => item.symbol === symbol)?.name || symbol;
+    const caption = document.createElement("div");
+    caption.className = "watch-caption";
+    caption.append(subtitle);
+    if (snapshot) {
+      const tag = document.createElement("span");
+      const future = symbol === "BZMAIN" || symbol === "CLMAIN";
+      tag.textContent = future ? "◷" : "24H";
+      tag.className = future ? "session-tag futures" : "session-tag";
+      caption.append(tag);
+      if (symbol === "MRVL") {
+        const globe = document.createElement("span");
+        globe.className = "session-tag global-session";
+        globe.textContent = "🌐";
+        globe.setAttribute("aria-hidden", "true");
+        caption.append(globe);
+      }
+    }
+    identity.append(name, caption);
+    const chart = document.createElement("span");
+    chart.className = snapshot ? "mini-chart reference-chart" : "mini-chart";
+    chart.setAttribute("aria-hidden", "true");
     const quote = document.createElement("div");
     quote.className = "watch-quote";
     const priceLabel = document.createElement("strong");
@@ -347,10 +425,17 @@ function renderWatchlist() {
     const holding = watchHoldings.find((item) => item.symbol === symbol);
     const price = holding?.current_price;
     const hasPrice = price != null && price !== "" && Number.isFinite(Number(price));
-    priceLabel.textContent = hasPrice
-      ? new Intl.NumberFormat("en-US", { style:"currency", currency:"USD" }).format(Number(price))
-      : "—";
-    priceNote.textContent = hasPrice ? "Last account sync" : "Price unavailable";
+    if (snapshot) {
+      quote.dataset.direction = snapshot.change < 0 ? "down" : "up";
+      priceLabel.textContent = `${snapshot.change > 0 ? "+" : ""}${snapshot.change.toFixed(2)}%`;
+      priceNote.textContent = snapshot.after;
+      priceNote.dataset.direction = snapshot.after.includes("-") ? "down" : "up";
+    } else {
+      priceLabel.textContent = hasPrice
+        ? new Intl.NumberFormat("en-US", { style:"currency", currency:"USD" }).format(Number(price))
+        : "—";
+      priceNote.textContent = hasPrice ? "Last account sync" : "No quote";
+    }
     quote.append(priceLabel, priceNote);
     const remove = document.createElement("button");
     const referenceSymbols = { BZMAIN: "BZmain", CLMAIN: "CLmain" };
@@ -364,7 +449,7 @@ function renderWatchlist() {
         renderWatchlist();
       } catch { watchStatus.textContent = "관심종목을 저장하지 못했습니다."; }
     });
-    row.append(badge, identity, editingWatchlist ? remove : quote);
+    row.append(badge, identity, chart, editingWatchlist ? remove : quote);
     watchList.append(row);
   }
 }
@@ -434,7 +519,6 @@ async function loadValuation(accessToken) {
   const note = document.querySelector("#valuation-note");
   const performance = document.querySelector("#kiwoom-return");
   const accountValue = document.querySelector("#kiwoom-value");
-  const homeValue = document.querySelector("#home-value");
 
   const allocationTotal = document.querySelector("#allocation-total");
   const allocation = document.querySelector("#allocation-breakdown");
@@ -518,7 +602,7 @@ async function openWorkspace(session, remember) {
   setDetail(false);
   workspace.hidden = false;
   navigation.hidden = false;
-  selectView("home");
+  selectView(document.body.dataset.view || "home");
   loadValuation(token);
   message.textContent = remember && !stored ? "이 브라우저에서는 로그인 상태를 저장할 수 없습니다." : "";
 }
@@ -526,13 +610,11 @@ async function openWorkspace(session, remember) {
 async function restoreSession() {
   if (!storedSession()) return;
   login.hidden = true;
-  message.textContent = "로그인 확인 중…";
   try {
     const resume = async () => {
       const refreshToken = storedSession();
       if (!refreshToken) {
-        login.hidden = false;
-        message.textContent = "";
+        selectView(document.body.dataset.view);
         return;
       }
       const session = await request("/auth/v1/token?grant_type=refresh_token", {
@@ -546,9 +628,10 @@ async function restoreSession() {
     if (error.httpStatus === 400 || error.httpStatus === 401 || error.code === "owner_required") {
       saveSession(null);
     }
-    login.hidden = false;
-    message.textContent = "저장된 로그인으로 화면을 열지 못했습니다. 다시 로그인해 주세요.";
+    selectView(document.body.dataset.view);
+    if (!login.hidden) message.textContent = "저장된 로그인으로 화면을 열지 못했습니다. 다시 로그인해 주세요.";
   }
 }
 
+selectView("home");
 restoreSession();
