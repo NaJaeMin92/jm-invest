@@ -95,10 +95,21 @@ button.broker-row:hover { background:#2a2c31; }
 .ledger-icon { background:#253655; gap:3px; }
 .ledger-icon i { background:#80abff; width:19px; height:3px; border-radius:2px; }
 .ledger-icon i:nth-child(2) { width:14px; }
-.account-nav { display:flex; align-items:center; justify-content:center; border-top:1px solid var(--line); }
-.account-nav>* { text-align:center; padding:15px 0; width:50%; font-size:.9rem; }
-.account-nav a { color:var(--muted); }
 
-.head #account-link { margin-left:auto; }
-.account-nav button { border:0; border-radius:0; background:transparent; color:var(--muted); }
-#cancel-login { justify-self:start; }
+.trade-page { --bg:#111315; --panel:#1c1e21; --line:#32363a; }
+.trade-page header { background:#151d29; border-bottom:1px solid #242d3c; }
+.trade-page .head { min-height:62px; }
+.trade-page #page-heading { margin:22px 3px 13px; font-size:1.35rem; }
+.trade-page .panel { border-radius:20px; }
+.total-row { grid-template-columns:44px minmax(0,1fr); padding:22px 18px; gap:13px; }
+#private .total-row h2 { margin-bottom:6px; }
+.portfolio-value { font-size:clamp(1.5rem,6.8vw,2.25rem); font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.broker-row { grid-template-columns:44px minmax(0,1fr) auto; padding:15px 18px; gap:13px; min-height:76px; }
+.broker-name strong { font-size:clamp(1rem,4.5vw,1.35rem); font-variant-numeric:tabular-nums; }
+.broker-caption { font-size:.9rem; color:var(--muted); }
+.broker-caption small { white-space:nowrap; }
+.broker-caption [data-direction="down"] { color:#8babff; }
+.broker-caption [data-direction="up"] { color:#ff9eaa; }
+.row-action { white-space:nowrap; padding:8px 9px; }
+.balance-footer { border-top:1px solid var(--line); display:flex; align-items:center; gap:10px; justify-content:space-between; padding:14px 18px; color:var(--muted); font-size:.8rem; }
+.balance-footer strong { white-space:nowrap; color:#d2d9e6; }

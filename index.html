@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#f2f5fa">
 <title>JM Invest</title>
-<link rel="stylesheet" href="./style.css?v=6">
-<script type="module" src="./journal.js?v=6"></script>
+<link rel="stylesheet" href="./style.css?v=7">
+<script type="module" src="./journal.js?v=7"></script>
 </head>
 <body class="trade-page">
 <header><div class="head"><a href="./"><span class="logo" aria-hidden="true">JM</span> JM Invest</a><button id="logout" type="button" hidden>로그아웃</button></div></header>
@@ -23,18 +23,22 @@
 <section id="account-home" aria-label="투자 계좌">
 <div class="total-row">
 <span class="ledger-icon" aria-hidden="true"><i></i><i></i><i></i></span>
-<div><h2>키움 미국주식 평가액</h2><strong id="portfolio-value" class="portfolio-value">조회 중…</strong><p id="valuation-note"></p></div>
+<div class="balance-summary">
+<h2>연동 계좌 평가액</h2>
+<strong id="portfolio-value" class="portfolio-value">조회 중…</strong>
+</div>
 </div>
 <button class="broker-row" id="open-kiwoom" type="button" aria-controls="trade-detail">
 <span class="broker-icon kiwoom" aria-hidden="true">K</span>
-<span class="broker-name"><strong>키움증권</strong><small id="kiwoom-return"></small><small id="kiwoom-caption">미국주식</small></span>
-<span class="row-action">체결 보기 <span aria-hidden="true">›</span></span>
+<span class="broker-name"><strong id="kiwoom-value" hidden></strong><span class="broker-caption">키움증권 <small id="kiwoom-return"></small></span></span>
+<span class="row-action">체결 보기</span>
 </button>
 <div class="broker-row">
 <span class="broker-icon samsung" aria-hidden="true">S</span>
 <div class="broker-name"><strong>삼성증권</strong><small>종합매매</small></div>
 <span class="row-status">미연동</span>
 </div>
+<div class="balance-footer"><strong>투자 계좌</strong><span id="valuation-note"></span></div>
 
 </section>
 <section id="trade-detail" hidden>

@@ -103,8 +103,6 @@ function drawChart() {
 
 function showRecords(records) {
   trades = records;
-  document.querySelector("#kiwoom-caption").textContent =
-    `미국주식 · 체결 ${records.length.toLocaleString("ko-KR")}건`;
   symbols.replaceChildren(...[...new Set(records.map((record) => record.symbol))].sort().map((symbol) => new Option(symbol, symbol)));
   symbols.disabled = !records.length;
   drawChart();
@@ -171,6 +169,7 @@ document.querySelector("#logout").addEventListener("click", () => {
   token = null;
   saveSession(null);
   workspace.hidden = true;
+  document.querySelector("#kiwoom-value").textContent = "";
   document.querySelector("#portfolio-value").textContent = "";
   document.querySelector("#valuation-note").textContent = "";
   document.querySelector("#kiwoom-return").textContent = "";
@@ -190,6 +189,9 @@ async function loadValuation(accessToken) {
   const value = document.querySelector("#portfolio-value");
   const note = document.querySelector("#valuation-note");
   const performance = document.querySelector("#kiwoom-return");
+  const accountValue = document.querySelector("#kiwoom-value");
+  accountValue.hidden = true;
+  accountValue.textContent = "";
   value.textContent = "조회 중…";
   note.textContent = "";
   performance.textContent = "";
@@ -201,6 +203,9 @@ async function loadValuation(accessToken) {
       return;
     }
     value.textContent = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" }).format(balance.value_krw);
+    accountValue.textContent = value.textContent;
+    accountValue.hidden = false;
+    performance.dataset.direction = Number(balance.return_pct) < 0 ? "down" : "up";
     note.textContent = new Date(balance.observed_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) + " KST 기준";
     performance.textContent = balance.return_pct == null ? "" : "평가수익률 " + Number(balance.return_pct).toFixed(2) + "%";
   } catch (error) {
