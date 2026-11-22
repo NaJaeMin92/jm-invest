@@ -206,3 +206,5 @@ button.broker-row:hover { background:#2a2c31; }
 .allocation-row strong { font-size:clamp(1rem,4.5vw,1.2rem); }
 
 .broker-logo { display:block; width:44px; height:44px; border-radius:12px; object-fit:contain; background:#e9edf4; }
+
+.allocation-bar { background:linear-gradient(90deg,#83b3ff var(--stock-share,100%),#8791a0 var(--stock-share,100%)); }

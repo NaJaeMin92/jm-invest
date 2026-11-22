@@ -140,27 +140,47 @@ async function loadValuation(accessToken) {
   accountValue.hidden = true;
   accountValue.textContent = "";
   value.textContent = "조회 중…";
+  document.querySelector("#cash-value").textContent = "동기화 대기";
+  document.querySelector("#cash-breakdown").textContent = "";
+  document.querySelector("#cash-share").textContent = "";
   note.textContent = "";
   performance.textContent = "";
   try {
-    const [balance] = await request("/rest/v1/kiwoom_valuation?select=value_krw,return_pct,observed_at&limit=1", { accessToken });
+    const [balance] = await request("/rest/v1/kiwoom_valuation?select=*&limit=1", { accessToken });
     if (token !== accessToken) return;
     if (!balance) {
       homeValue.textContent = value.textContent = allocationTotal.textContent = "잔고 동기화 대기";
       return;
     }
-    value.textContent = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" }).format(balance.value_krw);
-    accountValue.textContent = value.textContent;
-    accountValue.hidden = false;
+    const won = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" });
+    const stocks = Number(balance.value_krw);
+    const hasCash = balance.cash_domestic_krw != null && balance.cash_foreign_krw != null;
+    const cash = hasCash ? Number(balance.cash_domestic_krw) + Number(balance.cash_foreign_krw) : 0;
+    const total = stocks + cash;
+    const canCompare = stocks >= 0 && cash >= 0 && total > 0;
+    const stockWeight = canCompare ? stocks / total : 0;
+    value.textContent = accountValue.textContent = won.format(total);
     allocationTotal.textContent = homeValue.textContent = value.textContent;
+    accountValue.hidden = false;
+    const bar = document.querySelector("#allocation-bar");
+    bar.hidden = !canCompare;
+    bar.style.setProperty("--stock-share", `${stockWeight * 100}%`);
+    const percent = new Intl.NumberFormat("ko-KR", { style: "percent", maximumFractionDigits: 1 });
+    document.querySelector("#stock-share").textContent = hasCash && canCompare ? percent.format(stockWeight) : "미국주식";
+    if (hasCash) {
+      document.querySelector("#cash-value").textContent = won.format(cash);
+      document.querySelector("#cash-breakdown").textContent =
+        `원화 ${won.format(balance.cash_domestic_krw)} · 외화 환산 ${won.format(balance.cash_foreign_krw)}`;
+      if (canCompare) document.querySelector("#cash-share").textContent = percent.format(1 - stockWeight);
+    }
     performance.dataset.direction = Number(balance.return_pct) < 0 ? "down" : "up";
     note.textContent = new Date(balance.observed_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) + " KST 기준";
     performance.textContent = balance.return_pct == null ? "" : "평가수익률 " + Number(balance.return_pct).toFixed(2) + "%";
     const allocationReturn = document.querySelector("#allocation-return");
-    document.querySelector("#allocation-value").textContent = value.textContent;
+    document.querySelector("#allocation-value").textContent = won.format(stocks);
     allocationReturn.textContent = performance.textContent;
     allocationReturn.dataset.direction = performance.dataset.direction;
-    allocation.hidden = Number(balance.value_krw) <= 0;
+    allocation.hidden = false;
   } catch (error) {
     if (token === accessToken) homeValue.textContent = value.textContent = allocationTotal.textContent = error.code === "PGRST205" ? "잔고 DB 설정 대기" : "평가액 조회 실패";
   }
