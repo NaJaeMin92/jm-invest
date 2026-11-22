@@ -242,3 +242,10 @@ button.broker-row:hover { background:#2a2c31; }
 #tab-profit [data-direction="up"] { color:#ff9eaa; }
 .holding-logo { width:42px; height:42px; border-radius:12px; }
 .holding-logo img { padding:6px; }
+
+#holdings-list li { display:block; }
+#holdings-list li .holding-top { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+#holdings-list li .holding-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 16px; margin-top:14px; padding:12px; border-radius:12px; background:#222a37; }
+#holdings-list li .holding-metrics div { display:flex; justify-content:space-between; align-items:baseline; gap:8px; text-align:left; font-size:.8rem; }
+#holdings-list li .holding-metrics span { text-align:right; overflow-wrap:anywhere; }
+@media (max-width:360px) { #holdings-list li .holding-metrics { grid-template-columns:1fr; } }

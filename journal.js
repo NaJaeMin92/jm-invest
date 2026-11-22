@@ -190,7 +190,33 @@ function showHoldings(balance) {
     labels.append(name, quantity);
     left.append(logo, labels);
     right.append(value, profit);
-    item.append(left, right);
+    const content = document.createElement("div");
+    content.className = "holding-top";
+    content.append(left, right);
+    const metrics = document.createElement("div");
+    metrics.className = "holding-metrics";
+    const money = (amount, currency) => {
+      if (amount == null || amount === "" || !Number.isFinite(Number(amount))) return "동기화 필요";
+      return new Intl.NumberFormat("ko-KR", {
+        style: "currency", currency, maximumFractionDigits: currency === "KRW" ? 0 : 4,
+      }).format(Number(amount));
+    };
+    const currency = /^[A-Z]{3}$/.test(holding.currency || "") ? holding.currency : null;
+    for (const [label, metric] of [
+      ["매입금액", money(holding.cost_krw, "KRW")],
+      ["평가금액", money(holding.value_krw, "KRW")],
+      ["매입가", currency ? money(holding.cost_price, currency) : "동기화 필요"],
+      ["현재가", currency ? money(holding.current_price, currency) : "동기화 필요"],
+    ]) {
+      const cell = document.createElement("div");
+      const title = document.createElement("small");
+      const text = document.createElement("span");
+      title.textContent = label;
+      text.textContent = metric;
+      cell.append(title, text);
+      metrics.append(cell);
+    }
+    item.append(content, metrics);
     holdingsList.append(item);
   }
 }
