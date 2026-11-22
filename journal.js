@@ -1,4 +1,4 @@
-"use strict";
+import { publicQuote, setupInstrument, sparkline } from "./instrument.js?v=45";
 
 const service = "https://mfycpprqyaidoixytdim.supabase.co";
 const publicKey = "sb_publishable_KIxbzozNkk50oEZ9GehtZA_E484E5Lr";
@@ -54,7 +54,10 @@ function selectView(view) {
   for (const button of navButtons) {
     const active = button.dataset.view === view;
     document.querySelector(`#tab-${button.dataset.view}`).hidden = !active || needsLogin;
-    if (active) button.setAttribute("aria-current", "page");
+    if (active) {
+      document.querySelector("#section-icon").replaceChildren(button.querySelector("svg").cloneNode(true));
+      button.setAttribute("aria-current", "page");
+    }
     else button.removeAttribute("aria-current");
   }
   document.querySelector("#page-heading").textContent = {
@@ -66,11 +69,16 @@ for (const button of navButtons) {
   button.addEventListener("click", () => selectView(button.dataset.view));
 }
 
+for (const button of document.querySelectorAll("[data-shortcut]")) {
+  button.addEventListener("click", () => selectView(button.dataset.shortcut));
+}
+
 function setDetail(open) {
   home.hidden = open;
   detail.hidden = !open;
   document.querySelector("#back-accounts").hidden = !open;
-  document.querySelector("#page-heading").textContent = open ? "키움증권" : "내 계좌";
+  document.querySelector("#section-icon").hidden = open;
+  document.querySelector("#page-heading").textContent = open ? "Kiwoom Securities" : "Accounts";
 }
 
 document.querySelector("#open-kiwoom").addEventListener("click", () => {
@@ -87,7 +95,7 @@ login.addEventListener("submit", async (event) => {
   event.preventDefault();
   const submit = login.querySelector("button");
   submit.disabled = true;
-  message.textContent = "로그인 확인 중…";
+  message.textContent = "Signing in…";
   try {
     const body = { email: login.elements.email.value.trim(), password: login.elements.password.value };
     const session = await request("/auth/v1/token?grant_type=password", { method: "POST", body });
@@ -96,15 +104,15 @@ login.addEventListener("submit", async (event) => {
 
   } catch (error) {
     if (error.code === "owner_required") {
-      message.textContent = "이 사이트에 등록된 본인 계정으로 로그인하세요.";
+      message.textContent = "Sign in with the registered owner account.";
     } else if (error.code === "invalid_credentials") {
-      message.textContent = "이메일 또는 비밀번호가 맞지 않습니다. Supabase Authentication에서 만든 이메일 계정을 사용하세요.";
+      message.textContent = "Check your email and password and try again.";
     } else if (error.code === "email_not_confirmed") {
-      message.textContent = "이메일 인증이 완료되지 않았습니다.";
+      message.textContent = "Verify your email before signing in.";
     } else if (error.httpStatus === 429) {
-      message.textContent = "로그인 시도가 너무 많습니다. 잠시 후 다시 시도하세요.";
+      message.textContent = "Too many attempts. Try again shortly.";
     } else {
-      message.textContent = `인증 서버에 연결하지 못했습니다${error.httpStatus ? ` (HTTP ${error.httpStatus})` : ""}.`;
+      message.textContent = `Unable to reach the sign-in service${error.httpStatus ? ` (HTTP ${error.httpStatus})` : ""}.`;
     }
   } finally {
     login.elements.password.value = "";
@@ -122,7 +130,7 @@ document.querySelector("#logout").addEventListener("click", () => {
   document.querySelector("#profit-list").replaceChildren();
   document.querySelector("#profit-period").textContent = "";
   document.querySelector("#profit-updated").textContent = "";
-  document.querySelector("#profit-total").textContent = "동기화 대기";
+  document.querySelector("#profit-total").textContent = "Awaiting sync";
   workspace.hidden = true;
   document.querySelector("#kiwoom-value").textContent = "";
   document.querySelector("#allocation-total").textContent = "";
@@ -150,10 +158,10 @@ holdingsDialog.addEventListener("click", (event) => {
 
 function formatStockProfit(balance, won) {
   const holdings = balance.holdings;
-  if (!Array.isArray(holdings) || balance.return_pct == null) return "평가손익 동기화 필요";
+  if (!Array.isArray(holdings) || balance.return_pct == null) return "Awaiting P&L sync";
   const profits = holdings.map((holding) => holding.profit_krw);
   if (profits.some((amount) => amount == null || amount === "" || !Number.isFinite(Number(amount)))) {
-    return "평가손익 동기화 필요";
+    return "Awaiting P&L sync";
   }
   const total = profits.reduce((sum, amount) => sum + Number(amount), 0);
   return `${total > 0 ? "+" : ""}${won.format(total)} (${Math.abs(Number(balance.return_pct)).toFixed(2)}%)`;
@@ -166,13 +174,13 @@ function showHoldings(balance) {
   const holdings = balance.holdings;
   if (!Array.isArray(holdings)) {
     const item = document.createElement("li");
-    item.textContent = "종목별 잔고 동기화가 필요합니다.";
+    item.textContent = "Holdings will appear after the next sync.";
     holdingsList.append(item);
     return;
   }
   if (!holdings.length) {
     const item = document.createElement("li");
-    item.textContent = "보유 중인 미국주식이 없습니다.";
+    item.textContent = "No US equity positions.";
     holdingsList.append(item);
     return;
   }
@@ -205,7 +213,7 @@ function showHoldings(balance) {
     const value = document.createElement("strong");
     const profit = document.createElement("small");
     name.textContent = holding.name === ticker ? ticker : `${holding.name} (${ticker})`;
-    quantity.textContent = `${Number(holding.quantity).toLocaleString("ko-KR")}주`;
+    quantity.textContent = `${Number(holding.quantity).toLocaleString("en-US")} shares`;
     value.textContent = won.format(Number(holding.value_krw));
     const amount = Number(holding.profit_krw);
     profit.textContent = `${amount > 0 ? "+" : ""}${won.format(amount)} (${Math.abs(Number(holding.return_pct)).toFixed(2)}%)`;
@@ -219,7 +227,7 @@ function showHoldings(balance) {
     const metrics = document.createElement("div");
     metrics.className = "holding-metrics";
     const money = (amount, currency) => {
-      if (amount == null || amount === "" || !Number.isFinite(Number(amount))) return "동기화 필요";
+      if (amount == null || amount === "" || !Number.isFinite(Number(amount))) return "Awaiting sync";
       return new Intl.NumberFormat("ko-KR", {
         style: "currency", currency, maximumFractionDigits: currency === "KRW" ? 0 : 4,
       }).format(Number(amount));
@@ -230,16 +238,16 @@ function showHoldings(balance) {
       return fraction.replace(/0+$/, "").length;
     }));
     const formatPrice = (price) => {
-      if (!currency || price == null || price === "" || !Number.isFinite(Number(price))) return "동기화 필요";
+      if (!currency || price == null || price === "" || !Number.isFinite(Number(price))) return "Awaiting sync";
       return new Intl.NumberFormat("ko-KR", {
         style: "currency", currency, currencyDisplay: "narrowSymbol", minimumFractionDigits: priceDigits, maximumFractionDigits: priceDigits,
       }).format(Number(price));
     };
     for (const [label, metric] of [
-      ["매입가", formatPrice(holding.cost_price)],
-      ["매입금액", money(holding.cost_krw, "KRW")],
-      ["현재가", formatPrice(holding.current_price)],
-      ["평가금액", money(holding.value_krw, "KRW")],
+      ["Cost per share", formatPrice(holding.cost_price)],
+      ["Cost basis", money(holding.cost_krw, "KRW")],
+      ["Last price", formatPrice(holding.current_price)],
+      ["Market value", money(holding.value_krw, "KRW")],
     ]) {
       const cell = document.createElement("div");
       const title = document.createElement("small");
@@ -261,7 +269,7 @@ function showProfit(data) {
   const updated = document.querySelector("#profit-updated");
   list.replaceChildren();
   if (!data || !Array.isArray(data.entries)) {
-    total.textContent = "동기화 대기";
+    total.textContent = "Awaiting sync";
     period.textContent = "";
     updated.textContent = "";
     return;
@@ -269,18 +277,22 @@ function showProfit(data) {
   const won = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" });
   total.textContent = won.format(Number(data.total_krw));
   total.dataset.direction = Number(data.total_krw) < 0 ? "down" : "up";
-  period.textContent = `${data.start} ~ ${data.end} · 키움 원화 기준`;
-  updated.textContent = new Date(data.observed_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) + " KST 조회";
+  period.textContent = `${data.start} ~ ${data.end} · Kiwoom · KRW`;
+  updated.textContent = new Date(data.observed_at).toLocaleString("en-US", { timeZone: "Asia/Seoul" }) + " KST";
   if (!data.entries.length) {
     const row = document.createElement("li");
-    row.textContent = "기간 내 실현손익이 없습니다.";
+    row.textContent = "No realized trades in this period.";
     list.append(row);
   }
   for (const entry of data.entries) {
     const row = document.createElement("li");
     const label = document.createElement("span");
     const amount = document.createElement("strong");
-    label.textContent = `${entry.date} · ${entry.name} (${entry.symbol})`;
+    const ticker = document.createElement("b");
+    ticker.textContent = entry.symbol;
+    const date = document.createElement("small");
+    date.textContent = [entry.date, entry.name !== entry.symbol && entry.name].filter(Boolean).join(" · ");
+    label.append(ticker, date);
     amount.textContent = won.format(Number(entry.profit_krw));
     amount.dataset.direction = Number(entry.profit_krw) < 0 ? "down" : "up";
     row.append(label, amount);
@@ -359,12 +371,36 @@ function readWatchlist() {
     return Array.isArray(value) ? value.filter((symbol) => typeof symbol === "string" && /^[A-Z][A-Z0-9.\-]{0,11}$/.test(symbol)) : [];
   } catch { return []; }
 }
+let nvidiaQuote;
+publicQuote("NVDA").then(quote => {
+  if (!quote) return;
+  nvidiaQuote = quote;
+  renderWatchlist();
+});
+const percentageFor = symbol => symbol === "NVDA" ? nvidiaQuote?.percent : snapshots.get(symbol)?.change;
+const openInstrument = setupInstrument({
+  navigate: selectView,
+  search() {
+    selectView("home");
+    if (!editingWatchlist) toggleEdit();
+    document.querySelector("#watch-symbol").focus();
+  },
+  nameFor: symbol => snapshots.get(symbol)?.name || stockDirectory?.find(item => item.symbol === symbol)?.name || symbol,
+  readList: readWatchlist,
+  saveList(symbols) {
+    try {
+      localStorage.setItem(watchKey, JSON.stringify(symbols));
+      renderWatchlist();
+      return true;
+    } catch { return false; }
+  },
+});
 function renderWatchlist() {
   const symbols = readWatchlist();
   if (sortDirection) symbols.sort((a, b) => {
-    const left = snapshots.get(a), right = snapshots.get(b);
-    if (!left || !right) return Number(Boolean(right)) - Number(Boolean(left));
-    return sortDirection * (left.change - right.change);
+    const left = percentageFor(a), right = percentageFor(b);
+    if (left == null || right == null) return Number(right != null) - Number(left != null);
+    return sortDirection * (left - right);
   });
   watchList.replaceChildren();
   watchStatus.textContent = symbols.length ? "" : "Add symbols to your watchlist.";
@@ -391,14 +427,15 @@ function renderWatchlist() {
     identity.className = "watch-identity";
     const name = document.createElement("strong");
     const subtitle = document.createElement("small");
-    subtitle.textContent = snapshot?.name || stockDirectory?.find((item) => item.symbol === symbol)?.name || symbol;
+    const market = symbol === "NVDA" ? nvidiaQuote : null;
+    subtitle.textContent = market?.name || snapshot?.name || stockDirectory?.find((item) => item.symbol === symbol)?.name || symbol;
     const caption = document.createElement("div");
     caption.className = "watch-caption";
     caption.append(subtitle);
-    if (snapshot) {
+    if (snapshot || market) {
       const tag = document.createElement("span");
       const future = symbol === "BZMAIN" || symbol === "CLMAIN";
-      tag.textContent = future ? "◷" : "24H";
+      tag.textContent = market ? "1D" : future ? "◷" : "24H";
       tag.className = future ? "session-tag futures" : "session-tag";
       caption.append(tag);
       if (symbol === "MRVL") {
@@ -420,11 +457,18 @@ function renderWatchlist() {
     const holding = watchHoldings.find((item) => item.symbol === symbol);
     const price = holding?.current_price;
     const hasPrice = price != null && price !== "" && Number.isFinite(Number(price));
-    if (snapshot) {
-      quote.dataset.direction = snapshot.change < 0 ? "down" : "up";
-      priceLabel.textContent = `${snapshot.change > 0 ? "+" : ""}${snapshot.change.toFixed(2)}%`;
-      priceNote.textContent = snapshot.after;
-      priceNote.dataset.direction = snapshot.after.includes("-") ? "down" : "up";
+    if (snapshot || market) {
+      const change = percentageFor(symbol);
+      quote.dataset.direction = change < 0 ? "down" : "up";
+      priceLabel.textContent = `${change > 0 ? "+" : ""}${change.toFixed(2)}%`;
+      if (snapshot) priceNote.textContent = snapshot.after;
+      else {
+        priceNote.textContent = market.afterPercent == null ? "Close $" + market.price.toFixed(2)
+          : `After: ${market.afterPercent >= 0 ? "+" : ""}${market.afterPercent.toFixed(2)}%`;
+        chart.style.color = change < 0 ? "var(--down)" : "var(--up)";
+        chart.append(sparkline(market.intraday));
+      }
+      priceNote.dataset.direction = priceNote.textContent.includes("-") ? "down" : "up";
     } else {
       priceLabel.textContent = hasPrice
         ? new Intl.NumberFormat("en-US", { style:"currency", currency:"USD" }).format(Number(price))
@@ -435,6 +479,19 @@ function renderWatchlist() {
     const remove = document.createElement("button");
     const referenceSymbols = { BZMAIN: "BZmain", CLMAIN: "CLmain" };
     name.textContent = referenceSymbols[symbol] || symbol;
+    if (!editingWatchlist) {
+      const link = document.createElement("a");
+      link.href = "#stock=" + encodeURIComponent(symbol);
+      link.className = "symbol-link";
+      link.textContent = name.textContent;
+      link.setAttribute("aria-label", "Open " + symbol + " chart");
+      link.addEventListener("click", event => {
+        if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        openInstrument(symbol);
+      });
+      name.replaceChildren(link);
+    }
     remove.textContent = "Remove";
     remove.type = "button";
     remove.setAttribute("aria-label", `Remove ${symbol}`);
@@ -442,7 +499,7 @@ function renderWatchlist() {
       try {
         localStorage.setItem(watchKey, JSON.stringify(readWatchlist().filter((item) => item !== symbol)));
         renderWatchlist();
-      } catch { watchStatus.textContent = "관심종목을 저장하지 못했습니다."; }
+      } catch { watchStatus.textContent = "Unable to save your watchlist."; }
     });
     row.append(badge, identity, chart, editingWatchlist ? remove : quote);
     watchList.append(row);
@@ -517,12 +574,12 @@ async function loadValuation(accessToken) {
 
   const allocationTotal = document.querySelector("#allocation-total");
   const allocation = document.querySelector("#allocation-breakdown");
-  allocationTotal.textContent = "조회 중…";
+  allocationTotal.textContent = "Loading…";
   allocation.hidden = true;
   accountValue.hidden = true;
   accountValue.textContent = "";
-  value.textContent = "조회 중…";
-  document.querySelector("#cash-value").textContent = "동기화 대기";
+  value.textContent = "Loading…";
+  document.querySelector("#cash-value").textContent = "Awaiting sync";
   document.querySelector("#cash-breakdown").textContent = "";
   document.querySelector("#cash-share").textContent = "";
   note.textContent = "";
@@ -531,7 +588,7 @@ async function loadValuation(accessToken) {
     const [balance] = await request("/rest/v1/kiwoom_valuation?select=*&limit=1", { accessToken });
     if (token !== accessToken) return;
     if (!balance) {
-      value.textContent = allocationTotal.textContent = "잔고 동기화 대기";
+      value.textContent = allocationTotal.textContent = "Awaiting balance sync";
       return;
     }
     const won = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" });
@@ -542,8 +599,8 @@ async function loadValuation(accessToken) {
     const candidate = estimate == null || !hasCash ? null : Number(estimate) - stocks - cash;
     const rp = candidate != null && Number.isFinite(candidate) && candidate >= 0 ? candidate : null;
     const total = rp == null ? stocks + cash : Number(estimate);
-    document.querySelector("#rp-value").textContent = rp == null ? "확인 필요" : won.format(rp);
-    document.querySelector("#rp-note").textContent = rp == null ? "총자산·예수금 확인 필요" : "차액 추정 · 영웅문 대조 필요";
+    document.querySelector("#rp-value").textContent = rp == null ? "Pending" : won.format(rp);
+    document.querySelector("#rp-note").textContent = rp == null ? "Awaiting total assets and cash" : "Estimated from remaining assets";
     document.querySelector("#rp-share").textContent = rp != null && total > 0 ? new Intl.NumberFormat("ko-KR", { style: "percent", maximumFractionDigits: 1 }).format(rp / total) : "";
     const canCompare = stocks >= 0 && cash >= 0 && total > 0;
     const stockWeight = canCompare ? stocks / total : 0;
@@ -554,22 +611,22 @@ async function loadValuation(accessToken) {
     bar.hidden = !canCompare;
     bar.style.setProperty("--stock-share", `${stockWeight * 100}%`);
     bar.style.setProperty("--cash-end", `${(stockWeight + cash / total) * 100}%`);
-    bar.setAttribute("aria-label", rp == null ? "연동된 주식과 예수금 비중" : "추정 총자산 중 주식, 예수금, 차액 비중");
+    bar.setAttribute("aria-label", rp == null ? "Equity and cash allocation" : "Equity, cash and estimated residual allocation");
     const percent = new Intl.NumberFormat("ko-KR", { style: "percent", maximumFractionDigits: 1 });
-    document.querySelector("#stock-share").textContent = hasCash && canCompare ? percent.format(stockWeight) : "미국주식";
+    document.querySelector("#stock-share").textContent = hasCash && canCompare ? percent.format(stockWeight) : "US equities";
     if (hasCash) {
       document.querySelector("#cash-value").textContent = won.format(cash);
       const usd = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "USD", currencyDisplay: "code" });
       const foreignLabel = balance.cash_usd == null
-        ? `외화 환산 ${won.format(balance.cash_foreign_krw)}`
+        ? `FX equivalent ${won.format(balance.cash_foreign_krw)}`
         : usd.format(balance.cash_usd);
       document.querySelector("#cash-breakdown").textContent =
         `${won.format(balance.cash_domestic_krw)} KRW\n${foreignLabel}`;
       if (canCompare) document.querySelector("#cash-share").textContent = percent.format(cash / total);
     }
     performance.dataset.direction = Number(balance.return_pct) < 0 ? "down" : "up";
-    note.textContent = new Date(balance.observed_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) + " KST 기준";
-    performance.textContent = balance.return_pct == null ? "" : "평가수익률 " + Number(balance.return_pct).toFixed(2) + "%";
+    note.textContent = new Date(balance.observed_at).toLocaleString("en-US", { timeZone: "Asia/Seoul" }) + " KST";
+    performance.textContent = balance.return_pct == null ? "" : "Return " + Number(balance.return_pct).toFixed(2) + "%";
     const allocationReturn = document.querySelector("#allocation-return");
     document.querySelector("#allocation-value").textContent = won.format(stocks);
     allocationReturn.textContent = formatStockProfit(balance, won);
@@ -581,7 +638,7 @@ async function loadValuation(accessToken) {
 
     showProfit(balance.realized_profit);
   } catch (error) {
-    if (token === accessToken) value.textContent = allocationTotal.textContent = error.code === "PGRST205" ? "잔고 DB 설정 대기" : "평가액 조회 실패";
+    if (token === accessToken) value.textContent = allocationTotal.textContent = error.code === "PGRST205" ? "Balance setup pending" : "Balance unavailable";
   }
 }
 
@@ -599,7 +656,7 @@ async function openWorkspace(session, remember) {
   navigation.hidden = false;
   selectView(document.body.dataset.view || "home");
   loadValuation(token);
-  message.textContent = remember && !stored ? "이 브라우저에서는 로그인 상태를 저장할 수 없습니다." : "";
+  message.textContent = remember && !stored ? "This browser could not save your session." : "";
 }
 
 async function restoreSession() {
@@ -624,7 +681,7 @@ async function restoreSession() {
       saveSession(null);
     }
     selectView(document.body.dataset.view);
-    if (!login.hidden) message.textContent = "저장된 로그인으로 화면을 열지 못했습니다. 다시 로그인해 주세요.";
+    if (!login.hidden) message.textContent = "Your saved session could not be restored. Sign in again.";
   }
 }
 

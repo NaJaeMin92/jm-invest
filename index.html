@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -9,19 +9,20 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=44">
-<script type="module" src="./journal.js?v=44"></script>
+<link rel="stylesheet" href="./style.css?v=45">
+<script type="module" src="./journal.js?v=45"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header><div class="head"><a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
 <main id="account">
-<div class="page-title"><button type="button" id="back-accounts" aria-label="계좌 목록으로 돌아가기" hidden>‹</button><h1 id="page-heading">내 계좌</h1></div>
+<div class="page-title"><button type="button" id="back-accounts" aria-label="Back to accounts" hidden>‹</button><span id="section-icon" aria-hidden="true"></span><h1 id="page-heading">Accounts</h1></div>
 <section class="panel">
 <form id="login" hidden>
-<label>이메일<input name="email" type="email" autocomplete="username" required></label>
-<label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label>
-<label class="remember"><input type="checkbox" name="remember">이 기기에서 로그인 유지</label>
-<button class="primary">로그인</button>
+<h2>Sign in to your account</h2>
+<label>Email<input name="email" type="email" autocomplete="username" required></label>
+<label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+<label class="remember"><input type="checkbox" name="remember">Keep me signed in on this device</label>
+<button class="primary">Sign in</button>
 </form>
 <div id="private">
 <section id="tab-home" class="tab-panel" lang="en" aria-labelledby="watch-title">
@@ -36,7 +37,7 @@
 <button id="watch-source" type="button" aria-expanded="false" aria-controls="watch-source-note">Snapshot</button>
 <button id="watch-sort" type="button" aria-label="Sort by percentage change">%Change <svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="m5 10 7-7 7 7zm0 4h14l-7 7z" fill="currentColor" stroke="none"/></svg></button>
 </div>
-<p id="watch-source-note" hidden>The nine featured quotes and charts are from the supplied watchlist screenshot. The percentages show the change at the time of capture.</p>
+<p id="watch-source-note" hidden>The nine featured quotes and charts are from the supplied watchlist screenshot. NVDA uses a saved November 20, 2026 market close and after-hours quote.</p>
 <div id="watch-tools" hidden>
 <form id="watch-form" class="watch-form"><label for="watch-symbol">Search stocks and ETFs</label>
 <div><input id="watch-symbol" maxlength="80" placeholder="Symbol or company name" autocomplete="off" required><button type="submit">Search</button></div>
@@ -45,64 +46,91 @@
 <ul id="home-holdings" class="watch-list"></ul>
 </section>
 <section id="tab-profit" class="tab-panel" hidden>
-<h2>미국주식 실현손익</h2>
+<h2>US equity realized P&L</h2>
 <p id="profit-period"></p>
-<strong id="profit-total" class="portfolio-value">동기화 대기</strong>
+<strong id="profit-total" class="portfolio-value">Awaiting sync</strong>
 <p id="profit-updated"></p>
 <ul id="profit-list"></ul>
 </section>
 <section id="tab-more" class="tab-panel" hidden>
-<h2>설정</h2>
-<button id="logout" type="button">로그아웃</button>
+<h2>Navigation</h2>
+<button class="menu-link" type="button" data-shortcut="home">My Watchlist <span>›</span></button>
+<button class="menu-link" type="button" data-shortcut="account">Investment accounts <span>›</span></button>
+<button class="menu-link" type="button" data-shortcut="profit">Realized P&amp;L <span>›</span></button>
+<h2>Session</h2>
+<button id="logout" type="button">Sign out</button>
 </section>
 <div id="tab-account" hidden>
-<section id="account-home" aria-label="투자 계좌">
+<section id="account-home" aria-label="Investment accounts">
 <div class="total-row">
 <span class="ledger-icon" aria-hidden="true"><i></i><i></i><i></i></span>
 <div class="balance-summary">
-<h2>연동 계좌 평가액</h2>
-<strong id="portfolio-value" class="portfolio-value">조회 중…</strong>
+<h2>Total investment assets</h2>
+<strong id="portfolio-value" class="portfolio-value">Loading…</strong>
 </div>
 </div>
 <button class="broker-row" id="open-kiwoom" type="button" aria-controls="trade-detail">
 <img class="broker-logo" src="./assets/kiwoom-global.jpg" width="44" height="44" alt="">
-<span class="broker-name"><strong id="kiwoom-value" hidden></strong><span class="broker-caption">키움증권 <small id="kiwoom-return"></small></span></span>
+<span class="broker-name"><strong id="kiwoom-value" hidden></strong><span class="broker-caption">Kiwoom Securities <small id="kiwoom-return"></small></span></span>
 <span class="account-chevron" aria-hidden="true">›</span>
 </button>
 <div class="broker-row">
 <img class="broker-logo" src="./assets/samsung.jpg" width="44" height="44" alt="">
-<div class="broker-name"><strong>삼성증권</strong><small>종합매매</small></div>
-<span class="row-status">미연동</span>
+<div class="broker-name"><strong>Samsung Securities</strong><small>Brokerage account</small></div>
+<span class="row-status">Not linked</span>
 </div>
-<div class="balance-footer"><strong>투자 계좌</strong><span id="valuation-note"></span></div>
+<div class="balance-footer"><strong>Investment accounts</strong><span id="valuation-note"></span></div>
 
 </section>
 <section id="trade-detail" hidden>
 
 <section class="allocation" aria-labelledby="allocation-heading">
-<h2 id="allocation-heading">총 투자 자산</h2>
-<strong id="allocation-total" class="allocation-total" aria-live="polite">조회 중…</strong>
+<h2 id="allocation-heading">Total investment assets</h2>
+<strong id="allocation-total" class="allocation-total" aria-live="polite">Loading…</strong>
 <div id="allocation-breakdown" hidden>
-<div class="allocation-bar" role="img" id="allocation-bar" aria-label="주식과 예수금 비중"></div>
+<div class="allocation-bar" role="img" id="allocation-bar" aria-label="Equity and cash allocation"></div>
 <button type="button" class="allocation-row allocation-button" id="open-holdings" aria-haspopup="dialog">
-<div><strong>해외 주식</strong><small id="stock-share">미국주식</small></div>
+<div><strong>US equities</strong><small id="stock-share">US equities</small></div>
 <div><strong id="allocation-value"></strong><small id="allocation-return"></small></div>
 </button>
 </div>
-<div class="allocation-row" style="--category-color:#ac82ff"><div><strong>외화RP 추정</strong><small id="rp-note">총자산 포함 여부 확인 필요</small></div><div><strong id="rp-value">동기화 대기</strong><small id="rp-share"></small></div></div>
-<div class="allocation-row" style="--category-color:#e3a450"><strong>펀드</strong><small>미연동</small></div>
-<div class="allocation-row" style="--category-color:#54c998"><strong>국내 주식</strong><small>미연동</small></div>
-<div class="allocation-row" style="--category-color:#8791a0"><div><strong>예수금</strong><small id="cash-share"></small></div><div><strong id="cash-value">동기화 대기</strong><small id="cash-breakdown"></small></div></div>
+<div class="allocation-row" style="--category-color:#ac82ff"><div><strong>Estimated FX repo</strong><small id="rp-note">Pending asset reconciliation</small></div><div><strong id="rp-value">Awaiting sync</strong><small id="rp-share"></small></div></div>
+<div class="allocation-row" style="--category-color:#e3a450"><strong>Funds</strong><small>Not linked</small></div>
+<div class="allocation-row" style="--category-color:#54c998"><strong>Korean equities</strong><small>Not linked</small></div>
+<div class="allocation-row" style="--category-color:#8791a0"><div><strong>Cash balance</strong><small id="cash-share"></small></div><div><strong id="cash-value">Awaiting sync</strong><small id="cash-breakdown"></small></div></div>
 </section>
 
 </section>
 </div>
 </div>
 <dialog id="holdings-dialog" aria-labelledby="holdings-title">
-<div class="sheet-header"><div><h2 id="holdings-title">해외 주식</h2><p id="holdings-summary"></p></div></div>
+<div class="sheet-header"><div><h2 id="holdings-title">US equities</h2><p id="holdings-summary"></p></div></div>
 <ul id="holdings-list"></ul>
-<button id="close-holdings" class="sheet-close" type="button">닫기</button>
+<button id="close-holdings" class="sheet-close" type="button">Close</button>
 </dialog>
+<dialog id="stock-detail" aria-labelledby="stock-symbol" lang="en">
+<div class="instrument">
+<div class="instrument-head">
+<button id="stock-back" aria-label="Back to watchlist">‹</button>
+<div><h2 id="stock-symbol"></h2><small id="stock-name"></small></div>
+<button id="stock-search" aria-label="Search symbols"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="8"/><path d="m16 16 6 6"/></svg></button>
+<button id="stock-star" aria-label="Save to watchlist" aria-pressed="false">♥</button>
+</div>
+<div class="instrument-quote"><div><strong id="stock-price">—</strong><b id="stock-change"></b></div>
+<dl><dt>H/L</dt><dd id="stock-range">—</dd><dt>Volume</dt><dd id="stock-volume">—</dd><dt>Mkt Cap</dt><dd id="stock-cap">—</dd></dl></div>
+<div class="quote-time"><span id="stock-time"></span><small>Snapshot</small></div>
+<nav class="instrument-tabs" aria-label="Symbol information">
+<button id="chart-tab" aria-current="page">Chart</button><a id="options-link">Options</a><a id="news-link">News</a><button id="symbol-feed">Feeds</button><a id="company-link">Company</a>
+</nav>
+<div id="chart-area"><img id="daily-reference" src="./assets/quotes/skhy-daily.webp" alt="SKHY daily candlesticks, exponential moving averages, volume and RSI from the November 20 reference chart" hidden>
+<canvas id="market-chart" role="img" aria-label="Candlesticks, volume and RSI"></canvas><div id="external-chart" hidden></div></div>
+<div class="frame-bar"><div id="stock-frames" aria-label="Chart interval">
+<button data-frame="hour">1 hour</button><button data-frame="day" aria-pressed="true">Daily</button><button data-frame="week">Weekly</button><button data-frame="month">Monthly</button><button data-frame="quarter">Quarterly</button>
+</div><button id="stock-expand" aria-pressed="false" aria-label="Expand chart">⛶</button></div>
+<section class="quote-summary"><h3 id="summary-title">Technical Summary</h3><p id="stock-summary"></p><a id="quote-source" target="_blank" rel="noopener noreferrer">Quote source ↗</a></section>
+<div class="instrument-actions"><div><button id="symbol-account">Open Account</button><a href="https://www.webull.com/paper-trading" target="_blank" rel="noopener noreferrer">paperTrade</a></div><button id="symbol-actions" aria-label="More symbol actions" aria-expanded="false" aria-controls="symbol-action-menu">•••</button></div>
+<div id="symbol-action-menu" hidden><button id="symbol-copy">Copy symbol</button><a id="symbol-finance">View quote ↗</a></div>
+</div></dialog>
 <nav id="bottom-nav" lang="en" aria-label="Main navigation">
 <button type="button" data-view="home" aria-current="page"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path fill="currentColor" stroke="none" d="M12 21 2.7 12A5.8 5.8 0 0 1 12 5 5.8 5.8 0 0 1 21.3 12Z"/></svg><span>Watchlists</span></button>
 <button type="button" data-view="account"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="m3 8 15-5v5M3 8h18v13H3z"/><circle cx="17" cy="14" r="1" fill="currentColor"/></svg><span>Open Account</span></button>
