@@ -172,3 +172,20 @@ button.broker-row:hover { background:#2a2c31; }
 .allocation-row [data-direction="up"] { color:#ff9eaa; }
 .trade-history { border-top:1px solid var(--line); padding-top:16px; }
 .trade-history summary { cursor:pointer; min-height:32px; }
+
+.trade-page {
+  font-family: "Geist", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.trade-page #page-heading,
+.trade-page .broker-name,
+.trade-page .allocation-row {
+  letter-spacing: -.025em;
+}
+.portfolio-value,
+.allocation-total,
+.broker-name strong,
+.allocation-row strong {
+  font-weight: 670;
+  font-variant-numeric: tabular-nums;
+}
