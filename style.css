@@ -285,3 +285,9 @@ button.broker-row:hover { background:#2a2c31; }
 .watch-quote small { white-space:nowrap; color:var(--muted); }
 .watch-quote [data-direction="down"] { color:#8babff; }
 .watch-quote [data-direction="up"] { color:#ff9eaa; }
+
+.watch-form { margin:16px 0; }
+.watch-form > div { display:flex; gap:8px; }
+.watch-form input { min-width:0; flex:1; }
+.watch-form button,.watch-list button { flex:none; }
+.watch-list li { grid-template-columns:minmax(0,1fr) auto; }

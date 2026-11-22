@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=33">
-<script type="module" src="./journal.js?v=33"></script>
+<link rel="stylesheet" href="./style.css?v=34">
+<script type="module" src="./journal.js?v=34"></script>
 </head>
 <body class="trade-page">
 <header><div class="head"><a href="./" class="brand-home" aria-label="내 계좌 홈"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -25,8 +25,12 @@
 </form>
 <div id="private" hidden>
 <section id="tab-home" class="tab-panel" hidden>
-<div class="watch-heading"><h2>보유 종목</h2><span>키움증권</span></div>
-<p id="home-value" class="watch-status">조회 중…</p>
+<div class="watch-heading"><h2>Watchlist</h2></div>
+<p id="home-value" class="watch-status"></p>
+<form id="watch-form" class="watch-form">
+<label for="watch-symbol">종목 티커</label>
+<div><input id="watch-symbol" maxlength="12" placeholder="예: NVDA" autocomplete="off" required><button type="submit">추가</button></div>
+</form>
 <ul id="home-holdings" class="watch-list"></ul>
 </section>
 <section id="tab-profit" class="tab-panel" hidden>

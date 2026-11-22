@@ -126,8 +126,7 @@ document.querySelector("#logout").addEventListener("click", () => {
   document.querySelector("#valuation-note").textContent = "";
   document.querySelector("#kiwoom-return").textContent = "";
   navigation.hidden = true;
-  document.querySelector("#home-value").textContent = "";
-  document.querySelector("#home-holdings").replaceChildren();
+  renderWatchlist();
   setDetail(false);
   login.reset();
   login.hidden = false;
@@ -283,58 +282,59 @@ function showProfit(data) {
   }
 }
 
-function showHomeHoldings(balance) {
-  const list = document.querySelector("#home-holdings");
-  const status = document.querySelector("#home-value");
-  list.replaceChildren();
-  if (!Array.isArray(balance.holdings)) {
-    status.textContent = "보유 종목 동기화가 필요합니다.";
-    return;
-  }
-  if (!balance.holdings.length) {
-    status.textContent = "보유 중인 미국주식이 없습니다.";
-    return;
-  }
-  status.textContent = new Date(balance.observed_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) + " KST 기준";
-  const logos = { NVDA: "nvda", GOOGL: "goog", GOOG: "goog", AMZN: "amzn", AVGO: "avgo", NBIS: "nbis", AMZU: "amzu", SOXX: "soxx", SOXL: "soxl" };
-  for (const holding of balance.holdings) {
+const watchKey = "jm-invest:watchlist:v1";
+const watchList = document.querySelector("#home-holdings");
+const watchStatus = document.querySelector("#home-value");
+const watchForm = document.querySelector("#watch-form");
+
+function readWatchlist() {
+  try {
+    const value = JSON.parse(localStorage.getItem(watchKey) || "[]");
+    return Array.isArray(value) ? value.filter((symbol) => typeof symbol === "string" && /^[A-Z][A-Z0-9.\-]{0,11}$/.test(symbol)) : [];
+  } catch { return []; }
+}
+function renderWatchlist() {
+  const symbols = readWatchlist();
+  watchList.replaceChildren();
+  watchStatus.textContent = symbols.length ? "이 기기에 저장된 관심종목" : "관심종목을 추가해 주세요.";
+  for (const symbol of symbols) {
     const row = document.createElement("li");
-    const logo = document.createElement("span");
-    logo.className = "watch-logo";
-    const ticker = String(holding.symbol || "").toUpperCase();
-    if (logos[ticker]) {
-      const image = document.createElement("img");
-      image.src = `./assets/companies/${logos[ticker]}.png?v=28`;
-      image.alt = "";
-      image.addEventListener("error", () => { image.remove(); logo.textContent = ticker.slice(0, 2); });
-      logo.append(image);
-    } else {
-      logo.textContent = ticker.slice(0, 2);
-    }
-    const identity = document.createElement("div");
-    identity.className = "watch-identity";
-    const symbol = document.createElement("strong");
-    const name = document.createElement("small");
-    symbol.textContent = ticker;
-    name.textContent = holding.name || ticker;
-    identity.append(symbol, name);
-    const quote = document.createElement("div");
-    quote.className = "watch-quote";
-    const price = document.createElement("strong");
-    const priceValue = holding.current_price;
-    price.textContent = priceValue == null || priceValue === "" || !Number.isFinite(Number(priceValue))
-      ? "동기화 필요"
-      : new Intl.NumberFormat("ko-KR", { style: "currency", currency: "USD", currencyDisplay: "narrowSymbol", minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(Number(priceValue));
-    const change = document.createElement("small");
-    const returnValue = holding.return_pct;
-    change.textContent = returnValue == null || returnValue === "" || !Number.isFinite(Number(returnValue))
-      ? "평가수익률 미확인" : `평가수익률 ${Number(returnValue).toFixed(2)}%`;
-    change.dataset.direction = Number(returnValue) < 0 ? "down" : "up";
-    quote.append(price, change);
-    row.append(logo, identity, quote);
-    list.append(row);
+    const name = document.createElement("strong");
+    const remove = document.createElement("button");
+    name.textContent = symbol;
+    remove.textContent = "삭제";
+    remove.type = "button";
+    remove.setAttribute("aria-label", `${symbol} 삭제`);
+    remove.addEventListener("click", () => {
+      try {
+        localStorage.setItem(watchKey, JSON.stringify(readWatchlist().filter((item) => item !== symbol)));
+        renderWatchlist();
+      } catch { watchStatus.textContent = "관심종목을 저장하지 못했습니다."; }
+    });
+    row.append(name, remove);
+    watchList.append(row);
   }
 }
+watchForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const input = document.querySelector("#watch-symbol");
+  const symbol = input.value.trim().toUpperCase();
+  if (!/^[A-Z][A-Z0-9.\-]{0,11}$/.test(symbol)) {
+    watchStatus.textContent = "영문 티커를 입력해 주세요.";
+    return;
+  }
+  const symbols = readWatchlist();
+  if (symbols.includes(symbol)) {
+    watchStatus.textContent = "이미 추가된 종목입니다.";
+    return;
+  }
+  try {
+    localStorage.setItem(watchKey, JSON.stringify([...symbols, symbol]));
+    input.value = "";
+    renderWatchlist();
+  } catch { watchStatus.textContent = "관심종목을 저장하지 못했습니다."; }
+});
+renderWatchlist();
 
 async function loadValuation(accessToken) {
   const value = document.querySelector("#portfolio-value");
@@ -342,7 +342,7 @@ async function loadValuation(accessToken) {
   const performance = document.querySelector("#kiwoom-return");
   const accountValue = document.querySelector("#kiwoom-value");
   const homeValue = document.querySelector("#home-value");
-  homeValue.textContent = "조회 중…";
+
   const allocationTotal = document.querySelector("#allocation-total");
   const allocation = document.querySelector("#allocation-breakdown");
   allocationTotal.textContent = "조회 중…";
@@ -359,7 +359,7 @@ async function loadValuation(accessToken) {
     const [balance] = await request("/rest/v1/kiwoom_valuation?select=*&limit=1", { accessToken });
     if (token !== accessToken) return;
     if (!balance) {
-      homeValue.textContent = value.textContent = allocationTotal.textContent = "잔고 동기화 대기";
+      value.textContent = allocationTotal.textContent = "잔고 동기화 대기";
       return;
     }
     const won = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" });
@@ -396,10 +396,10 @@ async function loadValuation(accessToken) {
     allocationReturn.dataset.direction = performance.dataset.direction;
     allocation.hidden = false;
     showHoldings(balance);
-    showHomeHoldings(balance);
+
     showProfit(balance.realized_profit);
   } catch (error) {
-    if (token === accessToken) homeValue.textContent = value.textContent = allocationTotal.textContent = error.code === "PGRST205" ? "잔고 DB 설정 대기" : "평가액 조회 실패";
+    if (token === accessToken) value.textContent = allocationTotal.textContent = error.code === "PGRST205" ? "잔고 DB 설정 대기" : "평가액 조회 실패";
   }
 }
 
