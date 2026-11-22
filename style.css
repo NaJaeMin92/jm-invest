@@ -189,3 +189,18 @@ button.broker-row:hover { background:#2a2c31; }
   font-weight: 670;
   font-variant-numeric: tabular-nums;
 }
+
+.trade-page { --bg:#0b0f17; --panel:#161b25; --text:#f2f3f6; --muted:#a0a6b0; --line:#ffffff17; --accent:#acc3fc; }
+.trade-page header,.trade-page .panel { background:var(--panel); border-color:var(--line); }
+.trade-page .primary { color:#0b0f17; }
+.trade-page main { padding-bottom:calc(92px + env(safe-area-inset-bottom)); }
+.trade-page button.broker-row:hover { background:#282e39; }
+.header-symbol { font-size:1.45rem; color:var(--accent); }
+.identity-mark { background:#222a38; color:#bbc8de; font-style:normal; }
+.identity-mark::before { display:none; }
+.tab-panel { padding:20px; }
+#private .tab-panel h2 { margin:0 0 12px; }
+#bottom-nav { position:fixed; z-index:5; bottom:calc(12px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); width:min(460px,calc(100% - 28px)); display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; padding:5px; border:1px solid #363e4d; border-radius:21px; background:#171d29; box-shadow:0 8px 28px #0007; }
+#bottom-nav button { display:grid; place-items:center; gap:1px; padding:5px; border:0; border-radius:15px; background:transparent; font-size:.8rem; color:#a0a6b0; }
+#bottom-nav button span { font-size:1.2rem; line-height:1; }
+#bottom-nav [aria-current="page"] { background:#282e39; color:#cfddff; }

@@ -113,6 +113,22 @@ function showRecords(records) {
 const home = document.querySelector("#account-home");
 const detail = document.querySelector("#trade-detail");
 const logout = document.querySelector("#logout");
+const navigation = document.querySelector("#bottom-nav");
+const navButtons = [...navigation.querySelectorAll("button")];
+function selectView(view) {
+  setDetail(false);
+  for (const button of navButtons) {
+    const active = button.dataset.view === view;
+    document.querySelector(`#tab-${button.dataset.view}`).hidden = !active;
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  }
+  document.querySelector("#page-heading").textContent = {home:"홈", account:"내 계좌", more:"더보기"}[view];
+  window.scrollTo(0, 0);
+}
+for (const button of navButtons) {
+  button.addEventListener("click", () => selectView(button.dataset.view));
+}
 
 function setDetail(open) {
   home.hidden = open;
@@ -178,7 +194,8 @@ document.querySelector("#logout").addEventListener("click", () => {
   document.querySelector("#portfolio-value").textContent = "";
   document.querySelector("#valuation-note").textContent = "";
   document.querySelector("#kiwoom-return").textContent = "";
-  logout.hidden = true;
+  navigation.hidden = true;
+  document.querySelector("#home-value").textContent = "";
   setDetail(false);
   showRecords([]);
   symbols.replaceChildren();
@@ -195,6 +212,8 @@ async function loadValuation(accessToken) {
   const note = document.querySelector("#valuation-note");
   const performance = document.querySelector("#kiwoom-return");
   const accountValue = document.querySelector("#kiwoom-value");
+  const homeValue = document.querySelector("#home-value");
+  homeValue.textContent = "조회 중…";
   const allocationTotal = document.querySelector("#allocation-total");
   const allocation = document.querySelector("#allocation-breakdown");
   allocationTotal.textContent = "조회 중…";
@@ -208,13 +227,13 @@ async function loadValuation(accessToken) {
     const [balance] = await request("/rest/v1/kiwoom_valuation?select=value_krw,return_pct,observed_at&limit=1", { accessToken });
     if (token !== accessToken) return;
     if (!balance) {
-      value.textContent = allocationTotal.textContent = "잔고 동기화 대기";
+      homeValue.textContent = value.textContent = allocationTotal.textContent = "잔고 동기화 대기";
       return;
     }
     value.textContent = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" }).format(balance.value_krw);
     accountValue.textContent = value.textContent;
     accountValue.hidden = false;
-    allocationTotal.textContent = value.textContent;
+    allocationTotal.textContent = homeValue.textContent = value.textContent;
     performance.dataset.direction = Number(balance.return_pct) < 0 ? "down" : "up";
     note.textContent = new Date(balance.observed_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) + " KST 기준";
     performance.textContent = balance.return_pct == null ? "" : "평가수익률 " + Number(balance.return_pct).toFixed(2) + "%";
@@ -224,7 +243,7 @@ async function loadValuation(accessToken) {
     allocationReturn.dataset.direction = performance.dataset.direction;
     allocation.hidden = Number(balance.value_krw) <= 0;
   } catch (error) {
-    if (token === accessToken) value.textContent = allocationTotal.textContent = error.code === "PGRST205" ? "잔고 DB 설정 대기" : "평가액 조회 실패";
+    if (token === accessToken) homeValue.textContent = value.textContent = allocationTotal.textContent = error.code === "PGRST205" ? "잔고 DB 설정 대기" : "평가액 조회 실패";
   }
 }
 
@@ -241,7 +260,8 @@ async function openWorkspace(session, remember) {
   login.hidden = true;
   setDetail(false);
   workspace.hidden = false;
-  logout.hidden = false;
+  navigation.hidden = false;
+  selectView("account");
   loadValuation(token);
   message.textContent = remember && !stored ? "이 브라우저에서는 로그인 상태를 저장할 수 없습니다." : "";
 }
