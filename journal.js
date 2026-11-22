@@ -8,7 +8,7 @@ const symbols = document.querySelector("#trade-symbol");
 const chart = document.querySelector("#trade-chart");
 let trades = [];
 const fills = document.querySelector("#fills");
-const status = document.querySelector("#status");
+const message = document.querySelector("#status");
 let token = null;
 
 async function request(path, { method = "GET", body, accessToken = token } = {}) {
@@ -17,9 +17,14 @@ async function request(path, { method = "GET", body, accessToken = token } = {})
   const response = await fetch(service + path, {
     method, headers, cache: "no-store", body: body && JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(String(response.status));
-  const payload = await response.text();
-  return payload ? JSON.parse(payload) : null;
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const error = new Error(`HTTP ${response.status}`);
+    error.code = payload?.error_code || payload?.code;
+    error.httpStatus = response.status;
+    throw error;
+  }
+  return payload;
 }
 
 function render(list, rows, format, emptyLabel) {
@@ -95,18 +100,36 @@ login.addEventListener("submit", async (event) => {
   event.preventDefault();
   const submit = login.querySelector("button");
   submit.disabled = true;
-  status.textContent = "로그인 확인 중…";
+  message.textContent = "로그인 확인 중…";
+  let signedIn = false;
   try {
     const body = Object.fromEntries(new FormData(login));
+    body.email = body.email.trim();
     const session = await request("/auth/v1/token?grant_type=password", { method: "POST", body });
+    signedIn = true;
+    if (session.user?.id !== "9fc22c69-b253-406a-be2b-eb8ad9526a3c") {
+      await request("/auth/v1/logout?scope=local", { method: "POST", accessToken: session.access_token }).catch(() => {});
+      message.textContent = "이 사이트에 등록된 본인 계정으로 로그인하세요.";
+      return;
+    }
     const records = await readRecords(session.access_token);
     token = session.access_token;
     showRecords(records);
     login.hidden = true;
     workspace.hidden = false;
-    status.textContent = "";
-  } catch {
-    status.textContent = "로그인 또는 데이터 조회에 실패했습니다. 계정 정보와 프로젝트 상태를 확인하세요.";
+    message.textContent = "";
+  } catch (error) {
+    if (signedIn) {
+      message.textContent = `로그인은 성공했지만 체결을 조회하지 못했습니다${error.httpStatus ? ` (HTTP ${error.httpStatus})` : ""}.`;
+    } else if (error.code === "invalid_credentials") {
+      message.textContent = "이메일 또는 비밀번호가 맞지 않습니다. Supabase Authentication에서 만든 이메일 계정을 사용하세요.";
+    } else if (error.code === "email_not_confirmed") {
+      message.textContent = "이메일 인증이 완료되지 않았습니다.";
+    } else if (error.httpStatus === 429) {
+      message.textContent = "로그인 시도가 너무 많습니다. 잠시 후 다시 시도하세요.";
+    } else {
+      message.textContent = `인증 서버에 연결하지 못했습니다${error.httpStatus ? ` (HTTP ${error.httpStatus})` : ""}.`;
+    }
   } finally {
     login.elements.password.value = "";
     submit.disabled = false;
@@ -123,6 +146,6 @@ document.querySelector("#logout").addEventListener("click", () => {
   fills.replaceChildren();
   login.reset();
   login.hidden = false;
-  status.textContent = "로그아웃했습니다.";
+  message.textContent = "로그아웃했습니다.";
   request("/auth/v1/logout?scope=local", { method: "POST", accessToken }).catch(() => {});
 });
