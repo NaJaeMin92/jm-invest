@@ -1,4 +1,12 @@
-export function renderAnnotations(ctx, drawings, view) {
+const strokes = {solid:[],dash:[7,5],dot:[1,4]};
+function gap(px, py, [x1,y1], [x2,y2]) {
+  const dx=x2-x1, dy=y2-y1;
+  const position=Math.max(0,Math.min(1,((px-x1)*dx+(py-y1)*dy)/(dx*dx+dy*dy || 1)));
+  return Math.hypot(px-x1-position*dx,py-y1-position*dy);
+}
+
+export function renderAnnotations(ctx, drawings, view, selected) {
+  const targets = [];
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, view.top, view.width, view.bottom - view.top);
@@ -8,9 +16,18 @@ export function renderAnnotations(ctx, drawings, view) {
   ctx.lineWidth = 1.3;
   ctx.font = "11px system-ui";
   for (const drawing of drawings) {
+    const color = drawing.color || "#e6ba6e";
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineCap = "round";
+    ctx.lineWidth = drawing === selected ? 2.5 : 1.3;
+    ctx.setLineDash(strokes[drawing.style] || []);
+    const targetsForDrawing = [];
+    targets.push([drawing, targetsForDrawing]);
     const points = drawing.points.map(p => [view.xAt(p.time), view.y(p.price)]);
     const [[x, y], second, third] = points;
     function line(path) {
+      for (let i=1; i<path.length; i+=1) targetsForDrawing.push([path[i-1],path[i]]);
       ctx.beginPath();
       for (const [px, py] of path) ctx.lineTo(px, py);
       ctx.stroke();
@@ -20,6 +37,7 @@ export function renderAnnotations(ctx, drawings, view) {
     else if (drawing.type === "note") {
       ctx.fillRect(x - 2, y - 2, 4, 4);
       ctx.fillText(drawing.text, x + 5, y - 6);
+      targetsForDrawing.push([[x,y],[x+ctx.measureText(drawing.text).width+5,y-6]]);
     } else if (drawing.type === "extended" && second) {
       const [endX, endY] = second;
       if (x === endX) line([[x,view.top],[x,view.bottom]]);
@@ -59,4 +77,18 @@ export function renderAnnotations(ctx, drawings, view) {
     }
   }
   ctx.restore();
+  return (px,py) => {
+    if (px<0 || px>view.width || py<view.top || py>view.bottom) return null;
+    let nearest = null, threshold = 13;
+    for (const [drawing,segments] of targets) {
+      for (const segment of segments) {
+        const distance=gap(px,py,...segment);
+        if (distance <= threshold) {
+          nearest=drawing;
+          threshold=distance;
+        }
+      }
+    }
+    return nearest;
+  };
 }

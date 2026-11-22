@@ -61,21 +61,33 @@ function grid() {
   return list;
 }
 
+const drawingKey = "tradeinsight:drawings:v2:";
+function removeTestDrawings() {
+  try {
+    for (let i=localStorage.length-1; i>=0; i-=1) {
+      const key=localStorage.key(i);
+      if (key?.startsWith("tradeinsight:draw:")) localStorage.removeItem(key);
+    }
+  } catch { /* Browser storage may be unavailable. */ }
+}
+
 export function setupChartTools({redraw,moveTo,getView,alternatives,loadComparison}) {
   const dialog = get("chart-tool-dialog"), body = get("chart-tool-body"), task = get("chart-task");
   const noteStatus = get("chart-tool-status"), canvas = get("market-chart"), secondCanvas = get("secondary-market-chart");
+  removeTestDrawings();
   const options = initialOptions();
+  let selectedDrawing, moving = false;
   let series, symbol, frame, saved = [], pending, replay, timer, comparison, compareRequest = 0, section;
   function store() {
     try {
-      localStorage.setItem("tradeinsight:draw:" + symbol + ":" + frame, JSON.stringify(saved));
+      localStorage.setItem(drawingKey + symbol + ":" + frame, JSON.stringify(saved));
     } catch {
       noteStatus.textContent = "Drawings are saved for this session.";
     }
   }
   function readDrawings() {
     try {
-      const data = JSON.parse(localStorage.getItem("tradeinsight:draw:" + symbol + ":" + frame) || "[]");
+      const data = JSON.parse(localStorage.getItem(drawingKey + symbol + ":" + frame) || "[]");
       return data.filter(drawing => drawings[drawing.type] && drawing.points?.length &&
         drawing.points.every(p => Number.isFinite(p.price) && Number.isFinite(p.time)));
     } catch {
@@ -86,6 +98,52 @@ export function setupChartTools({redraw,moveTo,getView,alternatives,loadComparis
     clearInterval(timer);
     timer = null;
     get("chart-play").textContent = "Play";
+  }
+  function showDrawingOptions(menu = "") {
+    get("drawing-colors").hidden = menu !== "color";
+    get("drawing-styles").hidden = menu !== "style";
+    for (const name of ["color","style"]) get("drawing-"+name).setAttribute("aria-expanded",String(menu===name));
+  }
+  function selectDrawing(drawing) {
+    selectedDrawing = saved.includes(drawing) ? drawing : null;
+    moving = false;
+    showDrawingOptions();
+    redraw();
+  }
+  for (const [name,panel] of [["color","drawing-colors"],["style","drawing-styles"]]) {
+    get("drawing-"+name).onclick = () => showDrawingOptions(get(panel).hidden ? name : "");
+  }
+  for (const control of document.querySelectorAll("#drawing-actions [data-color],#drawing-actions [data-style]")) {
+    if (control.dataset.color) control.style.setProperty("--swatch",control.dataset.color);
+    control.onclick = () => {
+      if (!selectedDrawing) return;
+      const attribute = control.dataset.color ? "color" : "style";
+      selectedDrawing[attribute] = control.dataset[attribute];
+      store();showDrawingOptions();redraw();
+    };
+  }
+  get("drawing-move").onclick = () => {
+    if (!selectedDrawing) return;
+    moving = !moving;
+    showDrawingOptions();
+    redraw();
+  };
+  get("drawing-delete").onclick = () => {
+    saved = saved.filter(drawing=>drawing!==selectedDrawing);
+    store();selectDrawing(null);
+  };
+  function drawingOptions() {
+    const visible = selectedDrawing && options.layers.drawings && !replay && !pending;
+    get("drawing-actions").hidden = !visible;
+    get("drawing-move").setAttribute("aria-pressed",String(moving));
+    get("drawing-move-hint").hidden = !moving;
+    if (visible) {
+      get("drawing-color").style.color = selectedDrawing.color || "#e6ba6e";
+      for (const button of get("drawing-styles").querySelectorAll("button")) {
+        button.setAttribute("aria-pressed",String(button.dataset.style === (selectedDrawing.style || "solid")));
+      }
+    }
+    return Boolean(visible && moving);
   }
   function status() {
     task.hidden = !pending && !replay;
@@ -116,6 +174,9 @@ export function setupChartTools({redraw,moveTo,getView,alternatives,loadComparis
   }
   function stopMode() {
     pending = null;
+    selectedDrawing = null;
+    moving = false;
+    showDrawingOptions();
     replay = null;
     stopTimer();
     update();
@@ -204,6 +265,7 @@ export function setupChartTools({redraw,moveTo,getView,alternatives,loadComparis
       function removeDrawing(clear) {
         if (clear) saved = [];
         else saved.pop();
+        selectedDrawing = null;
         store();update();
         render("draw");
       }
@@ -315,11 +377,20 @@ export function setupChartTools({redraw,moveTo,getView,alternatives,loadComparis
       const marks = replay
         ? saved.filter(mark => mark.points.every(point => point.time <= series.bars[replay.end-1][0]))
         : saved;
-      return {...options, drawings:pending?.points.length ? [...marks,pending] : marks,
+      return {...options, selectedDrawing, drawings:pending?.points.length ? [...marks,pending] : marks,
         compare:comparison?.mode === "compare" ? {...comparison.chart,symbol:comparison.symbol} : null,
         end:replay?.end};
     },
     secondary() { return comparison?.mode === "dual" ? comparison : null; },
+    drawingOptions,
+    selectDrawing,
+    pointsToMove() { return moving ? selectedDrawing?.points : null; },
+    moveDrawing(points) {
+      if (!moving || !selectedDrawing) return;
+      selectedDrawing.points = points;
+      redraw();
+    },
+    finishMove() { if (moving) { moving = false; store(); redraw(); } },
     activeDrawing() { return pending?.type; },
     addPoint(point) {
       if (!point || !pending) return;

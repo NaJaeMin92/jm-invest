@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=56">
-<script type="module" src="./journal.js?v=56"></script>
+<link rel="stylesheet" href="./style.css?v=58">
+<script type="module" src="./journal.js?v=58"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header><div class="head"><a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -150,7 +150,23 @@
 <button type="button" id="chart-tab" data-panel="chart" aria-current="page" aria-controls="chart-panel">Chart</button><button type="button" data-panel="sigma" aria-controls="sigma-panel">Sigma</button><button type="button" data-panel="sentiment" aria-controls="sentiment-panel">Fear &amp; Greed</button>
 </nav>
 <section id="chart-panel">
-<div id="chart-area"><img draggable="false" id="daily-reference" src="./assets/quotes/skhy-daily.webp" alt="SKHY daily candlesticks, exponential moving averages, volume and RSI from the November 20 reference chart" hidden>
+<div id="chart-area"><div id="drawing-actions" hidden aria-label="Selected drawing">
+<button id="drawing-move" type="button" aria-label="Move drawing" title="Move drawing" aria-pressed="false">✥</button>
+<button id="drawing-color" type="button" aria-label="Drawing color" title="Drawing color" aria-expanded="false">●</button>
+<button id="drawing-style" type="button" aria-label="Line style" title="Line style" aria-expanded="false">┄</button>
+<button id="drawing-delete" type="button" aria-label="Delete drawing" title="Delete drawing">
+<svg viewBox="0 0 24 24" class="ui-icon" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7m4-7v7"/></svg>
+</button>
+<div id="drawing-colors" hidden aria-label="Colors">
+<button type="button" data-color="#e6ba6e" aria-label="Gold"></button><button type="button" data-color="#65ccff" aria-label="Blue"></button>
+<button type="button" data-color="#64dab0" aria-label="Green"></button><button type="button" data-color="#ff839e" aria-label="Pink"></button>
+</div>
+<div id="drawing-styles" hidden aria-label="Line styles">
+<button type="button" data-style="solid">Solid</button><button type="button" data-style="dash">Dash</button><button type="button" data-style="dot">Dot</button>
+</div>
+<p id="drawing-move-hint" hidden>Drag to move the drawing</p>
+</div>
+<img draggable="false" id="daily-reference" src="./assets/quotes/skhy-daily.webp" alt="SKHY daily candlesticks, exponential moving averages, volume and RSI from the November 20 reference chart" hidden>
 <canvas id="market-chart" role="img" aria-label="Candlesticks, volume and RSI"></canvas><div id="external-chart" hidden></div><p id="chart-status" role="status" hidden></p></div>
 <figure id="dual-market-chart" hidden><figcaption id="dual-market-caption"></figcaption><canvas id="secondary-market-chart" role="img" aria-label="Second symbol chart"></canvas></figure>
 <div id="chart-history" hidden>
@@ -193,11 +209,45 @@
 <div id="sentiment-content" aria-live="polite"></div>
 <a class="market-source" href="https://edition.cnn.com/markets/fear-and-greed" target="_blank" rel="noopener noreferrer">CNN Fear &amp; Greed ↗</a>
 </section>
-<div id="stock-order-bar" lang="ko">
-<button id="stock-order" type="button" aria-haspopup="dialog" aria-controls="order-dialog">
+<div id="stock-order-bar">
+<button id="stock-order" type="button" aria-haspopup="dialog" aria-controls="trade-preview">
 <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14m-4-4 4 4-4 4M19 17H5m4-4-4 4 4 4"/></svg>
-<span>주문</span></button>
+<span>Trade</span></button>
 </div>
+<dialog id="trade-preview" aria-labelledby="trade-preview-title">
+<header class="trade-preview-head">
+<div><p id="trade-preview-symbol"></p><h3 id="trade-preview-title">Trade ticket</h3></div>
+<button type="button" id="trade-preview-close" aria-label="Close trade ticket">×</button>
+</header>
+<p id="trade-preview-quote" class="trade-preview-quote" hidden></p>
+<form id="trade-preview-form" method="dialog">
+<fieldset class="trade-side">
+<legend>Side</legend>
+<label><input type="radio" name="side" value="Buy" checked><span>Buy</span></label>
+<label><input type="radio" name="side" value="Sell"><span>Sell</span></label>
+</fieldset>
+<div class="trade-fields">
+<label>Shares<input type="number" name="quantity" inputmode="numeric" min="1" max="999999" step="1" placeholder="0" required></label>
+<label>Limit price (USD)<input type="number" name="price" inputmode="decimal" min="0.0001" max="9999999" step="0.0001" placeholder="0.00" required></label>
+</div>
+<div class="trade-ticket-total"><span>Order value</span><output id="trade-preview-total">—</output></div>
+<button type="submit" class="trade-ticket-primary">Review order</button>
+</form>
+<section id="trade-preview-review" hidden aria-labelledby="trade-review-title">
+<h4 id="trade-review-title" tabindex="-1">Review limit order</h4>
+<dl class="trade-review-details">
+<dt>Side</dt><dd id="trade-review-side"></dd>
+<dt>Shares</dt><dd id="trade-review-quantity"></dd>
+<dt>Limit price</dt><dd id="trade-review-price"></dd>
+<dt>Order value</dt><dd id="trade-review-total"></dd>
+</dl>
+<div class="trade-review-actions">
+<button type="button" id="trade-preview-edit">Edit order</button>
+<button type="button" disabled>Place order</button>
+</div>
+</section>
+<p class="trade-preview-note">Preview only · trading is offline</p>
+</dialog>
 <dialog id="chart-tool-dialog" aria-labelledby="chart-tool-title">
 <div class="chart-tool-head"><h3 id="chart-tool-title"></h3><button type="button" id="chart-tool-close" aria-label="Close chart tools">×</button></div>
 <div id="chart-tool-body"></div>

@@ -616,3 +616,65 @@ body.instrument-open { overflow:hidden; }
 .chart-tile-icon { display:grid; place-items:center; width:28px; height:28px; flex:none; border:1px solid #516e8d; border-radius:7px; color:#9bd6ff; font-size:18px; }
 #chart-tool-dialog[data-section="draw"] .chart-tile-icon { color:#f4cf96; }
 #chart-tool-dialog[data-section="indicators"] .chart-tool-grid button { min-height:46px; }
+
+#stock-order-bar { padding:4px; }
+#stock-order {
+  display:flex; justify-content:center; align-items:center; gap:9px; min-height:49px;
+  border-radius:32px; color:#e9f5ff; font:650 15px/1 "Geist",system-ui,sans-serif;
+  background:linear-gradient(105deg,#263a58,#314d72);
+  box-shadow:inset 0 1px #a6c9ef38;
+}
+#stock-order svg { width:19px; height:19px; color:#94d1ff; }
+#trade-preview {
+  position:fixed; inset:auto 0 0; margin:0 auto; width:min(100%,480px);
+  max-width:none; max-height:85dvh; padding:19px 18px calc(16px + env(safe-area-inset-bottom));
+  border:1px solid #344962; border-bottom:0; border-radius:22px 22px 0 0;
+  color:#edf5ff; background:#142139; box-shadow:0 -16px 48px #090f1c88;
+  font-family:"Geist",system-ui,sans-serif; overflow:auto;
+}
+#trade-preview::backdrop { background:#070e1c9c; }
+#trade-preview .trade-preview-head { display:flex; justify-content:space-between; align-items:center; gap:10px; border:0; background:none; }
+#trade-preview-symbol { margin:0 0 5px; color:#9ccfff; font-size:12px; font-weight:700; letter-spacing:.07em; }
+#trade-preview-title { margin:0; font-size:24px; letter-spacing:-.03em; }
+#trade-preview-close { width:40px; height:40px; border-radius:50%; background:#24364f; font-size:22px; }
+#trade-preview .trade-preview-quote { margin:12px 0; color:#afc3df; font-size:13px; }
+#trade-preview-form { display:grid; gap:15px; margin-top:15px; }
+.trade-side { display:flex; gap:6px; padding:4px; margin:0; border:0; border-radius:10px; background:#0f1b30; }
+.trade-side legend { margin-bottom:6px; color:#afc3df; font-size:12px; }
+.trade-side label { position:relative; flex:1; }
+.trade-side input { position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:pointer; }
+.trade-side span { display:grid; place-items:center; min-height:41px; color:#b8c6dc; font-size:14px; border-radius:7px; }
+.trade-side input:checked + span { background:#234b56; color:#9ef0da; font-weight:650; }
+.trade-side input[value="Sell"]:checked + span { background:#4e3048; color:#ffc3d0; }
+.trade-side input:focus-visible + span { outline:2px solid #9bcfff; outline-offset:-2px; }
+.trade-fields { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.trade-fields label { color:#b7c8df; min-width:0; font-size:12px; }
+.trade-fields input { min-width:0; min-height:48px; border:1px solid #3b506f; border-radius:9px; color:#edf5ff; background:#0f1b30; font-size:16px; }
+.trade-ticket-total { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-top:11px; border-top:1px solid #384c68; font-size:14px; }
+.trade-ticket-total output { font-weight:700; }
+#trade-preview button.trade-ticket-primary { min-height:47px; border-radius:9px; color:#102039; background:#a8d3ff; font-size:14px; font-weight:700; }
+#trade-preview .trade-preview-note { margin:12px 0 0; color:#adbfdb; font-size:11px; text-align:center; }
+#trade-review-title { margin:16px 0 6px; font-size:17px; }
+.trade-review-details { display:grid; grid-template-columns:1fr auto; gap:11px 10px; margin:0; padding:9px 0 15px; border:0; }
+.trade-review-details dt { color:#b6c7df; font-size:13px; }
+.trade-review-details dd { margin:0; font-size:14px; text-align:right; }
+.trade-review-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+#trade-preview .trade-review-actions button { min-height:44px; border-radius:9px; background:#2d4768; font-size:13px; }
+#trade-preview .trade-review-actions button:disabled { opacity:.45; cursor:default; }
+
+#chart-area { position:relative; }
+#chart-area.moving-drawing { touch-action:none; cursor:move; }
+#drawing-actions {
+  display:grid; grid-template-columns:repeat(4,40px); gap:4px; padding:4px;
+  position:absolute; z-index:2; top:36px; right:8px;
+  border:1px solid #4c6588; border-radius:11px; background:#142239; box-shadow:0 8px 20px #050b16a6;
+}
+#drawing-actions button { display:grid; place-items:center; min-height:38px; padding:3px; border-radius:7px; background:#253b58; color:#c8e3ff; font-size:19px; }
+#drawing-actions button[aria-pressed="true"] { background:#3b638a; box-shadow:inset 0 0 0 1px #7fb6eb; }
+#drawing-actions svg { width:19px; height:19px; }
+#drawing-delete { color:#ffa6b6 !important; }
+#drawing-colors,#drawing-styles { display:flex; grid-column:1/-1; justify-content:space-between; gap:4px; }
+#drawing-colors button { width:40px; }
+#drawing-colors button::after { content:""; width:15px; height:15px; border-radius:50%; background:var(--swatch); }
+#drawing-styles button { flex:1; font-size:12px; }
+#drawing-move-hint { grid-column:1/-1; margin:1px 2px; color:#b9d4f6; font-size:11px; }

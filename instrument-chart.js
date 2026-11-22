@@ -1,5 +1,5 @@
 import {study} from "./technical-indicators.js";
-import {renderAnnotations} from "./chart-annotations.js?v=56";
+import {renderAnnotations} from "./chart-annotations.js?v=58";
 
 // Bars are ordered [timestamp, open, high, low, close, volume].
 export function isIntraday(interval) {
@@ -277,6 +277,7 @@ export function drawChart(canvas, chart, frame, start, options) {
     }
     if (!lines.length) label("Volume",pad,axis+28,"#a2abc1");
   }
+  let drawingAt;
   if (options.layers.drawings && options.drawings.length) {
     const xAt = time => {
       let low = 0, high = bars.length - 1;
@@ -287,7 +288,25 @@ export function drawChart(canvas, chart, frame, start, options) {
       }
       return x(low-start);
     };
-    renderAnnotations(ctx, options.drawings, { width,top,bottom,xAt,y });
+    drawingAt = renderAnnotations(ctx, options.drawings, { width,top,bottom,xAt,y }, options.selectedDrawing);
   }
-  return { point, step };
+  let barIndex;
+  return {
+    point, step,
+    hitDrawing(clientX,clientY) {
+      const bounds=canvas.getBoundingClientRect();
+      return drawingAt?.(clientX-bounds.left, clientY-bounds.top);
+    },
+    translate(points,origin,target) {
+      barIndex ??= new Map(bars.map((bar,index) => [bar[0],index]));
+      const dx = barIndex.get(target.time)-barIndex.get(origin.time);
+      const scale = target.price/origin.price;
+      const indices = points.map(point => barIndex.get(point.time));
+      const shift = Math.max(-Math.min(...indices),Math.min(bars.length-1-Math.max(...indices),dx));
+      return points.map((point,index) => ({
+        time:bars[indices[index]+shift]?.[0] ?? point.time,
+        price:logarithmic ? point.price*scale : point.price+target.price-origin.price
+      }));
+    }
+  };
 }

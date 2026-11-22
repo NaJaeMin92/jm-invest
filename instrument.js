@@ -1,7 +1,7 @@
-import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=56";
+import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=58";
 import {showMarketPanel} from "./market-panels.js?v=50";
 
-import {setupChartTools} from "./chart-tools.js?v=56";
+import {setupChartTools} from "./chart-tools.js?v=58";
 
 const get = id => document.getElementById(id);
 const savedQuotes = new Set("ANT SKHY SPCX MRVL BZMAIN CLMAIN AAL UAL DAL NVDA AMZN".split(" "));
@@ -31,9 +31,56 @@ const signed = n => (n>=0?"+":"")+n.toFixed(2);
 const displaySymbol = s => ({BZMAIN:"BZmain",CLMAIN:"CLmain"}[s] || s);
 const validSymbol = /^[A-Z][A-Z0-9.\-]{0,11}$/;
 
-export function setupInstrument({search,nameFor,readList,saveList,openOrder}) {
+export function setupInstrument({search,nameFor,readList,saveList}) {
   const dialog=get("stock-detail"), canvas=get("market-chart"), reference=get("daily-reference");
   let current="", quote=null, frame="day", afterClose=null;
+  const trade = get("trade-preview");
+  const tradeForm = get("trade-preview-form"), tradeReview = get("trade-preview-review");
+  const dollars = new Intl.NumberFormat("en-US", {
+    style:"currency", currency:"USD", maximumFractionDigits:4
+  });
+  function readTrade() {
+    return {
+      side:tradeForm.elements.side.value,
+      quantity:tradeForm.elements.quantity.valueAsNumber,
+      price:tradeForm.elements.price.valueAsNumber
+    };
+  }
+  function updateTradeTotal() {
+    const {quantity,price} = readTrade();
+    const validNumbers = tradeForm.elements.quantity.validity.valid && tradeForm.elements.price.validity.valid;
+    get("trade-preview-total").textContent = validNumbers ? dollars.format(quantity * price) : "—";
+  }
+  function openTrade() {
+    tradeForm.reset();
+    tradeForm.hidden = false;
+    tradeReview.hidden = true;
+    updateTradeTotal();
+    get("trade-preview-symbol").textContent = displaySymbol(current);
+    const referencePrice = get("trade-preview-quote");
+    referencePrice.hidden = !Number.isFinite(quote?.price);
+    referencePrice.textContent = referencePrice.hidden ? "" : "Last close · " + dollars.format(quote.price);
+    trade.showModal();
+  }
+  get("trade-preview-close").onclick = () => trade.close();
+  trade.addEventListener("cancel", event => event.stopPropagation());
+  tradeForm.addEventListener("input", updateTradeTotal);
+  tradeForm.addEventListener("submit", event => {
+    event.preventDefault();
+    const {side,quantity,price} = readTrade();
+    get("trade-review-side").textContent = side;
+    get("trade-review-quantity").textContent = quantity.toLocaleString("en-US");
+    get("trade-review-price").textContent = dollars.format(price);
+    get("trade-review-total").textContent = dollars.format(quantity * price);
+    tradeForm.hidden = true;
+    tradeReview.hidden = false;
+    get("trade-review-title").focus();
+  });
+  get("trade-preview-edit").onclick = () => {
+    tradeReview.hidden = true;
+    tradeForm.hidden = false;
+    tradeForm.elements.quantity.focus();
+  };
   function setFavorite() {
     const saved=readList().includes(current);
     get("stock-star").setAttribute("aria-pressed",String(saved));
@@ -71,6 +118,7 @@ export function setupInstrument({search,nameFor,readList,saveList,openOrder}) {
   for (const tab of tabs) tab.addEventListener("click", () => selectPanel(tab.dataset.panel));
 
   function draw() {
+    area.classList.toggle("moving-drawing",tools.drawingOptions());
     if (!chart || !chart.bars.length || !dialog.open) return;
     const snapshot = current === "SKHY" && frame === "day" && start === lastStart && tools.canUseSnapshot();
     reference.hidden = !snapshot;
@@ -115,7 +163,15 @@ export function setupInstrument({search,nameFor,readList,saveList,openOrder}) {
     area.classList.remove("dragging");
   }
   area.addEventListener("pointerdown", event => {
-    if (!chart || !event.isPrimary || event.button !== 0) return;
+    if (!chart || !event.isPrimary || event.button !== 0 || event.target.closest("#drawing-actions")) return;
+    const points = tools.pointsToMove();
+    if (points) {
+      const origin = geometry?.point(event.clientX,event.clientY);
+      if (!origin) return;
+      drag = {id:event.pointerId,points,origin};
+      area.setPointerCapture(event.pointerId);
+      return;
+    }
     if (tools.activeDrawing()) {
       tools.addPoint(geometry?.point(event.clientX,event.clientY));
       if (tools.activeDrawing() === "freehand") {
@@ -124,21 +180,31 @@ export function setupInstrument({search,nameFor,readList,saveList,openOrder}) {
       }
       return;
     }
-    if (!lastStart) return;
-    drag = {id: event.pointerId, x: event.clientX, start,
+    drag = {id: event.pointerId, x: event.clientX, y:event.clientY, start, moved:false,
       step: Math.max(1, (area.clientWidth - 48) / visibleBars)};
     area.setPointerCapture(event.pointerId);
     area.classList.add("dragging");
   });
   area.addEventListener("pointermove", event => {
     if (drag?.id !== event.pointerId) return;
-    if (drag.freehand) tools.addPoint(geometry?.point(event.clientX,event.clientY));
-    else moveTo(drag.start + (drag.x - event.clientX) / drag.step);
+    if (drag.freehand) {
+      tools.addPoint(geometry?.point(event.clientX,event.clientY));
+    } else if (drag.points) {
+      const target = geometry?.point(event.clientX,event.clientY);
+      if (target) tools.moveDrawing(geometry.translate(drag.points,drag.origin,target));
+    } else {
+      drag.moved ||= Math.hypot(drag.x-event.clientX,drag.y-event.clientY)>7;
+      if (drag.moved && lastStart) moveTo(drag.start + (drag.x - event.clientX) / drag.step);
+    }
   });
   for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
     area.addEventListener(type, event => {
       if (drag?.id !== event.pointerId) return;
       if (drag.freehand) tools.finishFreehand();
+      else if (drag.points) tools.finishMove();
+      else if (type === "pointerup" && !drag.moved && tools.replayEnd() == null) {
+        tools.selectDrawing(geometry?.hitDrawing(event.clientX,event.clientY));
+      }
       endDrag();
     });
   }
@@ -229,6 +295,7 @@ export function setupInstrument({search,nameFor,readList,saveList,openOrder}) {
     get("stock-frames").hidden=true;
   }
   async function open(symbol) {
+    if (trade.open) trade.close();
     current=symbol;quote=null;
     selectPanel("chart");
     document.body.classList.add("instrument-open");
@@ -257,6 +324,7 @@ export function setupInstrument({search,nameFor,readList,saveList,openOrder}) {
       return;
     }
     requestId += 1;
+    if (trade.open) trade.close();
     current="";quote=null;chart=null;endDrag();
     tools.updateSeries(null,current,frame);
     if(dialog.open) dialog.close();
@@ -273,7 +341,7 @@ export function setupInstrument({search,nameFor,readList,saveList,openOrder}) {
   get("stock-back").onclick=()=>back();
   dialog.addEventListener("cancel",e=>{e.preventDefault();back();});
   get("stock-search").onclick=()=>back(search);
-  get("stock-order").onclick=()=>openOrder(current,quote?.exchange);
+  get("stock-order").onclick=openTrade;
   get("stock-star").onclick=()=>{
     const items=readList();
     if(saveList(items.includes(current)?items.filter(v=>v!==current):[...items,current]))setFavorite();
