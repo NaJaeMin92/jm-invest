@@ -203,10 +203,20 @@ function showHoldings(balance) {
       }).format(Number(amount));
     };
     const currency = /^[A-Z]{3}$/.test(holding.currency || "") ? holding.currency : null;
+    const priceDigits = Math.max(2, ...[holding.cost_price, holding.current_price].map((price) => {
+      const fraction = String(price ?? "").split(".")[1] || "";
+      return fraction.replace(/0+$/, "").length;
+    }));
+    const formatPrice = (price) => {
+      if (!currency || price == null || price === "" || !Number.isFinite(Number(price))) return "동기화 필요";
+      return new Intl.NumberFormat("ko-KR", {
+        style: "currency", currency, minimumFractionDigits: priceDigits, maximumFractionDigits: priceDigits,
+      }).format(Number(price));
+    };
     for (const [label, metric] of [
-      ["매입가", currency ? money(holding.cost_price, currency) : "동기화 필요"],
+      ["매입가", formatPrice(holding.cost_price)],
       ["매입금액", money(holding.cost_krw, "KRW")],
-      ["현재가", currency ? money(holding.current_price, currency) : "동기화 필요"],
+      ["현재가", formatPrice(holding.current_price)],
       ["평가금액", money(holding.value_krw, "KRW")],
     ]) {
       const cell = document.createElement("div");
