@@ -268,3 +268,20 @@ button.broker-row:hover { background:#2a2c31; }
 #holdings-list .holding-logo.has-logo img { padding:5px; }
 
 #cash-breakdown { white-space:pre-line; }
+
+#tab-home { padding:22px 18px; }
+.watch-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+#private .watch-heading h2 { margin:0; }
+.watch-heading span,.watch-status { color:var(--muted); font-size:.8rem; }
+.watch-status { margin:8px 0 14px; }
+.watch-list { list-style:none; margin:0; padding:0; }
+.watch-list li { display:grid; grid-template-columns:44px minmax(0,1fr) auto; align-items:center; gap:12px; padding:16px 0; border-bottom:1px solid var(--line); }
+.watch-logo { width:44px; height:44px; border-radius:50%; background:#303b4c; display:grid; place-items:center; overflow:hidden; font-weight:700; font-size:.8rem; }
+.watch-logo img { display:block; width:100%; height:100%; object-fit:contain; background:#fff; padding:4px; }
+.watch-identity,.watch-quote { display:grid; gap:4px; min-width:0; }
+.watch-identity strong { font-size:1.05rem; }
+.watch-identity small { color:var(--muted); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.watch-quote { text-align:right; }
+.watch-quote small { white-space:nowrap; color:var(--muted); }
+.watch-quote [data-direction="down"] { color:#8babff; }
+.watch-quote [data-direction="up"] { color:#ff9eaa; }
