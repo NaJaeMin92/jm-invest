@@ -40,7 +40,7 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     get("stock-star").setAttribute("aria-pressed",String(saved));
     get("stock-star").setAttribute("aria-label",saved?"Remove from watchlist":"Add to watchlist");
   }
-  const area = get("chart-area"), range = get("chart-position"), latest = get("chart-latest");
+  const area = get("chart-area"), latest = get("chart-latest");
   const dateFormat = new Intl.DateTimeFormat("en-US", {
     month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York"
   });
@@ -82,9 +82,6 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     drawSecondary(start,end,options);
     const dates = [start, end].map(i => dateFormat.format(chart.bars[i][0] * 1000));
     get("chart-dates").textContent = dates.join(" – ");
-    range.value = String(start);
-    range.setAttribute("aria-valuetext", dates.join(" to "));
-    range.max = String(options.end ? Math.min(lastStart, options.end - 1) : lastStart);
     latest.disabled = options.end != null || start === lastStart;
     first.disabled = start === 0;
   }
@@ -146,7 +143,6 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
       endDrag();
     });
   }
-  range.addEventListener("input", () => moveTo(Number(range.value)));
   latest.addEventListener("click", () => moveTo(lastStart));
   first.addEventListener("click", () => moveTo(0));
   new ResizeObserver(draw).observe(area);
@@ -154,8 +150,6 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     chart = source?.length ? prepareChart(source, frame) : null;
     lastStart = Math.max(0, (chart?.bars.length || 0) - visibleBars);
     start = lastStart;
-    range.max = String(lastStart);
-    range.disabled = lastStart === 0;
     get("chart-history").hidden = !chart;
     area.classList.toggle("pannable", lastStart > 0);
     tools.updateSeries(chart,current,frame);
