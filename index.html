@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=45">
-<script type="module" src="./journal.js?v=45"></script>
+<link rel="stylesheet" href="./style.css?v=46">
+<script type="module" src="./journal.js?v=46"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header><div class="head"><a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -122,8 +122,12 @@
 <nav class="instrument-tabs" aria-label="Symbol information">
 <button id="chart-tab" aria-current="page">Chart</button><a id="options-link">Options</a><a id="news-link">News</a><button id="symbol-feed">Feeds</button><a id="company-link">Company</a>
 </nav>
-<div id="chart-area"><img id="daily-reference" src="./assets/quotes/skhy-daily.webp" alt="SKHY daily candlesticks, exponential moving averages, volume and RSI from the November 20 reference chart" hidden>
+<div id="chart-area"><img draggable="false" id="daily-reference" src="./assets/quotes/skhy-daily.webp" alt="SKHY daily candlesticks, exponential moving averages, volume and RSI from the November 20 reference chart" hidden>
 <canvas id="market-chart" role="img" aria-label="Candlesticks, volume and RSI"></canvas><div id="external-chart" hidden></div></div>
+<div id="chart-history" hidden>
+<span id="chart-dates"></span><button type="button" id="chart-latest">Latest</button>
+<input type="range" min="0" step="1" id="chart-position" aria-label="Scroll chart history">
+</div>
 <div class="frame-bar"><div id="stock-frames" aria-label="Chart interval">
 <button data-frame="hour">1 hour</button><button data-frame="day" aria-pressed="true">Daily</button><button data-frame="week">Weekly</button><button data-frame="month">Monthly</button><button data-frame="quarter">Quarterly</button>
 </div><button id="stock-expand" aria-pressed="false" aria-label="Expand chart">⛶</button></div>

@@ -43,16 +43,27 @@ function rsi(values) {
   });
 }
 
-export function drawChart(canvas, bars, frame) {
+const periods = [5, 10, 20, 200];
+export const visibleBars = 55;
+
+export function prepareChart(quote, frame) {
+  const bars = aggregate(frame === "hour" ? quote.hourly : quote.daily, frame);
+  const closes = bars.map(bar => bar[4]);
+  return { bars, averages: periods.map(period => ema(closes, period)), strength: rsi(closes) };
+}
+
+export function drawChart(canvas, chart, frame, start) {
+  const { bars } = chart;
   if (!bars.length || !canvas.clientWidth) return;
   const w = canvas.clientWidth, h = canvas.clientHeight, pixel = window.devicePixelRatio || 1;
   canvas.width = Math.round(w * pixel);
   canvas.height = Math.round(h * pixel);
   const ctx = canvas.getContext("2d");
   ctx.scale(pixel, pixel);
-  const series = bars.map(b => b[4]), periods = [5,10,20,200];
-  const averages = periods.map(p=>ema(series,p).slice(-55));
-  const shown = bars.slice(-55), r = rsi(series).slice(-55);
+  const end = start + visibleBars;
+  const shown = bars.slice(start, end);
+  const averages = chart.averages.map(values => values.slice(start, end));
+  const r = chart.strength.slice(start, end);
   const colors = ["#388bff","#ff971e","#c659ff","#ffc647"];
   const pad = 8, top = 38, base = h * .61, volumeBase = h * .73, rsiBase = h - 8;
   const lo = Math.min(...shown.map(b=>b[3]),...averages.flat().filter(Number.isFinite));

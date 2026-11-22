@@ -1,4 +1,4 @@
-import {aggregate,drawChart} from "./instrument-chart.js";
+import {prepareChart, drawChart, visibleBars} from "./instrument-chart.js?v=46";
 
 const get = id => document.getElementById(id);
 const savedQuotes = new Set("ANT SKHY SPCX MRVL BZMAIN CLMAIN AAL UAL DAL NVDA".split(" "));
@@ -6,7 +6,7 @@ const cache = new Map();
 export function publicQuote(symbol) {
   if (!savedQuotes.has(symbol)) return Promise.resolve(null);
   if (!cache.has(symbol)) {
-    cache.set(symbol,fetch("./assets/quotes/"+symbol+".json").then(response=>{
+    cache.set(symbol,fetch("./assets/quotes/"+symbol+".json?v=46").then(response=>{
       if (!response.ok) throw new Error("Quote unavailable");
       return response.json();
     }).catch(()=>{cache.delete(symbol);return null;}));
@@ -37,16 +37,64 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     get("stock-star").setAttribute("aria-pressed",String(saved));
     get("stock-star").setAttribute("aria-label",saved?"Remove from watchlist":"Add to watchlist");
   }
+  const area = get("chart-area"), range = get("chart-position"), latest = get("chart-latest");
+  const dateFormat = new Intl.DateTimeFormat("en-US", {
+    month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York"
+  });
+  let chart = null, start = 0, lastStart = 0, drag = null;
+
   function draw() {
-    if (!current || !quote) return;
-    const snapshot=current==="SKHY" && frame==="day";
-    reference.hidden=!snapshot;canvas.hidden=snapshot;
-    if (!snapshot) drawChart(canvas,aggregate(frame==="hour"?quote.hourly:quote.daily,frame),frame);
+    if (!chart || !chart.bars.length || !dialog.open) return;
+    const snapshot = current === "SKHY" && frame === "day" && start === lastStart;
+    reference.hidden = !snapshot;
+    canvas.hidden = snapshot;
+    if (!snapshot) drawChart(canvas, chart, frame, start);
+    const end = Math.min(chart.bars.length, start + visibleBars) - 1;
+    const dates = [start, end].map(i => dateFormat.format(chart.bars[i][0] * 1000));
+    get("chart-dates").textContent = dates.join(" – ");
+    range.value = String(start);
+    range.setAttribute("aria-valuetext", dates.join(" to "));
+    latest.disabled = start === lastStart;
   }
-  new ResizeObserver(draw).observe(get("chart-area"));
+  function moveTo(index) {
+    const next = Math.min(lastStart, Math.max(0, Math.round(index)));
+    if (next !== start) {
+      start = next;
+      draw();
+    }
+  }
+  function endDrag() {
+    if (drag && area.hasPointerCapture(drag.id)) area.releasePointerCapture(drag.id);
+    drag = null;
+    area.classList.remove("dragging");
+  }
+  area.addEventListener("pointerdown", event => {
+    if (!chart || !lastStart || !event.isPrimary || event.button !== 0) return;
+    drag = {id: event.pointerId, x: event.clientX, start,
+      step: Math.max(1, (area.clientWidth - 48) / visibleBars)};
+    area.setPointerCapture(event.pointerId);
+    area.classList.add("dragging");
+  });
+  area.addEventListener("pointermove", event => {
+    if (drag?.id === event.pointerId) moveTo(drag.start + (drag.x - event.clientX) / drag.step);
+  });
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+    area.addEventListener(type, event => { if (drag?.id === event.pointerId) endDrag(); });
+  }
+  range.addEventListener("input", () => moveTo(Number(range.value)));
+  latest.addEventListener("click", () => moveTo(lastStart));
+  new ResizeObserver(draw).observe(area);
   function setFrame(value) {
-    frame=value;
-    for(const button of get("stock-frames").children) button.setAttribute("aria-pressed",String(button.dataset.frame===frame));
+    endDrag();
+    frame = value;
+    chart = quote ? prepareChart(quote, frame) : null;
+    lastStart = Math.max(0, (chart?.bars.length || 0) - visibleBars);
+    start = lastStart;
+    range.max = String(lastStart);
+    range.disabled = lastStart === 0;
+    get("chart-history").hidden = !chart;
+    area.classList.toggle("pannable", lastStart > 0);
+    for (const button of get("stock-frames").children) button.setAttribute("aria-pressed",String(button.dataset.frame===frame));
     draw();
   }
   function link(id, href) {
@@ -72,7 +120,7 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
       get("stock-summary").replaceChildren("SKHY saw ", bullish, " Bullish and ", bearish, " Bearish short-term technical signals. (2 more)");
     } else get("stock-summary").textContent = displaySymbol(current)+" closed at "+quote.price.toFixed(2)+" ("+signed(pct)+"%). The session ranged from "+quote.low.toFixed(2)+" to "+quote.high.toFixed(2)+".";
     get("stock-frames").hidden=false;
-    draw();
+    setFrame(frame);
   }
   function fallback(symbol) {
     const container=get("external-chart");container.hidden=false;canvas.hidden=true;
@@ -119,7 +167,7 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
       if(symbol!==current)open(symbol);
       return;
     }
-    current="";quote=null;
+    current="";quote=null;chart=null;endDrag();
     if(dialog.open) dialog.close();
     document.body.classList.remove("instrument-open");
     get("external-chart").replaceChildren();

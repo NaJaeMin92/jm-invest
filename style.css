@@ -460,3 +460,10 @@ body.instrument-open { overflow:hidden; }
 #tab-more .menu-link span { color:var(--muted); font-size:20px; }
 #private #tab-more h2:not(:first-child) { margin-top:24px; }
 #tab-more #logout { color:#ff709e; }
+
+#chart-area.pannable { touch-action:pan-y pinch-zoom; user-select:none; -webkit-user-select:none; cursor:grab; }
+#chart-area.dragging { cursor:grabbing; }
+#chart-history { display:grid; grid-template-columns:1fr auto; align-items:center; gap:0 8px; padding:0 14px; color:var(--sub); font-size:12px; }
+#chart-latest { min-height:30px; padding:2px 4px; font-size:12px; color:#69a7ff; }
+#chart-latest:disabled { color:var(--sub); opacity:.7; }
+#chart-position { grid-column:1/-1; margin:0; padding:0; min-height:22px; width:100%; accent-color:#438bed; }
