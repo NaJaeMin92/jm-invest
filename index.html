@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
 <link rel="stylesheet" href="./style.css?v=16">
-<script type="module" src="./journal.js?v=16"></script>
+<script type="module" src="./journal.js?v=18"></script>
 </head>
 <body class="trade-page">
 <header><div class="head"><a href="./" class="brand-home" aria-label="내 계좌 홈"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -76,8 +76,9 @@
 </div>
 </div>
 <dialog id="holdings-dialog" aria-labelledby="holdings-title">
-<div class="sheet-header"><div><h2 id="holdings-title">해외 주식</h2><p id="holdings-summary"></p></div><button id="close-holdings" type="button" aria-label="닫기">×</button></div>
+<div class="sheet-header"><div><h2 id="holdings-title">해외 주식</h2><p id="holdings-summary"></p></div></div>
 <ul id="holdings-list"></ul>
+<button id="close-holdings" class="sheet-close" type="button">닫기</button>
 </dialog>
 <nav id="bottom-nav" aria-label="주 메뉴" hidden>
 <button type="button" data-view="home"><span aria-hidden="true">⌂</span>홈</button>

@@ -158,6 +158,20 @@ function showHoldings(balance) {
   for (const holding of [...holdings].sort((a, b) => Number(b.value_krw) - Number(a.value_krw))) {
     const item = document.createElement("li");
     const left = document.createElement("div");
+    left.className = "holding-main";
+    const logo = document.createElement("span");
+    logo.className = "holding-logo";
+    const ticker = String(holding.symbol || "").toUpperCase();
+    const logoFiles = { NVDA: "nvda", GOOGL: "goog", GOOG: "goog", AMZN: "amzn", AVGO: "avgo", NBIS: "nbis", AMZU: "amzu", SOXX: "soxx", SOXL: "soxl" };
+    logo.textContent = ticker.slice(0, 2);
+    if (logoFiles[ticker]) {
+      const image = document.createElement("img");
+      image.src = `./assets/companies/${logoFiles[ticker]}.png`;
+      image.alt = "";
+      image.addEventListener("error", () => image.remove());
+      logo.append(image);
+    }
+    const labels = document.createElement("div");
     const name = document.createElement("strong");
     const quantity = document.createElement("small");
     const right = document.createElement("div");
@@ -169,7 +183,8 @@ function showHoldings(balance) {
     const amount = Number(holding.profit_krw);
     profit.textContent = `${amount > 0 ? "+" : ""}${won.format(amount)} · ${Number(holding.return_pct).toFixed(2)}%`;
     profit.dataset.direction = amount < 0 ? "down" : "up";
-    left.append(name, quantity);
+    labels.append(name, quantity);
+    left.append(logo, labels);
     right.append(value, profit);
     item.append(left, right);
     holdingsList.append(item);
