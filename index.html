@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=38">
+<link rel="stylesheet" href="./style.css?v=39">
 <script type="module" src="./journal.js?v=37"></script>
 </head>
 <body class="trade-page">
@@ -28,8 +28,8 @@
 <div class="watch-heading"><h2>My Watchlist</h2><button id="watch-edit" type="button" aria-expanded="false" aria-controls="watch-form">편집</button></div>
 <p id="home-value" class="watch-status"></p>
 <form id="watch-form" class="watch-form" hidden>
-<label for="watch-symbol">종목 티커</label>
-<div><input id="watch-symbol" maxlength="12" placeholder="예: NVDA" autocomplete="off" required><button type="submit">추가</button></div>
+<label for="watch-symbol">Search stocks and ETFs</label>
+<div><input id="watch-symbol" maxlength="80" placeholder="Symbol or company name" autocomplete="off" required><button type="submit">Search</button></div><ul id="watch-results" class="watch-results" aria-live="polite"></ul>
 </form>
 <ul id="home-holdings" class="watch-list"></ul>
 </section>

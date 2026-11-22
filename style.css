@@ -304,3 +304,8 @@ button.broker-row:hover { background:#2a2c31; }
 #bottom-nav button { font-size:clamp(.55rem,2.5vw,.72rem); }
 
 #bottom-nav button { min-width:0; white-space:nowrap; font-size:clamp(.58rem,2.4vw,.72rem); letter-spacing:-.02em; }
+
+.watch-results { list-style:none; padding:0; margin:4px 0 12px; max-height:280px; overflow:auto; }
+.watch-results li { border-bottom:1px solid var(--line); }
+.watch-results button { display:grid; width:100%; text-align:left; gap:4px; background:transparent; border:0; border-radius:0; }
+.watch-results small { color:var(--muted); overflow-wrap:anywhere; }

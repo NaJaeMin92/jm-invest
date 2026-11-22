@@ -315,7 +315,7 @@ function renderWatchlist() {
     identity.className = "watch-identity";
     const name = document.createElement("strong");
     const subtitle = document.createElement("small");
-    subtitle.textContent = "시세 미연동";
+    subtitle.textContent = stockDirectory?.find((item) => item.symbol === symbol)?.name || "Price unavailable";
     identity.append(name, subtitle);
     const quote = document.createElement("span");
     quote.className = "watch-unavailable";
@@ -335,25 +335,58 @@ function renderWatchlist() {
     watchList.append(row);
   }
 }
-watchForm.addEventListener("submit", (event) => {
+var stockDirectory;
+watchForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const input = document.querySelector("#watch-symbol");
-  const symbol = input.value.trim().toUpperCase();
-  if (!/^[A-Z][A-Z0-9.\-]{0,11}$/.test(symbol)) {
-    watchStatus.textContent = "영문 티커를 입력해 주세요.";
-    return;
-  }
-  const symbols = readWatchlist();
-  if (symbols.includes(symbol)) {
-    watchStatus.textContent = "이미 추가된 종목입니다.";
-    return;
-  }
+  const query = document.querySelector("#watch-symbol").value.trim().toUpperCase();
+  const results = document.querySelector("#watch-results");
+  results.replaceChildren();
+  if (!query) return;
+  watchStatus.textContent = "Searching…";
   try {
-    localStorage.setItem(watchKey, JSON.stringify([...symbols, symbol]));
-    input.value = "";
-    renderWatchlist();
-  } catch { watchStatus.textContent = "관심종목을 저장하지 못했습니다."; }
+    if (!stockDirectory) {
+      const response = await fetch("./assets/symbols.json");
+      if (!response.ok) throw new Error("directory unavailable");
+      stockDirectory = await response.json();
+    }
+    const matches = stockDirectory.filter((item) =>
+      item.symbol.includes(query) || item.name.toUpperCase().includes(query)
+    ).sort((a, b) => {
+      const rank = (item) => item.symbol === query ? 0 : item.symbol.startsWith(query) ? 1 : 2;
+      return rank(a) - rank(b) || a.symbol.localeCompare(b.symbol);
+    }).slice(0, 20);
+    watchStatus.textContent = matches.length ? "Select a result to add it." : "No matching symbols found.";
+    for (const item of matches) {
+      const row = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      const label = document.createElement("strong");
+      const name = document.createElement("small");
+      label.textContent = item.symbol;
+      name.textContent = item.name;
+      button.append(label, name);
+      button.addEventListener("click", () => {
+        const symbols = readWatchlist();
+        if (symbols.includes(item.symbol)) {
+          watchStatus.textContent = "Already in your watchlist.";
+          return;
+        }
+        try {
+          localStorage.setItem(watchKey, JSON.stringify([...symbols, item.symbol]));
+          document.querySelector("#watch-symbol").value = "";
+          results.replaceChildren();
+          renderWatchlist();
+        } catch { watchStatus.textContent = "Unable to save your watchlist."; }
+      });
+      row.append(button);
+      results.append(row);
+    }
+  } catch {
+    watchStatus.textContent = "Search is unavailable. Please try again.";
+    stockDirectory = null;
+  }
 });
+
 renderWatchlist();
 
 async function loadValuation(accessToken) {
