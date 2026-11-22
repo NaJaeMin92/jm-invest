@@ -204,10 +204,10 @@ function showHoldings(balance) {
     };
     const currency = /^[A-Z]{3}$/.test(holding.currency || "") ? holding.currency : null;
     for (const [label, metric] of [
-      ["매입금액", money(holding.cost_krw, "KRW")],
-      ["평가금액", money(holding.value_krw, "KRW")],
       ["매입가", currency ? money(holding.cost_price, currency) : "동기화 필요"],
+      ["매입금액", money(holding.cost_krw, "KRW")],
       ["현재가", currency ? money(holding.current_price, currency) : "동기화 필요"],
+      ["평가금액", money(holding.value_krw, "KRW")],
     ]) {
       const cell = document.createElement("div");
       const title = document.createElement("small");
