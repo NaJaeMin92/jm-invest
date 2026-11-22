@@ -9,13 +9,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=23">
-<script type="module" src="./journal.js?v=21"></script>
+<link rel="stylesheet" href="./style.css?v=24">
+<script type="module" src="./journal.js?v=24"></script>
 </head>
 <body class="trade-page">
 <header><div class="head"><a href="./" class="brand-home" aria-label="내 계좌 홈"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
 <main id="account">
-<h1 id="page-heading">내 계좌</h1>
+<div class="page-title"><button type="button" id="back-accounts" aria-label="계좌 목록으로 돌아가기" hidden>‹</button><h1 id="page-heading">내 계좌</h1></div>
 <section class="panel">
 <form id="login">
 <label>이메일<input name="email" type="email" autocomplete="username" required></label>
@@ -62,7 +62,7 @@
 
 </section>
 <section id="trade-detail" hidden>
-<button type="button" id="back-accounts">‹ 계좌 목록</button>
+
 <section class="allocation" aria-labelledby="allocation-heading">
 <h2 id="allocation-heading">총 투자 자산</h2>
 <strong id="allocation-total" class="allocation-total" aria-live="polite">조회 중…</strong>

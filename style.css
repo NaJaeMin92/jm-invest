@@ -257,3 +257,7 @@ button.broker-row:hover { background:#2a2c31; }
 #holdings-list .holding-logo img { position:absolute; inset:0; display:block; box-sizing:border-box; width:42px; height:42px; max-width:42px; max-height:42px; object-fit:contain; padding:6px; }
 #holdings-list li .holding-main > div { text-align:left; }
 #holdings-list li .holding-top > div:last-child { text-align:right; }
+
+.trade-page .page-title { display:flex; align-items:center; gap:8px; margin:22px 4px 14px; }
+.trade-page .page-title #page-heading { margin:0; }
+#back-accounts { background:transparent; padding:0; width:36px; min-height:40px; font-size:2rem; line-height:1; color:var(--text); }

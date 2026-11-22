@@ -62,6 +62,7 @@ for (const button of navButtons) {
 function setDetail(open) {
   home.hidden = open;
   detail.hidden = !open;
+  document.querySelector("#back-accounts").hidden = !open;
   document.querySelector("#page-heading").textContent = open ? "키움증권" : "내 계좌";
 }
 
