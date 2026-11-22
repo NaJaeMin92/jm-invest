@@ -381,6 +381,8 @@ async function loadValuation(accessToken) {
     const bar = document.querySelector("#allocation-bar");
     bar.hidden = !canCompare;
     bar.style.setProperty("--stock-share", `${stockWeight * 100}%`);
+    bar.style.setProperty("--cash-end", `${(stockWeight + cash / total) * 100}%`);
+    bar.setAttribute("aria-label", rp == null ? "연동된 주식과 예수금 비중" : "추정 총자산 중 주식, 예수금, 차액 비중");
     const percent = new Intl.NumberFormat("ko-KR", { style: "percent", maximumFractionDigits: 1 });
     document.querySelector("#stock-share").textContent = hasCash && canCompare ? percent.format(stockWeight) : "미국주식";
     if (hasCash) {

@@ -293,3 +293,5 @@ button.broker-row:hover { background:#2a2c31; }
 .watch-list li { grid-template-columns:minmax(0,1fr) auto; }
 
 #rp-note { max-width:12rem; }
+
+.allocation-bar { background:linear-gradient(90deg,#83b3ff 0 var(--stock-share,100%),#8791a0 var(--stock-share,100%) var(--cash-end,100%),#ac82ff var(--cash-end,100%) 100%); }
