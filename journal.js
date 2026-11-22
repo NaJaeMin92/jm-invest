@@ -45,8 +45,7 @@ const logout = document.querySelector("#logout");
 const navigation = document.querySelector("#bottom-nav");
 const navButtons = [...navigation.querySelectorAll("button")];
 function selectView(view) {
-  const publicView = view === "home" || view === "markets";
-  const needsLogin = !publicView && !token;
+  const needsLogin = view !== "home" && !token;
   document.body.dataset.view = view;
   setDetail(false);
   login.hidden = !needsLogin;
@@ -59,12 +58,8 @@ function selectView(view) {
     else button.removeAttribute("aria-current");
   }
   document.querySelector("#page-heading").textContent = {
-    home:"My Watchlist", markets:"Markets", account:"Accounts", profit:"Realized P&L", more:"Menu"
+    home:"My Watchlist", account:"Accounts", profit:"Realized P&L", more:"Menu"
   }[view];
-  const tools = document.querySelector("#watch-tools");
-  const searchSlot = view === "markets" ? "#market-search-slot" : "#watch-edit-slot";
-  document.querySelector(searchSlot).append(tools);
-  tools.hidden = !(view === "markets" || (view === "home" && editingWatchlist));
   window.scrollTo(0, 0);
 }
 for (const button of navButtons) {

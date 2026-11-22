@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=43">
-<script type="module" src="./journal.js?v=43"></script>
+<link rel="stylesheet" href="./style.css?v=44">
+<script type="module" src="./journal.js?v=44"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header><div class="head"><a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -37,15 +37,13 @@
 <button id="watch-sort" type="button" aria-label="Sort by percentage change">%Change <svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="m5 10 7-7 7 7zm0 4h14l-7 7z" fill="currentColor" stroke="none"/></svg></button>
 </div>
 <p id="watch-source-note" hidden>The nine featured quotes and charts are from the supplied watchlist screenshot. The percentages show the change at the time of capture.</p>
-<div id="watch-edit-slot"></div>
-<ul id="home-holdings" class="watch-list"></ul>
-</section>
-<section id="tab-markets" class="tab-panel" lang="en" hidden><h2>Markets</h2><div id="market-search-slot"></div></section>
 <div id="watch-tools" hidden>
 <form id="watch-form" class="watch-form"><label for="watch-symbol">Search stocks and ETFs</label>
 <div><input id="watch-symbol" maxlength="80" placeholder="Symbol or company name" autocomplete="off" required><button type="submit">Search</button></div>
 <ul id="watch-results" class="watch-results" aria-live="polite"></ul></form>
 <p id="home-value" class="watch-status" role="status"></p></div>
+<ul id="home-holdings" class="watch-list"></ul>
+</section>
 <section id="tab-profit" class="tab-panel" hidden>
 <h2>미국주식 실현손익</h2>
 <p id="profit-period"></p>
@@ -107,7 +105,6 @@
 </dialog>
 <nav id="bottom-nav" lang="en" aria-label="Main navigation">
 <button type="button" data-view="home" aria-current="page"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path fill="currentColor" stroke="none" d="M12 21 2.7 12A5.8 5.8 0 0 1 12 5 5.8 5.8 0 0 1 21.3 12Z"/></svg><span>Watchlists</span></button>
-<button type="button" data-view="markets"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M1 16c6 2 17-4 22-10"/></svg><span>Markets</span></button>
 <button type="button" data-view="account"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="m3 8 15-5v5M3 8h18v13H3z"/><circle cx="17" cy="14" r="1" fill="currentColor"/></svg><span>Open Account</span></button>
 <button type="button" data-view="profit" title="Realized P&amp;L"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M2 4h17v12H6l-4 3zM9 19h9l4 3V8"/></svg><span>Feeds</span></button>
 <button type="button" data-view="more"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg><span>Menu</span></button>
