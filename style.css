@@ -59,4 +59,6 @@ footer { margin: 22px 0 36px; font-size: .875rem; }
 [hidden] { display: none !important; }
 #private h2 { margin-top: 24px; }
 #private li { white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 8px; }
-#entry textarea { font: inherit; padding: 10px; border: 1px solid var(--line); border-radius: 10px; resize: vertical; }
+
+#trade-symbol { font: inherit; min-height: 44px; padding: 8px 12px; }
+#trade-chart { margin-top: 14px; }
