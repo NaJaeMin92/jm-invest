@@ -108,6 +108,9 @@ document.querySelector("#logout").addEventListener("click", () => {
   const accessToken = token;
   token = null;
   saveSession(null);
+  if (holdingsDialog.open) holdingsDialog.close();
+  holdingsList.replaceChildren();
+  document.querySelector("#holdings-summary").textContent = "";
   workspace.hidden = true;
   document.querySelector("#kiwoom-value").textContent = "";
   document.querySelector("#allocation-total").textContent = "";
@@ -125,6 +128,53 @@ document.querySelector("#logout").addEventListener("click", () => {
   message.textContent = "";
   request("/auth/v1/logout?scope=local", { method: "POST", accessToken }).catch(() => {});
 });
+
+const holdingsDialog = document.querySelector("#holdings-dialog");
+const holdingsList = document.querySelector("#holdings-list");
+document.querySelector("#open-holdings").addEventListener("click", () => holdingsDialog.showModal());
+document.querySelector("#close-holdings").addEventListener("click", () => holdingsDialog.close());
+holdingsDialog.addEventListener("click", (event) => {
+  if (event.target === holdingsDialog) holdingsDialog.close();
+});
+
+function showHoldings(balance) {
+  const won = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" });
+  document.querySelector("#holdings-summary").textContent =
+    won.format(balance.value_krw) + (balance.return_pct == null ? "" : ` · ${Number(balance.return_pct).toFixed(2)}%`);
+  holdingsList.replaceChildren();
+  const holdings = balance.holdings;
+  if (!Array.isArray(holdings)) {
+    const item = document.createElement("li");
+    item.textContent = "종목별 잔고 동기화가 필요합니다.";
+    holdingsList.append(item);
+    return;
+  }
+  if (!holdings.length) {
+    const item = document.createElement("li");
+    item.textContent = "보유 중인 미국주식이 없습니다.";
+    holdingsList.append(item);
+    return;
+  }
+  for (const holding of [...holdings].sort((a, b) => Number(b.value_krw) - Number(a.value_krw))) {
+    const item = document.createElement("li");
+    const left = document.createElement("div");
+    const name = document.createElement("strong");
+    const quantity = document.createElement("small");
+    const right = document.createElement("div");
+    const value = document.createElement("strong");
+    const profit = document.createElement("small");
+    name.textContent = holding.name;
+    quantity.textContent = `${Number(holding.quantity).toLocaleString("ko-KR")}주 · ${holding.symbol}`;
+    value.textContent = won.format(Number(holding.value_krw));
+    const amount = Number(holding.profit_krw);
+    profit.textContent = `${amount > 0 ? "+" : ""}${won.format(amount)} · ${Number(holding.return_pct).toFixed(2)}%`;
+    profit.dataset.direction = amount < 0 ? "down" : "up";
+    left.append(name, quantity);
+    right.append(value, profit);
+    item.append(left, right);
+    holdingsList.append(item);
+  }
+}
 
 async function loadValuation(accessToken) {
   const value = document.querySelector("#portfolio-value");
@@ -185,6 +235,7 @@ async function loadValuation(accessToken) {
     allocationReturn.textContent = performance.textContent;
     allocationReturn.dataset.direction = performance.dataset.direction;
     allocation.hidden = false;
+    showHoldings(balance);
   } catch (error) {
     if (token === accessToken) homeValue.textContent = value.textContent = allocationTotal.textContent = error.code === "PGRST205" ? "잔고 DB 설정 대기" : "평가액 조회 실패";
   }

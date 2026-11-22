@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=14">
-<script type="module" src="./journal.js?v=15"></script>
+<link rel="stylesheet" href="./style.css?v=16">
+<script type="module" src="./journal.js?v=16"></script>
 </head>
 <body class="trade-page">
 <header><div class="head"><a href="./" class="brand-home" aria-label="내 계좌 홈"><span class="header-symbol" aria-hidden="true">◈</span></a></div></header>
@@ -56,14 +56,14 @@
 <section id="trade-detail" hidden>
 <button type="button" id="back-accounts">‹ 계좌 목록</button>
 <section class="allocation" aria-labelledby="allocation-heading">
-<h2 id="allocation-heading">연동 자산 평가액</h2>
+<h2 id="allocation-heading">총 투자 자산</h2>
 <strong id="allocation-total" class="allocation-total" aria-live="polite">조회 중…</strong>
 <div id="allocation-breakdown" hidden>
 <div class="allocation-bar" role="img" id="allocation-bar" aria-label="주식과 예수금 비중"></div>
-<div class="allocation-row">
+<button type="button" class="allocation-row allocation-button" id="open-holdings" aria-haspopup="dialog">
 <div><strong>해외 주식</strong><small id="stock-share">미국주식</small></div>
 <div><strong id="allocation-value"></strong><small id="allocation-return"></small></div>
-</div>
+</button>
 </div>
 <div class="allocation-row" style="--category-color:#ac82ff"><strong>채권·RP·금·기타</strong><small>미연동</small></div>
 <div class="allocation-row" style="--category-color:#e3a450"><strong>펀드</strong><small>미연동</small></div>
@@ -74,6 +74,10 @@
 </section>
 </div>
 </div>
+<dialog id="holdings-dialog" aria-labelledby="holdings-title">
+<div class="sheet-header"><div><h2 id="holdings-title">해외 주식</h2><p id="holdings-summary"></p></div><button id="close-holdings" type="button" aria-label="닫기">×</button></div>
+<ul id="holdings-list"></ul>
+</dialog>
 <nav id="bottom-nav" aria-label="주 메뉴" hidden>
 <button type="button" data-view="home"><span aria-hidden="true">⌂</span>홈</button>
 <button type="button" data-view="account" aria-current="page"><span aria-hidden="true">▤</span>내 계좌</button>
