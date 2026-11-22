@@ -297,6 +297,18 @@ watchEdit.addEventListener("click", () => {
   renderWatchlist();
 });
 
+const suggestedWatchlist = ["ANT", "SKHY", "SPCX", "MRVL", "BZMAIN", "CLMAIN", "AAL", "UAL", "DAL"];
+const watchSeedKey = "jm-invest:watchlist:reference-added:v1";
+try {
+  if (!localStorage.getItem(watchSeedKey)) {
+    const existing = JSON.parse(localStorage.getItem(watchKey) || "[]");
+    if (Array.isArray(existing)) {
+      localStorage.setItem(watchKey, JSON.stringify([...new Set([...existing, ...suggestedWatchlist])]));
+      localStorage.setItem(watchSeedKey, "1");
+    }
+  }
+} catch {}
+
 function readWatchlist() {
   try {
     const value = JSON.parse(localStorage.getItem(watchKey) || "[]");
@@ -325,7 +337,8 @@ function renderWatchlist() {
     identity.className = "watch-identity";
     const name = document.createElement("strong");
     const subtitle = document.createElement("small");
-    subtitle.textContent = stockDirectory?.find((item) => item.symbol === symbol)?.name || "Price unavailable";
+    const referenceNames = { ANT: "Anthropic PBC", SKHY: "SK Hynix Inc", SPCX: "Space Exploration", MRVL: "Marvell Technology", BZMAIN: "Brent crude futures", CLMAIN: "Crude oil futures", AAL: "American Airlines", UAL: "United Airlines", DAL: "Delta Air Lines" };
+    subtitle.textContent = stockDirectory?.find((item) => item.symbol === symbol)?.name || referenceNames[symbol] || "Price unavailable";
     identity.append(name, subtitle);
     const quote = document.createElement("div");
     quote.className = "watch-quote";
@@ -340,7 +353,8 @@ function renderWatchlist() {
     priceNote.textContent = hasPrice ? "Last account sync" : "Price unavailable";
     quote.append(priceLabel, priceNote);
     const remove = document.createElement("button");
-    name.textContent = symbol;
+    const referenceSymbols = { BZMAIN: "BZmain", CLMAIN: "CLmain" };
+    name.textContent = referenceSymbols[symbol] || symbol;
     remove.textContent = "Remove";
     remove.type = "button";
     remove.setAttribute("aria-label", `Remove ${symbol}`);
@@ -504,7 +518,7 @@ async function openWorkspace(session, remember) {
   setDetail(false);
   workspace.hidden = false;
   navigation.hidden = false;
-  selectView("account");
+  selectView("home");
   loadValuation(token);
   message.textContent = remember && !stored ? "이 브라우저에서는 로그인 상태를 저장할 수 없습니다." : "";
 }
