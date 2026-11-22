@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=36">
-<script type="module" src="./journal.js?v=36"></script>
+<link rel="stylesheet" href="./style.css?v=37">
+<script type="module" src="./journal.js?v=37"></script>
 </head>
 <body class="trade-page">
 <header><div class="head"><a href="./" class="brand-home" aria-label="내 계좌 홈"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -25,9 +25,9 @@
 </form>
 <div id="private" hidden>
 <section id="tab-home" class="tab-panel" hidden>
-<div class="watch-heading"><h2>Watchlist</h2></div>
+<div class="watch-heading"><h2>My Watchlist</h2><button id="watch-edit" type="button" aria-expanded="false" aria-controls="watch-form">편집</button></div>
 <p id="home-value" class="watch-status"></p>
-<form id="watch-form" class="watch-form">
+<form id="watch-form" class="watch-form" hidden>
 <label for="watch-symbol">종목 티커</label>
 <div><input id="watch-symbol" maxlength="12" placeholder="예: NVDA" autocomplete="off" required><button type="submit">추가</button></div>
 </form>
@@ -93,7 +93,7 @@
 <button id="close-holdings" class="sheet-close" type="button">닫기</button>
 </dialog>
 <nav id="bottom-nav" aria-label="주 메뉴" hidden>
-<button type="button" data-view="home"><span aria-hidden="true">⌂</span>홈</button>
+<button type="button" data-view="home"><span aria-hidden="true">♡</span>Watchlists</button>
 <button type="button" data-view="account" aria-current="page"><span aria-hidden="true">▤</span>내 계좌</button>
 <button type="button" data-view="profit"><span aria-hidden="true">◫</span>실현손익 조회</button>
 <button type="button" data-view="more"><span aria-hidden="true">☰</span>더보기</button>

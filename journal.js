@@ -52,7 +52,7 @@ function selectView(view) {
     if (active) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
   }
-  document.querySelector("#page-heading").textContent = {home:"홈", account:"내 계좌", profit:"실현손익 조회", more:"더보기"}[view];
+  document.querySelector("#page-heading").textContent = {home:"Watchlists", account:"내 계좌", profit:"실현손익 조회", more:"더보기"}[view];
   window.scrollTo(0, 0);
 }
 for (const button of navButtons) {
@@ -286,6 +286,15 @@ const watchKey = "jm-invest:watchlist:v1";
 const watchList = document.querySelector("#home-holdings");
 const watchStatus = document.querySelector("#home-value");
 const watchForm = document.querySelector("#watch-form");
+const watchEdit = document.querySelector("#watch-edit");
+let editingWatchlist = false;
+watchEdit.addEventListener("click", () => {
+  editingWatchlist = !editingWatchlist;
+  watchForm.hidden = !editingWatchlist;
+  watchEdit.textContent = editingWatchlist ? "완료" : "편집";
+  watchEdit.setAttribute("aria-expanded", String(editingWatchlist));
+  renderWatchlist();
+});
 
 function readWatchlist() {
   try {
@@ -299,7 +308,18 @@ function renderWatchlist() {
   watchStatus.textContent = symbols.length ? "이 기기에 저장된 관심종목" : "관심종목을 추가해 주세요.";
   for (const symbol of symbols) {
     const row = document.createElement("li");
+    const badge = document.createElement("span");
+    badge.className = "watch-ticker-icon";
+    badge.textContent = symbol.slice(0, 2);
+    const identity = document.createElement("div");
+    identity.className = "watch-identity";
     const name = document.createElement("strong");
+    const subtitle = document.createElement("small");
+    subtitle.textContent = "시세 미연동";
+    identity.append(name, subtitle);
+    const quote = document.createElement("span");
+    quote.className = "watch-unavailable";
+    quote.textContent = "—";
     const remove = document.createElement("button");
     name.textContent = symbol;
     remove.textContent = "삭제";
@@ -311,7 +331,7 @@ function renderWatchlist() {
         renderWatchlist();
       } catch { watchStatus.textContent = "관심종목을 저장하지 못했습니다."; }
     });
-    row.append(name, remove);
+    row.append(badge, identity, editingWatchlist ? remove : quote);
     watchList.append(row);
   }
 }
