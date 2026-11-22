@@ -171,7 +171,7 @@ function showHoldings(balance) {
     logo.textContent = ticker.slice(0, 2);
     if (logoFiles[ticker]) {
       const image = document.createElement("img");
-      image.src = `./assets/companies/${logoFiles[ticker]}.png`;
+      image.src = `./assets/companies/${logoFiles[ticker]}.png?v=28`;
       image.alt = "";
       image.addEventListener("error", () => image.remove());
       logo.append(image);

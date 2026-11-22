@@ -261,3 +261,5 @@ button.broker-row:hover { background:#2a2c31; }
 .trade-page .page-title { display:flex; align-items:center; gap:8px; margin:22px 4px 14px; }
 .trade-page .page-title #page-heading { margin:0; }
 #back-accounts { background:transparent; padding:0; width:36px; min-height:40px; font-size:2rem; line-height:1; color:var(--text); }
+
+#holdings-list .holding-logo img { object-fit:contain; padding:0; background:transparent; }
