@@ -320,7 +320,7 @@ async function loadValuation(accessToken) {
         ? `외화 환산 ${won.format(balance.cash_foreign_krw)}`
         : usd.format(balance.cash_usd);
       document.querySelector("#cash-breakdown").textContent =
-        `${won.format(balance.cash_domestic_krw)} KRW · ${foreignLabel}`;
+        `${won.format(balance.cash_domestic_krw)} KRW\n${foreignLabel}`;
       if (canCompare) document.querySelector("#cash-share").textContent = percent.format(1 - stockWeight);
     }
     performance.dataset.direction = Number(balance.return_pct) < 0 ? "down" : "up";

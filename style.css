@@ -266,3 +266,5 @@ button.broker-row:hover { background:#2a2c31; }
 
 #holdings-list .holding-logo.has-logo { background:#fff; }
 #holdings-list .holding-logo.has-logo img { padding:5px; }
+
+#cash-breakdown { white-space:pre-line; }
