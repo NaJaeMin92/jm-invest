@@ -2,7 +2,8 @@ export function setupOrders(readToken) {
   const get = id => document.getElementById(id);
   const dialog = get("order-dialog"), form = get("order-form"), review = get("order-review");
   const status = get("order-status"), launch = get("open-order"), confirm = get("order-confirm");
-  let reviewId = null, busy = false;
+  let reviewId = null, busy = false, dialogVersion = 0;
+  const publicSite = location.hostname === "najaemin92.github.io";
   async function call(path, body) {
     const session = readToken();
     if (!session) throw new Error("로그인이 필요합니다.");
@@ -17,7 +18,34 @@ export function setupOrders(readToken) {
   function reset() {
     form.reset();status.textContent="";form.hidden=false;review.hidden=true;confirm.disabled=false;get("order-edit").disabled=false;reviewId=null;
   }
-  launch.onclick = () => {if (!dialog.open) {reset();dialog.showModal();}};
+  async function open(symbol = "", exchange = "") {
+    if (dialog.open || busy) return;
+    const version = ++dialogVersion;
+    const session = readToken();
+    reset();
+    get("order-title").textContent = symbol ? symbol + " 지정가 주문" : "미국주식 지정가 주문";
+    form.elements.symbol.value = symbol;
+    const venue = exchange.toUpperCase();
+    if (venue.startsWith("NASDAQ")) form.elements.exchange.value = "ND";
+    else if (venue === "NYSE") form.elements.exchange.value = "NY";
+    else if (venue === "AMEX" || venue === "NYSE AMERICAN") form.elements.exchange.value = "NA";
+    form.hidden = true;
+    dialog.showModal();
+    if (publicSite) {
+      status.textContent = "실계좌 주문은 이 Mac의 비공개 주문 서버에서 사용할 수 있습니다.";
+      return;
+    }
+    if (!session) {
+      status.textContent = "Account에서 본인 계정으로 로그인한 뒤 주문할 수 있습니다.";
+      return;
+    }
+    status.textContent = "주문 서버에 연결하는 중입니다.";
+    const settings = await call("status").catch(() => null);
+    if (version !== dialogVersion || !dialog.open || readToken() !== session) return;
+    form.hidden = settings?.enabled !== true;
+    status.textContent = form.hidden ? "실계좌 주문 서버가 연결되어 있지 않습니다." : "";
+  }
+  launch.onclick = () => open();
   get("order-close").onclick = () => {if (!busy) dialog.close();};
   dialog.addEventListener("cancel",event=>{if (busy) event.preventDefault();});
   get("order-edit").onclick = () => {if (!busy) {reviewId=null;review.hidden=true;form.hidden=false;status.textContent="";}};
@@ -54,11 +82,14 @@ export function setupOrders(readToken) {
   return {
     async refresh() {
       const token = readToken();
-      const isPrivateHost = location.hostname !== "najaemin92.github.io";
-      if (!token || !isPrivateHost) return;
-      try { launch.hidden = readToken() !== token || !(await call("status")).enabled; }
+      if (!token || publicSite) return;
+      try {
+        const settings = await call("status");
+        launch.hidden = readToken() !== token || settings.enabled !== true;
+      }
       catch { launch.hidden=true; }
     },
+    open,
     signOut() { if (dialog.open) dialog.close(); launch.hidden=true; reset(); }
   };
 }

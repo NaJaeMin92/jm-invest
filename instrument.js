@@ -31,7 +31,7 @@ const signed = n => (n>=0?"+":"")+n.toFixed(2);
 const displaySymbol = s => ({BZMAIN:"BZmain",CLMAIN:"CLmain"}[s] || s);
 const validSymbol = /^[A-Z][A-Z0-9.\-]{0,11}$/;
 
-export function setupInstrument({search,nameFor,readList,saveList}) {
+export function setupInstrument({search,nameFor,readList,saveList,openOrder}) {
   const dialog=get("stock-detail"), canvas=get("market-chart"), reference=get("daily-reference");
   let current="", quote=null, frame="day", afterClose=null;
   function setFavorite() {
@@ -273,6 +273,7 @@ export function setupInstrument({search,nameFor,readList,saveList}) {
   get("stock-back").onclick=()=>back();
   dialog.addEventListener("cancel",e=>{e.preventDefault();back();});
   get("stock-search").onclick=()=>back(search);
+  get("stock-order").onclick=()=>openOrder(current,quote?.exchange);
   get("stock-star").onclick=()=>{
     const items=readList();
     if(saveList(items.includes(current)?items.filter(v=>v!==current):[...items,current]))setFavorite();
