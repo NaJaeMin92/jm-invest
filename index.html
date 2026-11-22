@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111917">
+<title>시그마 보드 · 주간 예상 범위</title>
+<link rel="stylesheet" href="./style.css">
+<script src="./app.js" defer></script>
+</head>
+<body>
+<header><div class="head"><a href="./"><span class="logo">Σ</span> 시그마 보드</a><span class="tag">예시 데이터</span></div></header>
+<main>
+<section class="intro"><h1>주간 예상 범위</h1><p>종목별 예상 변동폭과 관측 가격이 범위의 어디에 있는지 비교합니다.</p></section>
+<div class="layout">
+<section class="panel" aria-labelledby="detail-title">
+<h2 id="detail-title">종목별 범위</h2>
+<div class="symbols" id="symbols" aria-label="예시 종목"></div>
+<div id="details" aria-live="polite"></div>
+</section>
+<section class="panel" aria-labelledby="calc-title">
+<h2 id="calc-title">시그마 계산기</h2>
+<p class="muted">기준가, 관측가, 주간 예상 변동폭을 입력하세요.</p>
+<form id="calculator">
+<label>기준가 ($)<input name="anchor" type="number" min="0.000001" step="any" value="100" required></label>
+<label>관측가 ($)<input name="price" type="number" min="0" step="any" value="94" required></label>
+<label>주간 예상 변동폭 (±%)<input name="width" type="number" min="0.000001" step="any" value="5" required></label>
+<button class="primary">계산하기</button>
+</form>
+<div id="result" aria-live="polite"></div>
+</section>
+</div>
+<footer>σ 위치 = (관측가 − 기준가) ÷ 예상 변동폭(달러). 예상 범위의 상·하단은 기준가에서 예상 변동폭을 더하고 뺀 값입니다.</footer>
+</main>
+</body>
+</html>
