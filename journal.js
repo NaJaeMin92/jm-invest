@@ -103,20 +103,33 @@ function drawChart() {
 
 function showRecords(records) {
   trades = records;
-  const format = new Intl.NumberFormat("ko-KR");
-  const buy = records.filter((record) => record.side === "buy").length;
-  document.querySelector("#trade-count").textContent = format.format(records.length);
-  document.querySelector("#buy-count").textContent = format.format(buy);
-  document.querySelector("#sell-count").textContent = format.format(records.length - buy);
-  document.querySelector("#trade-period").textContent = records.length
-    ? `가져온 체결 주문 · ${records.at(-1).order_date} ~ ${records[0].order_date}`
-    : "가져온 체결 주문이 없습니다.";
+  document.querySelector("#kiwoom-caption").textContent =
+    `미국주식 · 체결 ${records.length.toLocaleString("ko-KR")}건`;
   symbols.replaceChildren(...[...new Set(records.map((record) => record.symbol))].sort().map((symbol) => new Option(symbol, symbol)));
   symbols.disabled = !records.length;
   drawChart();
   render(fills, trades, ({ order_date, symbol, side, price, quantity }) =>
     `${order_date} · ${symbol} · ${side === "buy" ? "매수" : "매도"} · $${price} × ${quantity}`, "가져온 체결 내역이 없습니다.");
 }
+
+const home = document.querySelector("#account-home");
+const detail = document.querySelector("#trade-detail");
+const logout = document.querySelector("#logout");
+
+function setDetail(open) {
+  home.hidden = open;
+  detail.hidden = !open;
+  document.querySelector("#page-heading").textContent = open ? "키움증권" : "내 계좌";
+}
+
+document.querySelector("#open-kiwoom").addEventListener("click", () => {
+  setDetail(true);
+  document.querySelector("#back-accounts").focus();
+});
+document.querySelector("#back-accounts").addEventListener("click", () => {
+  setDetail(false);
+  document.querySelector("#open-kiwoom").focus();
+});
 
 symbols.addEventListener("change", drawChart);
 
@@ -158,6 +171,8 @@ document.querySelector("#logout").addEventListener("click", () => {
   token = null;
   saveSession(null);
   workspace.hidden = true;
+  logout.hidden = true;
+  setDetail(false);
   showRecords([]);
   symbols.replaceChildren();
   chart.replaceChildren();
@@ -179,7 +194,9 @@ async function openWorkspace(session, remember) {
   token = session.access_token;
   showRecords(records);
   login.hidden = true;
+  setDetail(false);
   workspace.hidden = false;
+  logout.hidden = false;
   message.textContent = remember && !stored ? "이 브라우저에서는 로그인 상태를 저장할 수 없습니다." : "";
 }
 

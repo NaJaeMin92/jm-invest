@@ -67,14 +67,34 @@ footer { margin: 22px 0 36px; font-size: .875rem; }
 .trade-page main { max-width: 760px; }
 .remember { display: flex; align-items: center; gap: 10px; min-height: 44px; }
 .remember input { width: 20px; min-height: 20px; margin: 0; }
-.trade-overview { padding-bottom: 22px; border-bottom: 1px solid var(--line); }
-.overview-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-#private .overview-header h2 { margin: 0; }
-.overview-total { display: flex; align-items: baseline; gap: 8px; margin: 12px 0 0; color: var(--text); }
-.overview-total strong { font-size: clamp(2.5rem, 10vw, 3.6rem); line-height: 1; letter-spacing: -.055em; }
-.overview-period { margin: 9px 0 20px; }
-.overview-account { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; border-radius: 16px; padding: 14px; background: #202e45; }
-.overview-account p { margin: 4px 0 0; font-size: .875rem; }
-.account-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 13px; background: #294572; color: #dceaff; font-weight: 800; }
-.account-counts { display: flex; margin: 0; padding: 0; border: 0; gap: 12px; }
-.account-counts dd { text-align: center; }
+
+.trade-page { --bg: #101114; --panel: #202125; --line: #34363d; --text: #f4f5f8; --muted: #a5a9b3; min-height: 100vh; }
+.trade-page header { background: linear-gradient(110deg,#141920,#1a2a44); border: 0; }
+.trade-page .head, .trade-page main { max-width: 620px; padding-inline: clamp(14px,4vw,26px); }
+.trade-page .head { min-height: 68px; }
+.jm-mark { display: grid; place-items:center; background:#c2d8ff; color:#19243c; width:30px; height:30px; border-radius:10px; font-size:.75rem; }
+.trade-page #page-heading { margin: 28px 4px 14px; font-size:1.5rem; }
+.trade-page .panel { padding:0; border-radius:22px; overflow:hidden; border:1px solid #2a2c32; }
+.trade-page #login, #trade-detail { padding:22px; }
+#status { margin: 0; }
+#status:not(:empty) { padding: 14px 22px; }
+.total-row,.broker-row { display:grid; grid-template-columns:44px 1fr auto; align-items:center; gap:14px; }
+.total-row { padding:24px 20px; border-bottom:1px solid var(--line); }
+#private .total-row h2 { margin:0 0 4px; font-weight:550; font-size:.95rem; color:var(--muted); }
+.portfolio-value { font-size:1.65rem; letter-spacing:-.05em; }
+.broker-row { width:100%; padding:18px 20px; border:0; background:transparent; border-radius:0; text-align:left; }
+button.broker-row:hover { background:#2a2c31; }
+.broker-name { display:grid; gap:4px; }
+.broker-name strong { font-size:1.15rem; }
+.broker-name small,.row-status { font-size:.875rem; color:var(--muted); }
+.row-action,#logout,#back-accounts { background:#33363e; color:#e2e5eb; border:0; border-radius:10px; padding:8px 10px; font-size:.875rem; }
+.row-action span { margin-left:3px; }
+.broker-icon,.ledger-icon { height:44px; width:44px; border-radius:14px; display:grid; place-content:center; font-weight:750; }
+.kiwoom { background:#183b3a; color:#7fe6cb; }
+.samsung { background:#243457; color:#9cbcff; }
+.ledger-icon { background:#253655; gap:3px; }
+.ledger-icon i { background:#80abff; width:19px; height:3px; border-radius:2px; }
+.ledger-icon i:nth-child(2) { width:14px; }
+.account-nav { display:flex; align-items:center; justify-content:center; border-top:1px solid var(--line); }
+.account-nav>* { text-align:center; padding:15px 0; width:50%; font-size:.9rem; }
+.account-nav a { color:var(--muted); }
