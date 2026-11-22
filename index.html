@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=46">
-<script type="module" src="./journal.js?v=46"></script>
+<link rel="stylesheet" href="./style.css?v=47">
+<script type="module" src="./journal.js?v=47"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header><div class="head"><a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -120,18 +120,31 @@
 <dl><dt>H/L</dt><dd id="stock-range">—</dd><dt>Volume</dt><dd id="stock-volume">—</dd><dt>Mkt Cap</dt><dd id="stock-cap">—</dd></dl></div>
 <div class="quote-time"><span id="stock-time"></span><small>Snapshot</small></div>
 <nav class="instrument-tabs" aria-label="Symbol information">
-<button id="chart-tab" aria-current="page">Chart</button><a id="options-link">Options</a><a id="news-link">News</a><button id="symbol-feed">Feeds</button><a id="company-link">Company</a>
+<button type="button" id="chart-tab" data-panel="chart" aria-current="page" aria-controls="chart-panel">Chart</button><button type="button" data-panel="sigma" aria-controls="sigma-panel">Sigma</button><button type="button" data-panel="sentiment" aria-controls="sentiment-panel">Fear &amp; Greed</button><button id="symbol-feed">Feeds</button><a id="company-link">Company</a>
 </nav>
+<section id="chart-panel">
 <div id="chart-area"><img draggable="false" id="daily-reference" src="./assets/quotes/skhy-daily.webp" alt="SKHY daily candlesticks, exponential moving averages, volume and RSI from the November 20 reference chart" hidden>
-<canvas id="market-chart" role="img" aria-label="Candlesticks, volume and RSI"></canvas><div id="external-chart" hidden></div></div>
+<canvas id="market-chart" role="img" aria-label="Candlesticks, volume and RSI"></canvas><div id="external-chart" hidden></div><p id="chart-status" role="status" hidden></p></div>
 <div id="chart-history" hidden>
-<span id="chart-dates"></span><button type="button" id="chart-latest">Latest</button>
+<span id="chart-dates"></span><div class="chart-jumps"><button type="button" id="chart-first">First</button><button type="button" id="chart-latest">Latest</button></div>
 <input type="range" min="0" step="1" id="chart-position" aria-label="Scroll chart history">
+<small id="chart-coverage"></small>
 </div>
 <div class="frame-bar"><div id="stock-frames" aria-label="Chart interval">
-<button data-frame="hour">1 hour</button><button data-frame="day" aria-pressed="true">Daily</button><button data-frame="week">Weekly</button><button data-frame="month">Monthly</button><button data-frame="quarter">Quarterly</button>
+<button data-frame="minute">1 min</button><button data-frame="five">5 min</button><button data-frame="hour">1 hour</button><button data-frame="day" aria-pressed="true">Daily</button><button data-frame="week">Weekly</button><button data-frame="month">Monthly</button><button data-frame="quarter">Quarterly</button>
 </div><button id="stock-expand" aria-pressed="false" aria-label="Expand chart">⛶</button></div>
 <section class="quote-summary"><h3 id="summary-title">Technical Summary</h3><p id="stock-summary"></p><a id="quote-source" target="_blank" rel="noopener noreferrer">Quote source ↗</a></section>
+</section>
+<section class="market-panel" id="sigma-panel" aria-labelledby="sigma-heading" hidden>
+<h3 id="sigma-heading">Weekly expected range</h3>
+<div id="sigma-content" aria-live="polite"></div>
+<a class="market-source" id="sigma-source" href="https://sigmarange.com/#watchlist" target="_blank" rel="noopener noreferrer">SigmaRange ↗</a>
+</section>
+<section class="market-panel" id="sentiment-panel" aria-labelledby="sentiment-heading" hidden>
+<h3 id="sentiment-heading">Fear &amp; Greed Index</h3>
+<div id="sentiment-content" aria-live="polite"></div>
+<a class="market-source" href="https://edition.cnn.com/markets/fear-and-greed" target="_blank" rel="noopener noreferrer">CNN Fear &amp; Greed ↗</a>
+</section>
 <div class="instrument-actions"><div><button id="symbol-account">Open Account</button><a href="https://www.webull.com/paper-trading" target="_blank" rel="noopener noreferrer">paperTrade</a></div><button id="symbol-actions" aria-label="More symbol actions" aria-expanded="false" aria-controls="symbol-action-menu">•••</button></div>
 <div id="symbol-action-menu" hidden><button id="symbol-copy">Copy symbol</button><a id="symbol-finance">View quote ↗</a></div>
 </div></dialog>

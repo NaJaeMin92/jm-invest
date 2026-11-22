@@ -1,13 +1,18 @@
 // Bars are ordered [timestamp, open, high, low, close, volume].
+export function isIntraday(interval) {
+  return interval === "minute" || interval === "five" || interval === "hour";
+}
+
 export function aggregate(bars, interval) {
-  if (interval === "hour" || interval === "day") return bars;
+  if (interval === "minute" || interval === "hour" || interval === "day") return bars;
   const groups = [];
   let lastKey;
   for (const bar of bars) {
     const date = new Date(bar[0] * 1000);
     if (interval === "week") date.setUTCDate(date.getUTCDate() - (date.getUTCDay() + 6) % 7);
     if (interval === "quarter") date.setUTCMonth(3 * Math.floor(date.getUTCMonth() / 3), 1);
-    const key = date.toISOString().slice(0, interval === "week" ? 10 : 7);
+    const key = interval === "five" ? Math.floor(bar[0] / 300)
+      : date.toISOString().slice(0, interval === "week" ? 10 : 7);
     if (key !== lastKey) {
       groups.push([...bar]);
       lastKey = key;
@@ -46,8 +51,8 @@ function rsi(values) {
 const periods = [5, 10, 20, 200];
 export const visibleBars = 55;
 
-export function prepareChart(quote, frame) {
-  const bars = aggregate(frame === "hour" ? quote.hourly : quote.daily, frame);
+export function prepareChart(source, frame) {
+  const bars = aggregate(source, frame);
   const closes = bars.map(bar => bar[4]);
   return { bars, averages: periods.map(period => ema(closes, period)), strength: rsi(closes) };
 }
@@ -104,7 +109,7 @@ export function drawChart(canvas, chart, frame, start) {
   text(last.toFixed(2),w-43,Math.max(top,y(last)-3),"#f2f4fa");
   for(const i of new Set([0,Math.floor(shown.length/2),shown.length-1])){
     const d=new Date(shown[i][0]*1000);
-    const label=frame==="hour"?d.toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"2-digit",minute:"2-digit",hour12:false}):d.toISOString().slice(5,10);
+    const label=isIntraday(frame)?d.toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"2-digit",minute:"2-digit",hour12:false}):(frame === "month" || frame === "quarter" ? d.toISOString().slice(0,7) : d.toISOString().slice(5,10));
     text(label,x(i)-4,volumeBase+13,"#8e99af");
   }
   const ry=v=>rsiBase-(rsiBase-volumeBase-32)*v/100;

@@ -1,4 +1,5 @@
-import {prepareChart, drawChart, visibleBars} from "./instrument-chart.js?v=46";
+import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=47";
+import {showMarketPanel} from "./market-panels.js?v=47";
 
 const get = id => document.getElementById(id);
 const savedQuotes = new Set("ANT SKHY SPCX MRVL BZMAIN CLMAIN AAL UAL DAL NVDA".split(" "));
@@ -41,7 +42,21 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
   const dateFormat = new Intl.DateTimeFormat("en-US", {
     month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York"
   });
-  let chart = null, start = 0, lastStart = 0, drag = null;
+  const first = get("chart-first"), coverage = get("chart-coverage");
+  const chartStatus = get("chart-status");
+  const minuteCache = new Map();
+  const tabs = [...dialog.querySelectorAll("[data-panel]")];
+  let chart = null, start = 0, lastStart = 0, drag = null, requestId = 0;
+  function selectPanel(panel) {
+    for (const tab of tabs) {
+      const selected = tab.dataset.panel === panel;
+      get(tab.getAttribute("aria-controls")).hidden = !selected;
+      if (selected) tab.setAttribute("aria-current", "page");
+      else tab.removeAttribute("aria-current");
+    }
+    if (panel !== "chart") showMarketPanel(panel, current);
+  }
+  for (const tab of tabs) tab.addEventListener("click", () => selectPanel(tab.dataset.panel));
 
   function draw() {
     if (!chart || !chart.bars.length || !dialog.open) return;
@@ -55,6 +70,7 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     range.value = String(start);
     range.setAttribute("aria-valuetext", dates.join(" to "));
     latest.disabled = start === lastStart;
+    first.disabled = start === 0;
   }
   function moveTo(index) {
     const next = Math.min(lastStart, Math.max(0, Math.round(index)));
@@ -83,19 +99,64 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
   }
   range.addEventListener("input", () => moveTo(Number(range.value)));
   latest.addEventListener("click", () => moveTo(lastStart));
+  first.addEventListener("click", () => moveTo(0));
   new ResizeObserver(draw).observe(area);
-  function setFrame(value) {
-    endDrag();
-    frame = value;
-    chart = quote ? prepareChart(quote, frame) : null;
+  function finishFrame(source) {
+    chart = source?.length ? prepareChart(source, frame) : null;
     lastStart = Math.max(0, (chart?.bars.length || 0) - visibleBars);
     start = lastStart;
     range.max = String(lastStart);
     range.disabled = lastStart === 0;
     get("chart-history").hidden = !chart;
     area.classList.toggle("pannable", lastStart > 0);
-    for (const button of get("stock-frames").children) button.setAttribute("aria-pressed",String(button.dataset.frame===frame));
-    draw();
+    if (chart) {
+      const startDate = dateFormat.format(source[0][0] * 1000);
+      const endDate = dateFormat.format(source.at(-1)[0] * 1000);
+      coverage.textContent = (isIntraday(frame) ? "Intraday snapshot" : "Available since first recorded session")
+        + " · " + startDate + " – " + endDate + " ET";
+      draw();
+    } else {
+      reference.hidden = true;
+      canvas.hidden = true;
+    }
+  }
+  function minuteBars(symbol) {
+    if (!minuteCache.has(symbol)) {
+      const loading = fetch("./assets/intraday/" + encodeURIComponent(symbol) + ".json?v=47")
+        .then(response => {
+          if (!response.ok) throw new Error("Missing minute series");
+          return response.json();
+        }).catch(error => {
+          minuteCache.delete(symbol);
+          throw error;
+        });
+      minuteCache.set(symbol, loading);
+    }
+    return minuteCache.get(symbol);
+  }
+  async function setFrame(value) {
+    const id = ++requestId;
+    endDrag();
+    frame = value;
+    chartStatus.hidden = true;
+    for (const button of get("stock-frames").children) {
+      button.setAttribute("aria-pressed", String(button.dataset.frame === frame));
+    }
+    if (!quote || value === "hour" || !isIntraday(value)) {
+      finishFrame(quote && (value === "hour" ? quote.hourly : quote.daily));
+      return;
+    }
+    finishFrame(null);
+    chartStatus.textContent = "Loading intraday history…";
+    chartStatus.hidden = false;
+    try {
+      const source = await minuteBars(current);
+      if (id !== requestId) return;
+      chartStatus.hidden = true;
+      finishFrame(source);
+    } catch {
+      if (id === requestId) chartStatus.textContent = "Intraday history is temporarily unavailable. Select another interval.";
+    }
   }
   function link(id, href) {
     const anchor=get(id);anchor.href=href;anchor.target="_blank";anchor.rel="noopener noreferrer";
@@ -127,7 +188,7 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     const iframe=document.createElement("iframe");
     iframe.title=displaySymbol(symbol)+" market chart";
     iframe.referrerPolicy="no-referrer";
-    iframe.src="https://s.tradingview.com/widgetembed/?"+new URLSearchParams({symbol,interval:"D",theme:"dark",style:"1",locale:"en",timezone:"America/New_York"});
+    iframe.src="https://s.tradingview.com/widgetembed/?"+new URLSearchParams({symbol,interval:"D",theme:"dark",style:"1",range:"ALL",locale:"en",timezone:"America/New_York"});
     container.replaceChildren(iframe);
     get("stock-time").textContent="Chart by TradingView";
     document.querySelector(".quote-time small").hidden=true;
@@ -136,6 +197,7 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
   }
   async function open(symbol) {
     current=symbol;quote=null;
+    selectPanel("chart");
     document.body.classList.add("instrument-open");
     if (!dialog.open) dialog.showModal();
     dialog.scrollTop=0;
@@ -152,7 +214,7 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     get("stock-change").textContent="";get("stock-time").textContent="Loading quote…";
     get("summary-title").textContent="Session Summary";get("stock-summary").textContent="";
     const url="https://finance.yahoo.com/quote/"+encodeURIComponent(quoteSymbol(symbol))+"/";
-    for(const [id,path] of [["options-link","options/"],["news-link","news/"],["company-link","profile/"],["quote-source",""],["symbol-finance",""]]) link(id,url+path);
+    for(const [id,path] of [["company-link","profile/"],["quote-source",""],["symbol-finance",""]]) link(id,url+path);
     get("external-chart").replaceChildren();get("external-chart").hidden=true;
     canvas.hidden=true;reference.hidden=true;get("stock-frames").hidden=true;
     setFavorite();setFrame("day");
@@ -167,6 +229,7 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
       if(symbol!==current)open(symbol);
       return;
     }
+    requestId += 1;
     current="";quote=null;chart=null;endDrag();
     if(dialog.open) dialog.close();
     document.body.classList.remove("instrument-open");
@@ -184,7 +247,6 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
   get("stock-search").onclick=()=>back(search);
   get("symbol-account").onclick=()=>back(()=>navigate("account"));
   get("symbol-feed").onclick=()=>back(()=>navigate("profit"));
-  get("chart-tab").onclick=()=>get("chart-area").scrollIntoView({block:"nearest"});
   get("stock-star").onclick=()=>{
     const items=readList();
     if(saveList(items.includes(current)?items.filter(v=>v!==current):[...items,current]))setFavorite();

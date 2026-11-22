@@ -467,3 +467,33 @@ body.instrument-open { overflow:hidden; }
 #chart-latest { min-height:30px; padding:2px 4px; font-size:12px; color:#69a7ff; }
 #chart-latest:disabled { color:var(--sub); opacity:.7; }
 #chart-position { grid-column:1/-1; margin:0; padding:0; min-height:22px; width:100%; accent-color:#438bed; }
+
+.instrument-tabs { gap:clamp(12px,3.8vw,24px); }
+.instrument-tabs a,.instrument-tabs button { font-size:clamp(13px,3.8vw,16px); }
+.chart-jumps { display:flex; gap:8px; }
+#chart-first { min-height:30px; padding:2px 4px; font-size:12px; color:#69a7ff; }
+#chart-first:disabled { color:var(--sub); opacity:.7; }
+#chart-coverage { grid-column:1/-1; color:var(--sub); font-size:11px; }
+#chart-status { min-height:100px; margin:0; padding:14px; color:var(--sub); }
+
+.market-panel { padding:20px 16px 0; }
+.market-panel h3 { font-size:19px; margin:0 0 12px; }
+.market-panel h4 { font-size:14px; margin:20px 0 10px; }
+.market-card { padding:16px; border:1px solid #2c3853; border-radius:14px; background:#17223a; }
+.market-number { display:block; margin:4px 0 0; font-size:clamp(22px,6.7vw,34px); font-variant-numeric:tabular-nums; }
+.market-date,.market-subtitle { margin:0; font-size:12px; color:#b5c0d8; }
+.market-subtitle { margin-top:5px; color:#a8caff; font-size:14px; }
+.market-meter { margin:22px 0 14px; }
+.market-rail { position:relative; height:8px; border-radius:999px; background:linear-gradient(90deg,#864cba,#427ef1 25%,#5bafd9 50%,#4678e2 75%,#8746ae); }
+.sentiment-meter .market-rail { background:linear-gradient(90deg,#ec6471,#ef9f62 25%,#ddc478 50%,#9ec47a 75%,#52b9a3); }
+.market-rail::after { content:""; position:absolute; width:3px; height:16px; left:var(--position); top:-4px; border-radius:3px; background:#fff; box-shadow:0 0 0 2px #10172a; transform:translateX(-50%); }
+.market-ticks { display:flex; justify-content:space-between; margin-top:7px; color:#bcc5d8; font-size:11px; }
+.market-facts,.market-drivers { padding:0; border:0; margin:0; }
+.market-facts { gap:10px; margin-bottom:12px; }
+.market-facts div { background:#1c2b48; border-radius:8px; padding:8px 9px; }
+.market-facts dt,.market-drivers dt { color:#b5c0d8; font-size:12px; }
+.market-facts dd { font-size:14px; }
+.market-drivers { display:block; }
+.market-drivers div { display:flex; justify-content:space-between; align-items:center; gap:6px; padding:8px 0; border-bottom:1px solid #29354c; }
+.market-drivers dd { margin:0; font-size:12px; }
+.instrument .market-source { display:inline-block; margin-top:12px; color:#a4c7ff; font-size:13px; }
