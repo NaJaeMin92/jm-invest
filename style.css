@@ -191,7 +191,7 @@ button.broker-row:hover { background:#2a2c31; }
 .trade-page .primary { color:#0b0f17; }
 .trade-page main { padding-bottom:calc(92px + env(safe-area-inset-bottom)); }
 .trade-page button.broker-row:hover { background:#282e39; }
-.header-symbol { font-size:1.45rem; color:var(--accent); }
+.brand-home img { display:block; width:36px; height:36px; border-radius:10px; }
 .identity-mark { background:#222a38; color:#bbc8de; font-style:normal; }
 .identity-mark::before { display:none; }
 .tab-panel { padding:20px; }
