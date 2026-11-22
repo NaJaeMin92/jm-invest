@@ -10,6 +10,22 @@ let trades = [];
 const fills = document.querySelector("#fills");
 const message = document.querySelector("#status");
 let token = null;
+const storageKey = "jm-invest:private-refresh:v1";
+const ownerId = "9fc22c69-b253-406a-be2b-eb8ad9526a3c";
+
+function storedSession() {
+  try { return localStorage.getItem(storageKey); } catch { return null; }
+}
+
+function saveSession(refreshToken) {
+  try {
+    if (refreshToken) localStorage.setItem(storageKey, refreshToken);
+    else localStorage.removeItem(storageKey);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function request(path, { method = "GET", body, accessToken = token } = {}) {
   const headers = { apikey: publicKey, "Content-Type": "application/json" };
@@ -87,6 +103,14 @@ function drawChart() {
 
 function showRecords(records) {
   trades = records;
+  const format = new Intl.NumberFormat("ko-KR");
+  const buy = records.filter((record) => record.side === "buy").length;
+  document.querySelector("#trade-count").textContent = format.format(records.length);
+  document.querySelector("#buy-count").textContent = format.format(buy);
+  document.querySelector("#sell-count").textContent = format.format(records.length - buy);
+  document.querySelector("#trade-period").textContent = records.length
+    ? `가져온 체결 주문 · ${records.at(-1).order_date} ~ ${records[0].order_date}`
+    : "가져온 체결 주문이 없습니다.";
   symbols.replaceChildren(...[...new Set(records.map((record) => record.symbol))].sort().map((symbol) => new Option(symbol, symbol)));
   symbols.disabled = !records.length;
   drawChart();
@@ -103,23 +127,16 @@ login.addEventListener("submit", async (event) => {
   message.textContent = "로그인 확인 중…";
   let signedIn = false;
   try {
-    const body = Object.fromEntries(new FormData(login));
-    body.email = body.email.trim();
+    const body = { email: login.elements.email.value.trim(), password: login.elements.password.value };
     const session = await request("/auth/v1/token?grant_type=password", { method: "POST", body });
     signedIn = true;
-    if (session.user?.id !== "9fc22c69-b253-406a-be2b-eb8ad9526a3c") {
-      await request("/auth/v1/logout?scope=local", { method: "POST", accessToken: session.access_token }).catch(() => {});
-      message.textContent = "이 사이트에 등록된 본인 계정으로 로그인하세요.";
-      return;
-    }
-    const records = await readRecords(session.access_token);
-    token = session.access_token;
-    showRecords(records);
-    login.hidden = true;
-    workspace.hidden = false;
-    message.textContent = "";
+    const remember = login.elements.remember.checked;
+    await openWorkspace(session, remember);
+
   } catch (error) {
-    if (signedIn) {
+    if (error.code === "owner_required") {
+      message.textContent = "이 사이트에 등록된 본인 계정으로 로그인하세요.";
+    } else if (signedIn) {
       message.textContent = `로그인은 성공했지만 체결을 조회하지 못했습니다${error.httpStatus ? ` (HTTP ${error.httpStatus})` : ""}.`;
     } else if (error.code === "invalid_credentials") {
       message.textContent = "이메일 또는 비밀번호가 맞지 않습니다. Supabase Authentication에서 만든 이메일 계정을 사용하세요.";
@@ -139,8 +156,9 @@ login.addEventListener("submit", async (event) => {
 document.querySelector("#logout").addEventListener("click", () => {
   const accessToken = token;
   token = null;
+  saveSession(null);
   workspace.hidden = true;
-  trades = [];
+  showRecords([]);
   symbols.replaceChildren();
   chart.replaceChildren();
   fills.replaceChildren();
@@ -149,3 +167,48 @@ document.querySelector("#logout").addEventListener("click", () => {
   message.textContent = "로그아웃했습니다.";
   request("/auth/v1/logout?scope=local", { method: "POST", accessToken }).catch(() => {});
 });
+
+async function openWorkspace(session, remember) {
+  if (session.user?.id !== ownerId) {
+    const error = new Error("Owner account required");
+    error.code = "owner_required";
+    throw error;
+  }
+  const stored = saveSession(remember ? session.refresh_token : null);
+  const records = await readRecords(session.access_token);
+  token = session.access_token;
+  showRecords(records);
+  login.hidden = true;
+  workspace.hidden = false;
+  message.textContent = remember && !stored ? "이 브라우저에서는 로그인 상태를 저장할 수 없습니다." : "";
+}
+
+async function restoreSession() {
+  if (!storedSession()) return;
+  login.hidden = true;
+  message.textContent = "로그인 확인 중…";
+  try {
+    const resume = async () => {
+      const refreshToken = storedSession();
+      if (!refreshToken) {
+        login.hidden = false;
+        message.textContent = "";
+        return;
+      }
+      const session = await request("/auth/v1/token?grant_type=refresh_token", {
+        method: "POST", body: { refresh_token: refreshToken },
+      });
+      await openWorkspace(session, true);
+    };
+    if (navigator.locks) await navigator.locks.request(storageKey, resume);
+    else await resume();
+  } catch (error) {
+    if (error.httpStatus === 400 || error.httpStatus === 401 || error.code === "owner_required") {
+      saveSession(null);
+    }
+    login.hidden = false;
+    message.textContent = "저장된 로그인으로 화면을 열지 못했습니다. 다시 로그인해 주세요.";
+  }
+}
+
+restoreSession();

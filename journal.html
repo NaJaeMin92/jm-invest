@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>내 거래 · JM Invest</title>
-<link rel="stylesheet" href="./style.css">
-<script src="./journal.js?v=2" defer></script>
+<link rel="stylesheet" href="./style.css?v=3">
+<script src="./journal.js?v=3" defer></script>
 </head>
-<body>
+<body class="trade-page">
 <header><div class="head"><a href="./">JM Invest</a></div></header>
 <main>
 <section class="intro"><h1>내 거래</h1></section>
@@ -15,10 +15,20 @@
 <form id="login">
 <label>이메일<input name="email" type="email" autocomplete="username" required></label>
 <label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label>
+<label class="remember"><input type="checkbox" name="remember">이 기기에서 로그인 유지</label>
 <button class="primary">로그인</button>
 </form>
 <div id="private" hidden>
-<button id="logout" type="button">로그아웃</button>
+<section class="trade-overview" aria-labelledby="overview-title">
+<div class="overview-header"><h2 id="overview-title">거래 요약</h2><button id="logout" type="button">로그아웃</button></div>
+<p class="overview-total"><strong id="trade-count">0</strong><span>건</span></p>
+<p class="overview-period" id="trade-period"></p>
+<div class="overview-account">
+<span class="account-icon" aria-hidden="true">K</span>
+<div><strong>키움증권</strong><p>미국주식 체결</p></div>
+<dl class="account-counts"><div><dt>매수</dt><dd id="buy-count"></dd></div><div><dt>매도</dt><dd id="sell-count"></dd></div></dl>
+</div>
+</section>
 <h2>종목별 체결가</h2>
 <label>종목<select id="trade-symbol"></select></label>
 <div id="trade-chart"></div>

@@ -62,3 +62,19 @@ footer { margin: 22px 0 36px; font-size: .875rem; }
 
 #trade-symbol { font: inherit; min-height: 44px; padding: 8px 12px; }
 #trade-chart { margin-top: 14px; }
+
+.trade-page { --bg: #101725; --panel: #182233; --text: #f2f6ff; --muted: #b2bfd4; --line: #344358; --accent: #416fe0; color-scheme: dark; background: var(--bg); color: var(--text); }
+.trade-page main { max-width: 760px; }
+.remember { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.remember input { width: 20px; min-height: 20px; margin: 0; }
+.trade-overview { padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+.overview-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#private .overview-header h2 { margin: 0; }
+.overview-total { display: flex; align-items: baseline; gap: 8px; margin: 12px 0 0; color: var(--text); }
+.overview-total strong { font-size: clamp(2.5rem, 10vw, 3.6rem); line-height: 1; letter-spacing: -.055em; }
+.overview-period { margin: 9px 0 20px; }
+.overview-account { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; border-radius: 16px; padding: 14px; background: #202e45; }
+.overview-account p { margin: 4px 0 0; font-size: .875rem; }
+.account-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 13px; background: #294572; color: #dceaff; font-weight: 800; }
+.account-counts { display: flex; margin: 0; padding: 0; border: 0; gap: 12px; }
+.account-counts dd { text-align: center; }
