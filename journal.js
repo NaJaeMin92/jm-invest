@@ -52,7 +52,7 @@ function selectView(view) {
     if (active) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
   }
-  document.querySelector("#page-heading").textContent = {home:"홈", account:"내 계좌", more:"더보기"}[view];
+  document.querySelector("#page-heading").textContent = {home:"홈", account:"내 계좌", profit:"실현손익 조회", more:"더보기"}[view];
   window.scrollTo(0, 0);
 }
 for (const button of navButtons) {
@@ -111,6 +111,10 @@ document.querySelector("#logout").addEventListener("click", () => {
   if (holdingsDialog.open) holdingsDialog.close();
   holdingsList.replaceChildren();
   document.querySelector("#holdings-summary").textContent = "";
+  document.querySelector("#profit-list").replaceChildren();
+  document.querySelector("#profit-period").textContent = "";
+  document.querySelector("#profit-updated").textContent = "";
+  document.querySelector("#profit-total").textContent = "동기화 대기";
   workspace.hidden = true;
   document.querySelector("#kiwoom-value").textContent = "";
   document.querySelector("#allocation-total").textContent = "";
@@ -191,6 +195,40 @@ function showHoldings(balance) {
   }
 }
 
+function showProfit(data) {
+  const list = document.querySelector("#profit-list");
+  const total = document.querySelector("#profit-total");
+  const period = document.querySelector("#profit-period");
+  const updated = document.querySelector("#profit-updated");
+  list.replaceChildren();
+  if (!data || !Array.isArray(data.entries)) {
+    total.textContent = "동기화 대기";
+    period.textContent = "";
+    updated.textContent = "";
+    return;
+  }
+  const won = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" });
+  total.textContent = won.format(Number(data.total_krw));
+  total.dataset.direction = Number(data.total_krw) < 0 ? "down" : "up";
+  period.textContent = `${data.start} ~ ${data.end} · 키움 원화 기준`;
+  updated.textContent = new Date(data.observed_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) + " KST 조회";
+  if (!data.entries.length) {
+    const row = document.createElement("li");
+    row.textContent = "기간 내 실현손익이 없습니다.";
+    list.append(row);
+  }
+  for (const entry of data.entries) {
+    const row = document.createElement("li");
+    const label = document.createElement("span");
+    const amount = document.createElement("strong");
+    label.textContent = `${entry.date} · ${entry.name} (${entry.symbol})`;
+    amount.textContent = won.format(Number(entry.profit_krw));
+    amount.dataset.direction = Number(entry.profit_krw) < 0 ? "down" : "up";
+    row.append(label, amount);
+    list.append(row);
+  }
+}
+
 async function loadValuation(accessToken) {
   const value = document.querySelector("#portfolio-value");
   const note = document.querySelector("#valuation-note");
@@ -251,6 +289,7 @@ async function loadValuation(accessToken) {
     allocationReturn.dataset.direction = performance.dataset.direction;
     allocation.hidden = false;
     showHoldings(balance);
+    showProfit(balance.realized_profit);
   } catch (error) {
     if (token === accessToken) homeValue.textContent = value.textContent = allocationTotal.textContent = error.code === "PGRST205" ? "잔고 DB 설정 대기" : "평가액 조회 실패";
   }

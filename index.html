@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
 <link rel="stylesheet" href="./style.css?v=16">
-<script type="module" src="./journal.js?v=19"></script>
+<script type="module" src="./journal.js?v=20"></script>
 </head>
 <body class="trade-page">
 <header><div class="head"><a href="./" class="brand-home" aria-label="내 계좌 홈"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -27,6 +27,13 @@
 <section id="tab-home" class="tab-panel" hidden>
 <h2>투자 현황</h2>
 <strong id="home-value" class="portfolio-value">조회 중…</strong>
+</section>
+<section id="tab-profit" class="tab-panel" hidden>
+<h2>미국주식 실현손익</h2>
+<p id="profit-period"></p>
+<strong id="profit-total" class="portfolio-value">동기화 대기</strong>
+<p id="profit-updated"></p>
+<ul id="profit-list"></ul>
 </section>
 <section id="tab-more" class="tab-panel" hidden>
 <h2>설정</h2>
@@ -83,6 +90,7 @@
 <nav id="bottom-nav" aria-label="주 메뉴" hidden>
 <button type="button" data-view="home"><span aria-hidden="true">⌂</span>홈</button>
 <button type="button" data-view="account" aria-current="page"><span aria-hidden="true">▤</span>내 계좌</button>
+<button type="button" data-view="profit"><span aria-hidden="true">◫</span>실현손익 조회</button>
 <button type="button" data-view="more"><span aria-hidden="true">☰</span>더보기</button>
 </nav>
 <p id="status" role="status"></p>
