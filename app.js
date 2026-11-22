@@ -49,18 +49,25 @@ function select(example) {
     button.setAttribute("aria-pressed", String(button.textContent === example.symbol));
   });
   details.innerHTML = `
-    <div class="hero-value">${sigmaLabel(sigma)}</div>
-    <div class="meta">${example.name} · ${position(sigma)}</div>
+    <div class="quote">
+      <div>
+        <div class="meta">${example.symbol} · ${example.name}</div>
+        <div class="hero-value">${dollars.format(example.price)}</div>
+      </div>
+      <div class="sigma-summary">
+        <strong>${sigmaLabel(sigma)}</strong>
+        <span>${position(sigma)}</span>
+      </div>
+    </div>
     <div class="track" aria-hidden="true">
       <div class="band"></div><div class="marker" style="left:${marker}%"></div>
     </div>
     <div class="axis" aria-hidden="true"><span>−1σ</span><span>기준가</span><span>+1σ</span></div>
     <dl>
       <div><dt>기준가</dt><dd>${dollars.format(example.anchor)}</dd></div>
-      <div><dt>관측가</dt><dd>${dollars.format(example.price)}</dd></div>
-      <div><dt>주간 예상 범위</dt><dd>${dollars.format(lower)} ~ ${dollars.format(upper)}</dd></div>
       <div><dt>예상 변동폭</dt><dd>±${example.width}%</dd></div>
-    </dl>`;
+      <div><dt>주간 예상 범위</dt><dd>${dollars.format(lower)} ~ ${dollars.format(upper)}</dd></div>
+      </dl>`;
 }
 
 const form = document.querySelector("#calculator");
