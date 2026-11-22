@@ -391,11 +391,7 @@ body.instrument-open { overflow:hidden; }
 #stock-frames button,.frame-bar > button { min-height:40px; white-space:nowrap; padding:0 6px; font-weight:600; font-size:14px; }
 #stock-frames [aria-pressed=true] { background:#3889f1; border-radius:6px; min-height:24px; margin-block:7px; }
 .frame-bar > button { font-size:21px; color:#b5bfd5; margin-left:auto; }
-.quote-summary { padding:12px 16px 0; }
-.quote-summary h3 { font-size:20px; margin:0 0 10px; }
-.quote-summary p { font-size:15px; line-height:1.45; color:var(--txt); margin:0 0 9px; }
-#quote-source { font-size:11px; color:#93abda; }
-#stock-detail.expanded :is(.instrument-quote,.quote-time,.instrument-tabs,.quote-summary) { display:none; }
+#stock-detail.expanded :is(.instrument-quote,.quote-time,.instrument-tabs) { display:none; }
 #stock-detail.expanded #chart-area { max-width:900px; margin:auto; }
 #stock-detail.expanded canvas { height:calc(100dvh - 120px); aspect-ratio:auto; }
 #stock-detail.expanded #daily-reference { max-height:calc(100dvh - 120px); object-fit:contain; }

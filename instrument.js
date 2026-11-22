@@ -218,13 +218,6 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     document.querySelector(".quote-time small").hidden=false;
     const when=new Date(quote.asOf*1000).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",year:"numeric"});
     get("stock-time").textContent=current==="SKHY"?"Closed 19:59 11/20 ET":"Closed · "+when+" ET";
-    get("summary-title").textContent=current==="SKHY"?"Vega Summary":"Session Summary";
-    if (current === "SKHY") {
-      const bullish = document.createElement("b"), bearish = document.createElement("b");
-      bullish.dataset.direction = "up"; bullish.textContent = "2";
-      bearish.dataset.direction = "down"; bearish.textContent = "7";
-      get("stock-summary").replaceChildren("SKHY saw ", bullish, " Bullish and ", bearish, " Bearish short-term technical signals. (2 more)");
-    } else get("stock-summary").textContent = displaySymbol(current)+" closed at "+quote.price.toFixed(2)+" ("+signed(pct)+"%). The session ranged from "+quote.low.toFixed(2)+" to "+quote.high.toFixed(2)+".";
     get("stock-frames").hidden=false;
     setFrame(frame);
   }
@@ -237,7 +230,6 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     container.replaceChildren(iframe);
     get("stock-time").textContent="Chart by TradingView";
     document.querySelector(".quote-time small").hidden=true;
-    get("stock-summary").textContent="Use the quote source for market data and company details.";
     get("stock-frames").hidden=true;
   }
   async function open(symbol) {
@@ -254,9 +246,8 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     get("stock-name").textContent=nameFor(symbol);
     for (const id of ["stock-price","stock-range","stock-volume","stock-cap"]) get(id).textContent="—";
     get("stock-change").textContent="";get("stock-time").textContent="Loading quote…";
-    get("summary-title").textContent="Session Summary";get("stock-summary").textContent="";
     const url="https://finance.yahoo.com/quote/"+encodeURIComponent(quoteSymbol(symbol))+"/";
-    for(const [id,path] of [["company-link","profile/"],["quote-source",""]]) link(id,url+path);
+    link("company-link", url + "profile/");
     get("external-chart").replaceChildren();get("external-chart").hidden=true;
     canvas.hidden=true;reference.hidden=true;get("stock-frames").hidden=true;
     setFavorite();setFrame("day");
