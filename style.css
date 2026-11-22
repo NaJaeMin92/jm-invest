@@ -252,3 +252,8 @@ button.broker-row:hover { background:#2a2c31; }
 
 #bottom-nav { grid-template-columns:repeat(4,minmax(0,1fr)); }
 #bottom-nav button { min-width:0; white-space:nowrap; font-size:clamp(.6rem,2.8vw,.75rem); padding-inline:2px; }
+
+#holdings-list .holding-logo { display:flex; position:relative; flex:0 0 42px; width:42px; height:42px; max-width:42px; max-height:42px; align-items:center; justify-content:center; overflow:hidden; }
+#holdings-list .holding-logo img { position:absolute; inset:0; display:block; box-sizing:border-box; width:42px; height:42px; max-width:42px; max-height:42px; object-fit:contain; padding:6px; }
+#holdings-list li .holding-main > div { text-align:left; }
+#holdings-list li .holding-top > div:last-child { text-align:right; }
