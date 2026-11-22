@@ -216,7 +216,7 @@ function showHoldings(balance) {
     const formatPrice = (price) => {
       if (!currency || price == null || price === "" || !Number.isFinite(Number(price))) return "동기화 필요";
       return new Intl.NumberFormat("ko-KR", {
-        style: "currency", currency, minimumFractionDigits: priceDigits, maximumFractionDigits: priceDigits,
+        style: "currency", currency, currencyDisplay: "narrowSymbol", minimumFractionDigits: priceDigits, maximumFractionDigits: priceDigits,
       }).format(Number(price));
     };
     for (const [label, metric] of [
