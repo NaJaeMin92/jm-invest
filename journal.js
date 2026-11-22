@@ -170,6 +170,11 @@ document.querySelector("#logout").addEventListener("click", () => {
   saveSession(null);
   workspace.hidden = true;
   document.querySelector("#kiwoom-value").textContent = "";
+  document.querySelector("#allocation-total").textContent = "";
+  document.querySelector("#allocation-value").textContent = "";
+  document.querySelector("#allocation-return").textContent = "";
+  document.querySelector("#allocation-breakdown").hidden = true;
+  document.querySelector(".trade-history").open = false;
   document.querySelector("#portfolio-value").textContent = "";
   document.querySelector("#valuation-note").textContent = "";
   document.querySelector("#kiwoom-return").textContent = "";
@@ -190,6 +195,10 @@ async function loadValuation(accessToken) {
   const note = document.querySelector("#valuation-note");
   const performance = document.querySelector("#kiwoom-return");
   const accountValue = document.querySelector("#kiwoom-value");
+  const allocationTotal = document.querySelector("#allocation-total");
+  const allocation = document.querySelector("#allocation-breakdown");
+  allocationTotal.textContent = "조회 중…";
+  allocation.hidden = true;
   accountValue.hidden = true;
   accountValue.textContent = "";
   value.textContent = "조회 중…";
@@ -199,17 +208,23 @@ async function loadValuation(accessToken) {
     const [balance] = await request("/rest/v1/kiwoom_valuation?select=value_krw,return_pct,observed_at&limit=1", { accessToken });
     if (token !== accessToken) return;
     if (!balance) {
-      value.textContent = "잔고 동기화 대기";
+      value.textContent = allocationTotal.textContent = "잔고 동기화 대기";
       return;
     }
     value.textContent = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" }).format(balance.value_krw);
     accountValue.textContent = value.textContent;
     accountValue.hidden = false;
+    allocationTotal.textContent = value.textContent;
     performance.dataset.direction = Number(balance.return_pct) < 0 ? "down" : "up";
     note.textContent = new Date(balance.observed_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) + " KST 기준";
     performance.textContent = balance.return_pct == null ? "" : "평가수익률 " + Number(balance.return_pct).toFixed(2) + "%";
+    const allocationReturn = document.querySelector("#allocation-return");
+    document.querySelector("#allocation-value").textContent = value.textContent;
+    allocationReturn.textContent = performance.textContent;
+    allocationReturn.dataset.direction = performance.dataset.direction;
+    allocation.hidden = Number(balance.value_krw) <= 0;
   } catch (error) {
-    if (token === accessToken) value.textContent = error.code === "PGRST205" ? "잔고 DB 설정 대기" : "평가액 조회 실패";
+    if (token === accessToken) value.textContent = allocationTotal.textContent = error.code === "PGRST205" ? "잔고 DB 설정 대기" : "평가액 조회 실패";
   }
 }
 
