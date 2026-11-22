@@ -263,3 +263,6 @@ button.broker-row:hover { background:#2a2c31; }
 #back-accounts { background:transparent; padding:0; width:36px; min-height:40px; font-size:2rem; line-height:1; color:var(--text); }
 
 #holdings-list .holding-logo img { object-fit:contain; padding:0; background:transparent; }
+
+#holdings-list .holding-logo.has-logo { background:#fff; }
+#holdings-list .holding-logo.has-logo img { padding:5px; }

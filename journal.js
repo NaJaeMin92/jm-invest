@@ -168,13 +168,19 @@ function showHoldings(balance) {
     logo.className = "holding-logo";
     const ticker = String(holding.symbol || "").toUpperCase();
     const logoFiles = { NVDA: "nvda", GOOGL: "goog", GOOG: "goog", AMZN: "amzn", AVGO: "avgo", NBIS: "nbis", AMZU: "amzu", SOXX: "soxx", SOXL: "soxl" };
-    logo.textContent = ticker.slice(0, 2);
     if (logoFiles[ticker]) {
       const image = document.createElement("img");
-      image.src = `./assets/companies/${logoFiles[ticker]}.png?v=28`;
+      image.src = `./assets/companies/${logoFiles[ticker]}.png?v=29`;
       image.alt = "";
-      image.addEventListener("error", () => image.remove());
+      image.addEventListener("error", () => {
+        image.remove();
+        logo.textContent = ticker.slice(0, 2);
+        logo.classList.remove("has-logo");
+      });
+      logo.classList.add("has-logo");
       logo.append(image);
+    } else {
+      logo.textContent = ticker.slice(0, 2);
     }
     const labels = document.createElement("div");
     const name = document.createElement("strong");
