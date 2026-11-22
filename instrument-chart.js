@@ -1,3 +1,6 @@
+import {study} from "./technical-indicators.js";
+import {renderAnnotations} from "./chart-annotations.js";
+
 // Bars are ordered [timestamp, open, high, low, close, volume].
 export function isIntraday(interval) {
   return interval === "minute" || interval === "five" || interval === "hour";
@@ -27,15 +30,6 @@ export function aggregate(bars, interval) {
   return groups;
 }
 
-function ema(values, period) {
-  let sum = 0, value;
-  return values.map((close, i) => {
-    if (i < period) sum += close;
-    if (i < period - 1) return null;
-    value = i === period - 1 ? sum / period : value + 2 / (period + 1) * (close - value);
-    return value;
-  });
-}
 function rsi(values) {
   let up = 0, down = 0;
   return values.map((close, i) => {
@@ -48,74 +42,226 @@ function rsi(values) {
   });
 }
 
-const periods = [5, 10, 20, 200];
 export const visibleBars = 55;
 
 export function prepareChart(source, frame) {
   const bars = aggregate(source, frame);
   const closes = bars.map(bar => bar[4]);
-  return { bars, averages: periods.map(period => ema(closes, period)), strength: rsi(closes) };
+  return { bars, closes, strength: rsi(closes), studies: new Map() };
 }
 
-export function drawChart(canvas, chart, frame, start) {
-  const { bars } = chart;
-  if (!bars.length || !canvas.clientWidth) return;
-  const w = canvas.clientWidth, h = canvas.clientHeight, pixel = window.devicePixelRatio || 1;
+const tickDate = new Intl.DateTimeFormat("en-US", { timeZone:"America/New_York", month:"numeric", day:"numeric" });
+const tickHour = new Intl.DateTimeFormat("en-US", { timeZone:"America/New_York", hour:"2-digit", minute:"2-digit", hour12:false });
+const sessionDate = new Intl.DateTimeFormat("en-CA", { timeZone:"America/New_York" });
+
+function matchingCloses(shown, comparison, frame) {
+  if (!comparison) return [];
+  const key = timestamp => isIntraday(frame) ? timestamp : sessionDate.format(timestamp * 1000);
+  const closes = new Map(comparison.bars.map(bar => [key(bar[0]), bar[4]]));
+  return shown.map(bar => closes.get(key(bar[0])));
+}
+
+function heikinAshi(bars) {
+  let priorOpen, priorClose;
+  return bars.map(([time,open,high,low,close,volume]) => {
+    const average = (open + high + low + close) / 4;
+    const center = priorOpen == null ? (open + close) / 2 : (priorOpen + priorClose) / 2;
+    priorOpen = center;
+    priorClose = average;
+    return [time, center, Math.max(high, center, average), Math.min(low, center, average), average, volume];
+  });
+}
+
+export function drawChart(canvas, chart, frame, start, options) {
+  const {bars} = chart;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  const end = Math.min(start + visibleBars, options.end ?? bars.length);
+  if (!w || !h || start >= end) return null;
+  const pixel = window.devicePixelRatio || 1;
   canvas.width = Math.round(w * pixel);
   canvas.height = Math.round(h * pixel);
   const ctx = canvas.getContext("2d");
   ctx.scale(pixel, pixel);
-  const end = start + visibleBars;
+
   const shown = bars.slice(start, end);
-  const averages = chart.averages.map(values => values.slice(start, end));
-  const r = chart.strength.slice(start, end);
-  const colors = ["#388bff","#ff971e","#c659ff","#ffc647"];
-  const pad = 8, top = 38, base = h * .61, volumeBase = h * .73, rsiBase = h - 8;
-  const lo = Math.min(...shown.map(b=>b[3]),...averages.flat().filter(Number.isFinite));
-  const hi = Math.max(...shown.map(b=>b[2]),...averages.flat().filter(Number.isFinite));
-  const step = (w-48)/Math.max(shown.length,8);
-  const x = i => pad + (i+.5)*step, y = v => base-(v-lo)/(hi-lo || 1)*(base-top);
-  const volumeMax = Math.max(1,...shown.map(b=>b[5]));
-  function line(points, color) {
-    ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.beginPath();
-    for (const [a,b] of points) ctx.lineTo(a,b);
+  const priceBars = options.type === "heikin"
+    ? (chart.heikin ??= heikinAshi(bars)).slice(start, end) : shown;
+  const lower = options.lower === "none" ? null : study(chart, options.lower);
+  const overlayLines = options.overlays.flatMap(name => study(chart, name).lines || [])
+    .map(line => ({...line, values:line.values.slice(start, end)}));
+  if (options.overlays.includes("VWAP")) {
+    let total = 0, volume = 0;
+    const values = shown.map(bar => {
+      total += (bar[2] + bar[3] + bar[4]) * bar[5] / 3;
+      volume += bar[5];
+      return volume > 0 ? total / volume : null;
+    });
+    overlayLines.push({ label:"VWAP", color:"#80d6bd", values });
+  }
+
+  const pad = 8, top = 35, width = w - 43;
+  const axis = lower ? h * .73 : h - 19;
+  const bottom = options.layers.volume ? axis - 29 : axis - 4;
+  const comparison = matchingCloses(shown, options.compare, frame);
+  const firstMatch = comparison.findIndex(Number.isFinite);
+  const normalized = firstMatch >= 0 && comparison[firstMatch] !== 0
+    ? comparison.map(close => close == null ? null : shown[firstMatch][4] * close / comparison[firstMatch])
+    : [];
+  const extent = priceBars.flatMap(bar => [bar[2], bar[3]]);
+  extent.push(...normalized.filter(Number.isFinite));
+  extent.push(...overlayLines.flatMap(line => line.values).filter(Number.isFinite));
+  const rawLow = Math.min(...extent), rawHigh = Math.max(...extent);
+  const logarithmic = options.log && rawLow > 0;
+  const units = logarithmic ? Math.log : value => value;
+  const low = units(rawLow), high = units(rawHigh), spread = high - low || 1;
+  const step = (w - 48) / Math.max(shown.length, 8);
+  const x = i => pad + (i + .5) * step;
+  const y = price => bottom - (units(price) - low) / spread * (bottom - top);
+  const point = (clientX, clientY) => {
+    const bounds = canvas.getBoundingClientRect();
+    const px = clientX - bounds.left, py = clientY - bounds.top;
+    if (px < 0 || px >= width || py < top || py > bottom) return null;
+    const index = Math.max(0, Math.min(shown.length - 1, Math.floor((px - pad) / step)));
+    const price = low + spread * (bottom - py) / (bottom - top);
+    return { time:shown[index][0], price:logarithmic ? Math.exp(price) : price };
+  };
+
+  function line(points, color, thickness = 1) {
+    if (!points.length) return;
+    ctx.strokeStyle = color; ctx.lineWidth = thickness; ctx.beginPath();
+    for (const [px,py] of points) ctx.lineTo(px,py);
     ctx.stroke();
   }
-  function text(str,x,y,color) {
-    ctx.font = '11px system-ui'; ctx.fillStyle = color; ctx.fillText(str,x,y);
-    return ctx.measureText(str).width;
+  function label(text, px, py, color) {
+    ctx.font = "11px system-ui";
+    ctx.fillStyle = color;
+    ctx.fillText(text, px, py);
+    return ctx.measureText(text).width;
   }
-  let left = pad, legendY = 14;
-  periods.forEach((p,i)=>{
-    const last = averages[i].at(-1);
-    if (last == null) return;
-    const label = 'EMA'+p+' '+last.toFixed(2);
-    if (left+ctx.measureText(label).width>w-5) {left=pad;legendY+=13;}
-    left += text(label,left,legendY,colors[i])+7;
-  });
-  shown.forEach((bar,i)=>{
-    const [,o,high,low,c,v] = bar;
-    const color = c>=o ? "#ed3278" : "#54c89e";
-    line([[x(i),y(high)],[x(i),y(low)]],color);
-    ctx.fillStyle=color;
-    const body=Math.min(9,Math.max(2,step*.54));
-    ctx.fillRect(x(i)-body/2,Math.min(y(o),y(c)),body,Math.max(1,Math.abs(y(o)-y(c))));
-    const vh=v/volumeMax*(volumeBase-base-7);
-    ctx.fillRect(x(i)-body/2,volumeBase-vh,body,vh);
-  });
-  averages.forEach((values,j)=>line(values.flatMap((v,i)=>v==null?[]:[[x(i),y(v)]]),colors[j]));
-  const last=shown.at(-1)[4];
-  ctx.setLineDash([4,3]);line([[0,y(last)],[w,y(last)]],"#ac3972");ctx.setLineDash([]);
-  text(last.toFixed(2),w-43,Math.max(top,y(last)-3),"#f2f4fa");
-  for(const i of new Set([0,Math.floor(shown.length/2),shown.length-1])){
-    const d=new Date(shown[i][0]*1000);
-    const label=isIntraday(frame)?d.toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"2-digit",minute:"2-digit",hour12:false}):(frame === "month" || frame === "quarter" ? d.toISOString().slice(0,7) : d.toISOString().slice(5,10));
-    text(label,x(i)-4,volumeBase+13,"#8e99af");
+  const pointsFor = (values, vertical) => values.flatMap((value, i) => value == null ? [] : [[x(i),vertical(value)]]);
+  if (options.layers.grid) {
+    for (let i=0;i<=4;i+=1) {
+      const py = top + (bottom - top) * i / 4;
+      line([[pad,py],[width,py]], "#29374f");
+    }
   }
-  const ry=v=>rsiBase-(rsiBase-volumeBase-32)*v/100;
-  text('RSI(14)  '+(r.at(-1)?.toFixed(2)??'—'),pad,volumeBase+29,"#498fff");
-  for (const level of [30,70]) {
-    ctx.setLineDash([3,3]);line([[0,ry(level)],[w,ry(level)]],"#465168");ctx.setLineDash([]);
+
+  let legendX = pad;
+  let legendY = 13;
+  ctx.font = "11px system-ui";
+  for (const overlay of overlayLines) {
+    const value = overlay.values.at(-1);
+    if (value == null) continue;
+    const text = overlay.label + " " + value.toFixed(2);
+    if (legendX + ctx.measureText(text).width > w - 5) {
+      legendX = pad;
+      legendY += 12;
+    }
+    if (legendY < top - 2) legendX += label(text, legendX, legendY, overlay.color) + 8;
   }
-  line(r.flatMap((v,i)=>v==null?[]:[[x(i),ry(v)]]),"#428bff");
+  const bodyWidth = Math.min(10,Math.max(1,step * .55));
+  const volumeMax = Math.max(1,...shown.map(bar=>bar[5]));
+  const [gain, loss] = options.greenUp ? ["#57c49e","#eb4e79"] : ["#eb4e79","#57c49e"];
+  for (let i=0;i<priceBars.length;i+=1) {
+    const [,open,high,low,close,volume] = priceBars[i];
+    const color = close >= open ? gain : loss;
+    const mid = x(i);
+    if (options.type === "ohlc") {
+      line([[mid-bodyWidth/2,y(open)],[mid,y(open)]],color);
+      line([[mid,y(high)],[mid,y(low)]],color);
+      line([[mid,y(close)],[mid+bodyWidth/2,y(close)]],color);
+    } else if (options.type !== "line" && options.type !== "area") {
+      line([[mid,y(high)],[mid,y(low)]],color);
+      const height = Math.max(1,Math.abs(y(open)-y(close)));
+      const upper = Math.min(y(open),y(close));
+      ctx.fillStyle=color; ctx.strokeStyle=color;
+      if (options.type==="hollow" && close>=open) ctx.strokeRect(mid-bodyWidth/2,upper,bodyWidth,height);
+      else ctx.fillRect(mid-bodyWidth/2,upper,bodyWidth,height);
+    }
+    if (options.layers.volume) {
+      ctx.fillStyle=color;
+      const height=volume/volumeMax * 23;
+      ctx.fillRect(mid-bodyWidth/2,axis-height,bodyWidth,height);
+    }
+  }
+  if (options.type === "line" || options.type === "area") {
+    const points = pointsFor(shown.map(bar => bar[4]), y);
+    if (options.type === "area") {
+      const gradient = ctx.createLinearGradient(0, top, 0, bottom);
+      gradient.addColorStop(0, "#4099ed66");
+      gradient.addColorStop(1, "#4099ed05");
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      for (const [px,py] of points) ctx.lineTo(px,py);
+      ctx.lineTo(points.at(-1)[0],bottom);
+      ctx.lineTo(points[0][0],bottom);
+      ctx.fill();
+    }
+    line(points,"#68b7ff",1.6);
+  }
+  for (const overlay of overlayLines) line(pointsFor(overlay.values,y),overlay.color);
+  if (options.overlays.includes("VP")) {
+    const bins = Array(15).fill(0);
+    for (const bar of shown) {
+      const index = Math.min(14, Math.max(0, Math.floor(15*(units(bar[4])-low)/spread)));
+      bins[index] += bar[5];
+    }
+    const maximum = Math.max(1,...bins);
+    ctx.fillStyle = "#65a9ed55";
+    bins.forEach((volume,i) => {
+      const length = volume/maximum * Math.min(65,w*.19);
+      ctx.fillRect(width-length,bottom-(i+1)*(bottom-top)/15,length,(bottom-top)/15-1);
+    });
+  }
+
+  if (normalized.length) {
+    line(pointsFor(normalized,y),"#f5d47d",1.8);
+    label(options.compare.symbol + " · indexed at first shared bar",pad,bottom - 5,"#f5d47d");
+  }
+  const last = shown.at(-1)[4];
+  if (options.layers.price) {
+    ctx.setLineDash([4,3]);
+    line([[0,y(last)],[w,y(last)]],"#aa648d");
+    ctx.setLineDash([]);
+    label(last.toFixed(2),width,Math.max(top,y(last)-3),"#f0f4ff");
+  }
+  for (const i of new Set([0,Math.floor(shown.length/2),shown.length-1])) {
+    const stamp = shown[i][0] * 1000;
+    const time = isIntraday(frame) ? tickHour.format(stamp) :
+      ["month","quarter"].includes(frame) ? new Date(stamp).toISOString().slice(0,7) : tickDate.format(stamp);
+    label(time,x(i)-4,axis+14,"#a2abc1");
+  }
+  if (lower) {
+    const lines = (lower.lines || []).map(series => ({...series,values:series.values.slice(start,end)}));
+    const histogram = lower.histogram?.slice(start,end) || [];
+    const values = [...lines.flatMap(series=>series.values), ...histogram, ...(lower.levels || [])].filter(Number.isFinite);
+    const [min,max] = lower.domain || [Math.min(...values),Math.max(...values)];
+    const ly = value => h - 7 - (h - axis - 36) * (value - min)/(max-min || 1);
+    for (const level of lower.levels || []) line([[pad,ly(level)],[width,ly(level)]],"#465168");
+    histogram.forEach((value,i) => {
+      if (value == null) return;
+      ctx.fillStyle = value >= 0 ? "#5ebaac" : "#db6f94";
+      ctx.fillRect(x(i)-bodyWidth/2,Math.min(ly(value),ly(0)),bodyWidth,Math.abs(ly(value)-ly(0)));
+    });
+    let cursor = pad;
+    for (const series of lines) {
+      line(pointsFor(series.values,ly),series.color,1.3);
+      const value = series.values.at(-1);
+      cursor += label(series.label + " " + (value?.toFixed(2) ?? "—"),cursor,axis+28,series.color) + 8;
+    }
+    if (!lines.length) label("Volume",pad,axis+28,"#a2abc1");
+  }
+  if (options.layers.drawings && options.drawings.length) {
+    const xAt = time => {
+      let low = 0, high = bars.length - 1;
+      while (low < high) {
+        const middle = (low + high) >> 1;
+        if (bars[middle][0] < time) low = middle + 1;
+        else high = middle;
+      }
+      return x(low-start);
+    };
+    renderAnnotations(ctx, options.drawings, { width,top,bottom,xAt,y });
+  }
+  return { point, step };
 }

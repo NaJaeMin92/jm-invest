@@ -1,8 +1,10 @@
-import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=47";
-import {showMarketPanel} from "./market-panels.js?v=48";
+import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=49";
+import {showMarketPanel} from "./market-panels.js?v=49";
+
+import {setupChartTools} from "./chart-tools.js?v=49";
 
 const get = id => document.getElementById(id);
-const savedQuotes = new Set("ANT SKHY SPCX MRVL BZMAIN CLMAIN AAL UAL DAL NVDA".split(" "));
+const savedQuotes = new Set("ANT SKHY SPCX MRVL BZMAIN CLMAIN AAL UAL DAL NVDA AMZN".split(" "));
 const cache = new Map();
 export function publicQuote(symbol) {
   if (!savedQuotes.has(symbol)) return Promise.resolve(null);
@@ -47,33 +49,65 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
   const minuteCache = new Map();
   const tabs = [...dialog.querySelectorAll("[data-panel]")];
   let chart = null, start = 0, lastStart = 0, drag = null, requestId = 0;
+  let geometry;
+  const tools = setupChartTools({
+    redraw:draw, moveTo, getView:()=>({start,windowSize:visibleBars}), alternatives:[...savedQuotes],
+    async loadComparison(symbol, interval) {
+      const data = await publicQuote(symbol);
+      if (!data) return null;
+      const bars = interval === "hour" ? data.hourly : isIntraday(interval) ? await minuteBars(symbol) : data.daily;
+      return bars.length ? prepareChart(bars, interval) : null;
+    }
+  });
   function selectPanel(panel) {
+    if (panel !== "chart") tools.pause();
     for (const tab of tabs) {
       const selected = tab.dataset.panel === panel;
       get(tab.getAttribute("aria-controls")).hidden = !selected;
       if (selected) tab.setAttribute("aria-current", "page");
       else tab.removeAttribute("aria-current");
     }
-    if (panel !== "chart") showMarketPanel(panel, current);
+    if (panel !== "chart") showMarketPanel(panel, current, nameFor(current));
   }
   for (const tab of tabs) tab.addEventListener("click", () => selectPanel(tab.dataset.panel));
 
   function draw() {
     if (!chart || !chart.bars.length || !dialog.open) return;
-    const snapshot = current === "SKHY" && frame === "day" && start === lastStart;
+    const snapshot = current === "SKHY" && frame === "day" && start === lastStart && tools.canUseSnapshot();
     reference.hidden = !snapshot;
     canvas.hidden = snapshot;
-    if (!snapshot) drawChart(canvas, chart, frame, start);
-    const end = Math.min(chart.bars.length, start + visibleBars) - 1;
+    const options = tools.chartOptions();
+    geometry = snapshot ? null : drawChart(canvas, chart, frame, start, options);
+    const end = Math.min(options.end ?? chart.bars.length, start + visibleBars) - 1;
+    drawSecondary(start,end,options);
     const dates = [start, end].map(i => dateFormat.format(chart.bars[i][0] * 1000));
     get("chart-dates").textContent = dates.join(" – ");
     range.value = String(start);
     range.setAttribute("aria-valuetext", dates.join(" to "));
-    latest.disabled = start === lastStart;
+    range.max = String(options.end ? Math.min(lastStart, options.end - 1) : lastStart);
+    latest.disabled = options.end != null || start === lastStart;
     first.disabled = start === 0;
   }
+  function drawSecondary(start,end,options) {
+    const secondary = tools.secondary();
+    const plot = get("dual-market-chart");
+    plot.hidden = !secondary;
+    if (!secondary) return;
+    const {symbol,chart:other} = secondary;
+    const earliest = chart.bars[start][0], latest = chart.bars[end][0];
+    const first = other.bars.findIndex(bar => bar[0] >= earliest);
+    const next = other.bars.findIndex(bar => bar[0] > latest);
+    const last = next === -1 ? other.bars.length : next;
+    const show = first !== -1 && first < last;
+    tools.secondaryCanvas.hidden = !show;
+    get("dual-market-caption").textContent = show ? symbol : symbol + " · No candles in this date range";
+    if (show) drawChart(tools.secondaryCanvas, other, frame, first, {
+      ...options, end:last, drawings:[], overlays:[], lower:"none", compare:null
+    });
+  }
   function moveTo(index) {
-    const next = Math.min(lastStart, Math.max(0, Math.round(index)));
+    const limit = tools.replayEnd() == null ? lastStart : Math.min(lastStart, tools.replayEnd() - 1);
+    const next = Math.min(limit, Math.max(0, Math.round(index)));
     if (next !== start) {
       start = next;
       draw();
@@ -85,17 +119,32 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     area.classList.remove("dragging");
   }
   area.addEventListener("pointerdown", event => {
-    if (!chart || !lastStart || !event.isPrimary || event.button !== 0) return;
+    if (!chart || !event.isPrimary || event.button !== 0) return;
+    if (tools.activeDrawing()) {
+      tools.addPoint(geometry?.point(event.clientX,event.clientY));
+      if (tools.activeDrawing() === "freehand") {
+        drag = {id:event.pointerId,freehand:true};
+        area.setPointerCapture(event.pointerId);
+      }
+      return;
+    }
+    if (!lastStart) return;
     drag = {id: event.pointerId, x: event.clientX, start,
       step: Math.max(1, (area.clientWidth - 48) / visibleBars)};
     area.setPointerCapture(event.pointerId);
     area.classList.add("dragging");
   });
   area.addEventListener("pointermove", event => {
-    if (drag?.id === event.pointerId) moveTo(drag.start + (drag.x - event.clientX) / drag.step);
+    if (drag?.id !== event.pointerId) return;
+    if (drag.freehand) tools.addPoint(geometry?.point(event.clientX,event.clientY));
+    else moveTo(drag.start + (drag.x - event.clientX) / drag.step);
   });
   for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
-    area.addEventListener(type, event => { if (drag?.id === event.pointerId) endDrag(); });
+    area.addEventListener(type, event => {
+      if (drag?.id !== event.pointerId) return;
+      if (drag.freehand) tools.finishFreehand();
+      endDrag();
+    });
   }
   range.addEventListener("input", () => moveTo(Number(range.value)));
   latest.addEventListener("click", () => moveTo(lastStart));
@@ -109,6 +158,7 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     range.disabled = lastStart === 0;
     get("chart-history").hidden = !chart;
     area.classList.toggle("pannable", lastStart > 0);
+    tools.updateSeries(chart,current,frame);
     if (chart) {
       const startDate = dateFormat.format(source[0][0] * 1000);
       const endDate = dateFormat.format(source.at(-1)[0] * 1000);
@@ -118,6 +168,7 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     } else {
       reference.hidden = true;
       canvas.hidden = true;
+      get("dual-market-chart").hidden = true;
     }
   }
   function minuteBars(symbol) {
@@ -203,9 +254,6 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     dialog.scrollTop=0;
     dialog.classList.remove("expanded");
     get("stock-expand").setAttribute("aria-pressed","false");
-    get("symbol-copy").textContent="Copy symbol";
-    get("symbol-action-menu").hidden=true;
-    get("symbol-actions").setAttribute("aria-expanded","false");
     get("stock-price").parentElement.removeAttribute("data-direction");
     get("stock-symbol").textContent=displaySymbol(symbol);
     document.title=displaySymbol(symbol)+" · TradeInSight";
@@ -214,7 +262,7 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     get("stock-change").textContent="";get("stock-time").textContent="Loading quote…";
     get("summary-title").textContent="Session Summary";get("stock-summary").textContent="";
     const url="https://finance.yahoo.com/quote/"+encodeURIComponent(quoteSymbol(symbol))+"/";
-    for(const [id,path] of [["company-link","profile/"],["quote-source",""],["symbol-finance",""]]) link(id,url+path);
+    for(const [id,path] of [["company-link","profile/"],["quote-source",""]]) link(id,url+path);
     get("external-chart").replaceChildren();get("external-chart").hidden=true;
     canvas.hidden=true;reference.hidden=true;get("stock-frames").hidden=true;
     setFavorite();setFrame("day");
@@ -231,6 +279,7 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     }
     requestId += 1;
     current="";quote=null;chart=null;endDrag();
+    tools.updateSeries(null,current,frame);
     if(dialog.open) dialog.close();
     document.body.classList.remove("instrument-open");
     get("external-chart").replaceChildren();
@@ -245,7 +294,6 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
   get("stock-back").onclick=()=>back();
   dialog.addEventListener("cancel",e=>{e.preventDefault();back();});
   get("stock-search").onclick=()=>back(search);
-  get("symbol-account").onclick=()=>back(()=>navigate("account"));
   get("symbol-feed").onclick=()=>back(()=>navigate("profit"));
   get("stock-star").onclick=()=>{
     const items=readList();
@@ -256,14 +304,6 @@ export function setupInstrument({navigate,search,nameFor,readList,saveList}) {
     const expanded=dialog.classList.toggle("expanded");
     get("stock-expand").setAttribute("aria-pressed",String(expanded));
     dialog.scrollTop=0;draw();
-  };
-  get("symbol-actions").onclick=e=>{
-    const menu=get("symbol-action-menu");menu.hidden=!menu.hidden;
-    e.currentTarget.setAttribute("aria-expanded",String(!menu.hidden));
-  };
-  get("symbol-copy").onclick=async()=>{
-    try {await navigator.clipboard.writeText(current);get("symbol-action-menu").hidden=true;get("symbol-actions").setAttribute("aria-expanded","false");}
-    catch {get("symbol-copy").textContent=current;}
   };
   window.addEventListener("hashchange",sync);
   window.addEventListener("popstate",sync);

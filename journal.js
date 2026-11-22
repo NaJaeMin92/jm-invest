@@ -1,4 +1,6 @@
-import { publicQuote, setupInstrument, sparkline } from "./instrument.js?v=48";
+import {setupWatchEditor} from "./watch-editor.js?v=49";
+import {setupOrders} from "./orders.js?v=49";
+import { publicQuote, setupInstrument, sparkline } from "./instrument.js?v=49";
 
 const service = "https://mfycpprqyaidoixytdim.supabase.co";
 const publicKey = "sb_publishable_KIxbzozNkk50oEZ9GehtZA_E484E5Lr";
@@ -61,8 +63,18 @@ function selectView(view) {
     else button.removeAttribute("aria-current");
   }
   document.querySelector("#page-heading").textContent = {
-    home:"My Watchlist", account:"Accounts", profit:"Realized P&L", more:"Menu"
+    home:"My Watchlist", account:"계좌", profit:"Realized P&L", more:"Menu"
   }[view];
+  const korean = view === "account";
+  document.querySelector("#page-heading").lang = korean ? "ko" : "en";
+  login.lang = korean ? "ko" : "en";
+  for (const [id, english, translated] of [
+    ["login-heading","Sign in to your account","계좌에 로그인"],
+    ["login-email-label","Email","이메일"],
+    ["login-password-label","Password","비밀번호"],
+    ["login-remember-label","Keep me signed in on this device","이 기기에서 로그인 유지"],
+    ["login-submit","Sign in","로그인"],
+  ]) document.getElementById(id).textContent = korean ? translated : english;
   window.scrollTo(0, 0);
 }
 for (const button of navButtons) {
@@ -78,7 +90,7 @@ function setDetail(open) {
   detail.hidden = !open;
   document.querySelector("#back-accounts").hidden = !open;
   document.querySelector("#section-icon").hidden = open;
-  document.querySelector("#page-heading").textContent = open ? "Kiwoom Securities" : "Accounts";
+  document.querySelector("#page-heading").textContent = open ? "키움증권" : "계좌";
 }
 
 document.querySelector("#open-kiwoom").addEventListener("click", () => {
@@ -123,6 +135,7 @@ login.addEventListener("submit", async (event) => {
 document.querySelector("#logout").addEventListener("click", () => {
   const accessToken = token;
   token = null;
+  orders.signOut();
   saveSession(null);
   if (holdingsDialog.open) holdingsDialog.close();
   holdingsList.replaceChildren();
@@ -158,10 +171,10 @@ holdingsDialog.addEventListener("click", (event) => {
 
 function formatStockProfit(balance, won) {
   const holdings = balance.holdings;
-  if (!Array.isArray(holdings) || balance.return_pct == null) return "Awaiting P&L sync";
+  if (!Array.isArray(holdings) || balance.return_pct == null) return "평가손익 동기화 대기";
   const profits = holdings.map((holding) => holding.profit_krw);
   if (profits.some((amount) => amount == null || amount === "" || !Number.isFinite(Number(amount)))) {
-    return "Awaiting P&L sync";
+    return "평가손익 동기화 대기";
   }
   const total = profits.reduce((sum, amount) => sum + Number(amount), 0);
   return `${total > 0 ? "+" : ""}${won.format(total)} (${Math.abs(Number(balance.return_pct)).toFixed(2)}%)`;
@@ -174,13 +187,13 @@ function showHoldings(balance) {
   const holdings = balance.holdings;
   if (!Array.isArray(holdings)) {
     const item = document.createElement("li");
-    item.textContent = "Holdings will appear after the next sync.";
+    item.textContent = "동기화 후 보유종목을 표시합니다.";
     holdingsList.append(item);
     return;
   }
   if (!holdings.length) {
     const item = document.createElement("li");
-    item.textContent = "No US equity positions.";
+    item.textContent = "보유 중인 미국주식이 없습니다.";
     holdingsList.append(item);
     return;
   }
@@ -213,7 +226,7 @@ function showHoldings(balance) {
     const value = document.createElement("strong");
     const profit = document.createElement("small");
     name.textContent = holding.name === ticker ? ticker : `${holding.name} (${ticker})`;
-    quantity.textContent = `${Number(holding.quantity).toLocaleString("en-US")} shares`;
+    quantity.textContent = `${Number(holding.quantity).toLocaleString("en-US")}주`;
     value.textContent = won.format(Number(holding.value_krw));
     const amount = Number(holding.profit_krw);
     profit.textContent = `${amount > 0 ? "+" : ""}${won.format(amount)} (${Math.abs(Number(holding.return_pct)).toFixed(2)}%)`;
@@ -227,7 +240,7 @@ function showHoldings(balance) {
     const metrics = document.createElement("div");
     metrics.className = "holding-metrics";
     const money = (amount, currency) => {
-      if (amount == null || amount === "" || !Number.isFinite(Number(amount))) return "Awaiting sync";
+      if (amount == null || amount === "" || !Number.isFinite(Number(amount))) return "동기화 대기";
       return new Intl.NumberFormat("ko-KR", {
         style: "currency", currency, maximumFractionDigits: currency === "KRW" ? 0 : 4,
       }).format(Number(amount));
@@ -238,16 +251,16 @@ function showHoldings(balance) {
       return fraction.replace(/0+$/, "").length;
     }));
     const formatPrice = (price) => {
-      if (!currency || price == null || price === "" || !Number.isFinite(Number(price))) return "Awaiting sync";
+      if (!currency || price == null || price === "" || !Number.isFinite(Number(price))) return "동기화 대기";
       return new Intl.NumberFormat("ko-KR", {
         style: "currency", currency, currencyDisplay: "narrowSymbol", minimumFractionDigits: priceDigits, maximumFractionDigits: priceDigits,
       }).format(Number(price));
     };
     for (const [label, metric] of [
-      ["Cost per share", formatPrice(holding.cost_price)],
-      ["Cost basis", money(holding.cost_krw, "KRW")],
-      ["Last price", formatPrice(holding.current_price)],
-      ["Market value", money(holding.value_krw, "KRW")],
+      ["매입가", formatPrice(holding.cost_price)],
+      ["매입금액", money(holding.cost_krw, "KRW")],
+      ["현재가", formatPrice(holding.current_price)],
+      ["평가금액", money(holding.value_krw, "KRW")],
     ]) {
       const cell = document.createElement("div");
       const title = document.createElement("small");
@@ -305,30 +318,6 @@ const watchKey = "jm-invest:watchlist:v1";
 const watchList = document.querySelector("#home-holdings");
 const watchStatus = document.querySelector("#home-value");
 const watchForm = document.querySelector("#watch-form");
-const watchEdit = document.querySelector("#watch-edit");
-let editingWatchlist = false;
-function toggleEdit() {
-  editingWatchlist = !editingWatchlist;
-  document.querySelector("#watch-tools").hidden = !editingWatchlist;
-  watchEdit.querySelector("span").textContent = editingWatchlist ? "Done" : "Edit Watchlist";
-  watchEdit.setAttribute("aria-expanded", String(editingWatchlist));
-  renderWatchlist();
-  if (editingWatchlist) document.querySelector("#watch-symbol").focus();
-}
-watchEdit.addEventListener("click", toggleEdit);
-document.querySelector("#watch-manage").addEventListener("click", toggleEdit);
-for (const id of ["watch-source", "watch-settings"]) {
-  const button = document.getElementById(id);
-  const panel = document.getElementById(button.getAttribute("aria-controls"));
-  button.addEventListener("click", () => {
-    panel.hidden = !panel.hidden;
-    button.setAttribute("aria-expanded", String(!panel.hidden));
-  });
-}
-document.querySelector("#watch-charts").addEventListener("change", (event) => {
-  watchList.classList.toggle("without-charts", !event.target.checked);
-});
-
 // These display values and plots belong to the supplied reference snapshot.
 const featured = [
   ["ANT", "Anthropic PBC", -8.50, "After: -1.25%"],
@@ -365,12 +354,9 @@ try {
   }
 } catch {}
 
-function readWatchlist() {
-  try {
-    const value = JSON.parse(localStorage.getItem(watchKey) || "[]");
-    return Array.isArray(value) ? value.filter((symbol) => typeof symbol === "string" && /^[A-Z][A-Z0-9.\-]{0,11}$/.test(symbol)) : [];
-  } catch { return []; }
-}
+const nameFor = symbol => snapshots.get(symbol)?.name || stockDirectory?.find(item => item.symbol === symbol)?.name || symbol;
+const watchEditor = setupWatchEditor({watchKey, nameFor, refresh:renderWatchlist});
+const readWatchlist = watchEditor.readList;
 let nvidiaQuote;
 publicQuote("NVDA").then(quote => {
   if (!quote) return;
@@ -382,20 +368,15 @@ const openInstrument = setupInstrument({
   navigate: selectView,
   search() {
     selectView("home");
-    if (!editingWatchlist) toggleEdit();
+    watchEditor.open();
     document.querySelector("#watch-symbol").focus();
   },
-  nameFor: symbol => snapshots.get(symbol)?.name || stockDirectory?.find(item => item.symbol === symbol)?.name || symbol,
+  nameFor,
   readList: readWatchlist,
-  saveList(symbols) {
-    try {
-      localStorage.setItem(watchKey, JSON.stringify(symbols));
-      renderWatchlist();
-      return true;
-    } catch { return false; }
-  },
+  saveList: watchEditor.saveList,
 });
 function renderWatchlist() {
+  watchEditor.renameHeading();
   const symbols = readWatchlist();
   if (sortDirection) symbols.sort((a, b) => {
     const left = percentageFor(a), right = percentageFor(b);
@@ -403,7 +384,7 @@ function renderWatchlist() {
     return sortDirection * (left - right);
   });
   watchList.replaceChildren();
-  watchStatus.textContent = symbols.length ? "" : "Add symbols to your watchlist.";
+  document.querySelector("#watch-empty").hidden = Boolean(symbols.length);
   for (const symbol of symbols) {
     const row = document.createElement("li");
     const badge = document.createElement("span");
@@ -476,10 +457,9 @@ function renderWatchlist() {
       priceNote.textContent = hasPrice ? "Last account sync" : "No quote";
     }
     quote.append(priceLabel, priceNote);
-    const remove = document.createElement("button");
     const referenceSymbols = { BZMAIN: "BZmain", CLMAIN: "CLmain" };
     name.textContent = referenceSymbols[symbol] || symbol;
-    if (!editingWatchlist) {
+    {
       const link = document.createElement("a");
       link.href = "#stock=" + encodeURIComponent(symbol);
       link.className = "symbol-link";
@@ -492,16 +472,7 @@ function renderWatchlist() {
       });
       name.replaceChildren(link);
     }
-    remove.textContent = "Remove";
-    remove.type = "button";
-    remove.setAttribute("aria-label", `Remove ${symbol}`);
-    remove.addEventListener("click", () => {
-      try {
-        localStorage.setItem(watchKey, JSON.stringify(readWatchlist().filter((item) => item !== symbol)));
-        renderWatchlist();
-      } catch { watchStatus.textContent = "Unable to save your watchlist."; }
-    });
-    row.append(badge, identity, chart, editingWatchlist ? remove : quote);
+    row.append(badge, identity, chart, quote);
     watchList.append(row);
   }
 }
@@ -542,10 +513,10 @@ watchForm.addEventListener("submit", async (event) => {
           return;
         }
         try {
-          localStorage.setItem(watchKey, JSON.stringify([...symbols, item.symbol]));
+          if (!watchEditor.saveList([...symbols, item.symbol])) return;
           document.querySelector("#watch-symbol").value = "";
           results.replaceChildren();
-          renderWatchlist();
+          watchStatus.textContent = item.symbol + " added.";
         } catch { watchStatus.textContent = "Unable to save your watchlist."; }
       });
       row.append(button);
@@ -574,12 +545,12 @@ async function loadValuation(accessToken) {
 
   const allocationTotal = document.querySelector("#allocation-total");
   const allocation = document.querySelector("#allocation-breakdown");
-  allocationTotal.textContent = "Loading…";
+  allocationTotal.textContent = "조회 중…";
   allocation.hidden = true;
   accountValue.hidden = true;
   accountValue.textContent = "";
-  value.textContent = "Loading…";
-  document.querySelector("#cash-value").textContent = "Awaiting sync";
+  value.textContent = "조회 중…";
+  document.querySelector("#cash-value").textContent = "동기화 대기";
   document.querySelector("#cash-breakdown").textContent = "";
   document.querySelector("#cash-share").textContent = "";
   note.textContent = "";
@@ -588,7 +559,7 @@ async function loadValuation(accessToken) {
     const [balance] = await request("/rest/v1/kiwoom_valuation?select=*&limit=1", { accessToken });
     if (token !== accessToken) return;
     if (!balance) {
-      value.textContent = allocationTotal.textContent = "Awaiting balance sync";
+      value.textContent = allocationTotal.textContent = "잔고 동기화 대기";
       return;
     }
     const won = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" });
@@ -599,8 +570,8 @@ async function loadValuation(accessToken) {
     const candidate = estimate == null || !hasCash ? null : Number(estimate) - stocks - cash;
     const rp = candidate != null && Number.isFinite(candidate) && candidate >= 0 ? candidate : null;
     const total = rp == null ? stocks + cash : Number(estimate);
-    document.querySelector("#rp-value").textContent = rp == null ? "Pending" : won.format(rp);
-    document.querySelector("#rp-note").textContent = rp == null ? "Awaiting total assets and cash" : "Estimated from remaining assets";
+    document.querySelector("#rp-value").textContent = rp == null ? "확인 필요" : won.format(rp);
+    document.querySelector("#rp-note").textContent = rp == null ? "총자산·예수금 확인 필요" : "총자산에서 주식과 예수금을 뺀 추정액";
     document.querySelector("#rp-share").textContent = rp != null && total > 0 ? new Intl.NumberFormat("ko-KR", { style: "percent", maximumFractionDigits: 1 }).format(rp / total) : "";
     const canCompare = stocks >= 0 && cash >= 0 && total > 0;
     const stockWeight = canCompare ? stocks / total : 0;
@@ -611,14 +582,14 @@ async function loadValuation(accessToken) {
     bar.hidden = !canCompare;
     bar.style.setProperty("--stock-share", `${stockWeight * 100}%`);
     bar.style.setProperty("--cash-end", `${(stockWeight + cash / total) * 100}%`);
-    bar.setAttribute("aria-label", rp == null ? "Equity and cash allocation" : "Equity, cash and estimated residual allocation");
+    bar.setAttribute("aria-label", rp == null ? "주식 및 예수금 비중" : "주식, 예수금, 차액 비중");
     const percent = new Intl.NumberFormat("ko-KR", { style: "percent", maximumFractionDigits: 1 });
-    document.querySelector("#stock-share").textContent = hasCash && canCompare ? percent.format(stockWeight) : "US equities";
+    document.querySelector("#stock-share").textContent = hasCash && canCompare ? percent.format(stockWeight) : "미국주식";
     if (hasCash) {
       document.querySelector("#cash-value").textContent = won.format(cash);
       const usd = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "USD", currencyDisplay: "code" });
       const foreignLabel = balance.cash_usd == null
-        ? `FX equivalent ${won.format(balance.cash_foreign_krw)}`
+        ? `외화 환산 ${won.format(balance.cash_foreign_krw)}`
         : usd.format(balance.cash_usd);
       document.querySelector("#cash-breakdown").textContent =
         `${won.format(balance.cash_domestic_krw)} KRW\n${foreignLabel}`;
@@ -626,8 +597,8 @@ async function loadValuation(accessToken) {
     }
     performance.dataset.direction = Number(balance.return_pct) < 0 ? "down" : "up";
     note.textContent = new Date(balance.observed_at).toLocaleString("en-US", { timeZone: "Asia/Seoul" }) + " KST";
-    performance.textContent = balance.return_pct == null ? "" : "Return " + Number(balance.return_pct).toFixed(2) + "%";
-    const allocationReturn = document.querySelector("#allocation-return");
+    performance.textContent = balance.return_pct == null ? "" : "수익률 " + Number(balance.return_pct).toFixed(2) + "%";
+    const allocation수익률 = document.querySelector("#allocation-return");
     document.querySelector("#allocation-value").textContent = won.format(stocks);
     allocationReturn.textContent = formatStockProfit(balance, won);
     allocationReturn.dataset.direction = performance.dataset.direction;
@@ -638,7 +609,7 @@ async function loadValuation(accessToken) {
 
     showProfit(balance.realized_profit);
   } catch (error) {
-    if (token === accessToken) value.textContent = allocationTotal.textContent = error.code === "PGRST205" ? "Balance setup pending" : "Balance unavailable";
+    if (token === accessToken) value.textContent = allocationTotal.textContent = error.code === "PGRST205" ? "잔고 설정 대기" : "잔고를 불러오지 못했습니다";
   }
 }
 
@@ -656,6 +627,7 @@ async function openWorkspace(session, remember) {
   navigation.hidden = false;
   selectView(document.body.dataset.view || "home");
   loadValuation(token);
+  orders.refresh();
   message.textContent = remember && !stored ? "This browser could not save your session." : "";
 }
 
@@ -685,5 +657,6 @@ async function restoreSession() {
   }
 }
 
+const orders = setupOrders(() => token);
 selectView("home");
 restoreSession();

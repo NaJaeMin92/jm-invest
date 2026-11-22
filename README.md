@@ -10,3 +10,13 @@
 4. Pages 화면에 표시된 주소를 공유합니다. 프로젝트 사이트 주소는 보통 `https://<계정>.github.io/<저장소>/`입니다.
 
 실거래 파일, 일지 및 인증키는 공개 저장소에 포함하지 마세요. 이 버전에는 로그인이나 비공개 거래 저장 기능이 없습니다.
+
+## Private US stock orders
+
+The GitHub Pages build serves the public analysis site. Run the owner-only order service on a Mac whose external IP is registered with Kiwoom.
+
+```sh
+python3 scripts/order-server.py --live
+```
+
+Open `http://127.0.0.1:8765/`, sign in to **Account** and select **미국주식 주문**. The service reads the Kiwoom key and secret from the existing mode-600 `~/.jm-invest-credentials.json`. The order form accepts US whole-share limit orders. It sends a single request when you confirm the preview and displays the broker's order number. Check any uncertain submission in Kiwoom before sending a new order. The server binds to the Mac's loopback interface.

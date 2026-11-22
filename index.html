@@ -9,40 +9,31 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=47">
-<script type="module" src="./journal.js?v=48"></script>
+<link rel="stylesheet" href="./style.css?v=49">
+<script type="module" src="./journal.js?v=49"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header><div class="head"><a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
 <main id="account">
-<div class="page-title"><button type="button" id="back-accounts" aria-label="Back to accounts" hidden>‹</button><span id="section-icon" aria-hidden="true"></span><h1 id="page-heading">Accounts</h1></div>
+<div class="page-title"><button type="button" id="back-accounts" aria-label="계좌 목록으로 돌아가기" hidden>‹</button><span id="section-icon" aria-hidden="true"></span><h1 id="page-heading">Accounts</h1></div>
 <section class="panel">
 <form id="login" hidden>
-<h2>Sign in to your account</h2>
-<label>Email<input name="email" type="email" autocomplete="username" required></label>
-<label>Password<input name="password" type="password" autocomplete="current-password" required></label>
-<label class="remember"><input type="checkbox" name="remember">Keep me signed in on this device</label>
-<button class="primary">Sign in</button>
+<h2 id="login-heading">Sign in to your account</h2>
+<label><span id="login-email-label">Email</span><input name="email" type="email" autocomplete="username" required></label>
+<label><span id="login-password-label">Password</span><input name="password" type="password" autocomplete="current-password" required></label>
+<label class="remember"><input type="checkbox" name="remember"><span id="login-remember-label">Keep me signed in on this device</span></label>
+<button class="primary" id="login-submit">Sign in</button>
 </form>
 <div id="private">
 <section id="tab-home" class="tab-panel" lang="en" aria-labelledby="watch-title">
 <div class="watch-heading">
 <h2 id="watch-title"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M2 4h12M2 20h12M9 12h5"/><path d="m2 9 4 3-4 3z" fill="currentColor" stroke="none"/></svg>My Watchlist</h2>
-<button type="button" id="watch-manage" aria-label="Manage watchlist"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><circle cx="4" cy="6" r="2.4"/><circle cx="4" cy="18" r="2.4"/><path d="M11 6h11M11 18h11"/></svg></button>
-<button type="button" id="watch-settings" aria-label="Watchlist display settings" aria-expanded="false" aria-controls="watch-display"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="m7 3 10 0 5 9-5 9H7l-5-9z"/><circle cx="12" cy="12" r="3"/></svg></button>
 </div>
-<div id="watch-display" hidden><label><input type="checkbox" id="watch-charts" checked>Show charts</label></div>
 <div class="watch-toolbar">
-<button id="watch-edit" type="button" aria-expanded="false" aria-controls="watch-tools"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M10 4H4v16h16v-7M11 13l9-9"/></svg><span>Edit Watchlist</span></button>
-<button id="watch-source" type="button" aria-expanded="false" aria-controls="watch-source-note">Snapshot</button>
+<button id="watch-edit" type="button" aria-haspopup="dialog" aria-controls="watch-editor"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M10 4H4v16h16v-7M11 13l9-9"/></svg><span>Edit Watchlist</span></button>
 <button id="watch-sort" type="button" aria-label="Sort by percentage change">%Change <svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="m5 10 7-7 7 7zm0 4h14l-7 7z" fill="currentColor" stroke="none"/></svg></button>
 </div>
-<p id="watch-source-note" hidden>The nine featured quotes and charts are from the supplied watchlist screenshot. NVDA uses a saved November 20, 2026 market close and after-hours quote.</p>
-<div id="watch-tools" hidden>
-<form id="watch-form" class="watch-form"><label for="watch-symbol">Search stocks and ETFs</label>
-<div><input id="watch-symbol" maxlength="80" placeholder="Symbol or company name" autocomplete="off" required><button type="submit">Search</button></div>
-<ul id="watch-results" class="watch-results" aria-live="polite"></ul></form>
-<p id="home-value" class="watch-status" role="status"></p></div>
+<p id="watch-empty" hidden>No symbols in this watchlist.</p>
 <ul id="home-holdings" class="watch-list"></ul>
 </section>
 <section id="tab-profit" class="tab-panel" hidden>
@@ -61,52 +52,88 @@
 <button id="logout" type="button">Sign out</button>
 </section>
 <div id="tab-account" hidden>
-<section id="account-home" aria-label="Investment accounts">
+<section id="account-home" aria-label="투자 계좌" lang="ko">
 <div class="total-row">
 <span class="ledger-icon" aria-hidden="true"><i></i><i></i><i></i></span>
 <div class="balance-summary">
-<h2>Total investment assets</h2>
-<strong id="portfolio-value" class="portfolio-value">Loading…</strong>
+<h2>총 투자 자산</h2>
+<strong id="portfolio-value" class="portfolio-value">조회 중…</strong>
 </div>
 </div>
 <button class="broker-row" id="open-kiwoom" type="button" aria-controls="trade-detail">
 <img class="broker-logo" src="./assets/kiwoom-global.jpg" width="44" height="44" alt="">
-<span class="broker-name"><strong id="kiwoom-value" hidden></strong><span class="broker-caption">Kiwoom Securities <small id="kiwoom-return"></small></span></span>
+<span class="broker-name"><strong id="kiwoom-value" hidden></strong><span class="broker-caption">키움증권 <small id="kiwoom-return"></small></span></span>
 <span class="account-chevron" aria-hidden="true">›</span>
 </button>
 <div class="broker-row">
 <img class="broker-logo" src="./assets/samsung.jpg" width="44" height="44" alt="">
-<div class="broker-name"><strong>Samsung Securities</strong><small>Brokerage account</small></div>
-<span class="row-status">Not linked</span>
+<div class="broker-name"><strong>삼성증권</strong><small>종합매매</small></div>
+<span class="row-status">미연동</span>
 </div>
-<div class="balance-footer"><strong>Investment accounts</strong><span id="valuation-note"></span></div>
+<button type="button" id="open-order" hidden>미국주식 주문</button>
+<div class="balance-footer"><strong>투자 계좌</strong><span id="valuation-note"></span></div>
 
 </section>
-<section id="trade-detail" hidden>
+<section id="trade-detail" lang="ko" hidden>
 
 <section class="allocation" aria-labelledby="allocation-heading">
-<h2 id="allocation-heading">Total investment assets</h2>
-<strong id="allocation-total" class="allocation-total" aria-live="polite">Loading…</strong>
+<h2 id="allocation-heading">총 투자 자산</h2>
+<strong id="allocation-total" class="allocation-total" aria-live="polite">조회 중…</strong>
 <div id="allocation-breakdown" hidden>
-<div class="allocation-bar" role="img" id="allocation-bar" aria-label="Equity and cash allocation"></div>
+<div class="allocation-bar" role="img" id="allocation-bar" aria-label="주식 및 예수금 비중"></div>
 <button type="button" class="allocation-row allocation-button" id="open-holdings" aria-haspopup="dialog">
-<div><strong>US equities</strong><small id="stock-share">US equities</small></div>
+<div><strong>미국주식</strong><small id="stock-share">미국주식</small></div>
 <div><strong id="allocation-value"></strong><small id="allocation-return"></small></div>
 </button>
 </div>
-<div class="allocation-row" style="--category-color:#ac82ff"><div><strong>Estimated FX repo</strong><small id="rp-note">Pending asset reconciliation</small></div><div><strong id="rp-value">Awaiting sync</strong><small id="rp-share"></small></div></div>
-<div class="allocation-row" style="--category-color:#e3a450"><strong>Funds</strong><small>Not linked</small></div>
-<div class="allocation-row" style="--category-color:#54c998"><strong>Korean equities</strong><small>Not linked</small></div>
-<div class="allocation-row" style="--category-color:#8791a0"><div><strong>Cash balance</strong><small id="cash-share"></small></div><div><strong id="cash-value">Awaiting sync</strong><small id="cash-breakdown"></small></div></div>
+<div class="allocation-row" style="--category-color:#ac82ff"><div><strong>외화 RP 추정</strong><small id="rp-note">총자산 구성 확인 필요</small></div><div><strong id="rp-value">동기화 대기</strong><small id="rp-share"></small></div></div>
+<div class="allocation-row" style="--category-color:#e3a450"><strong>펀드</strong><small>미연동</small></div>
+<div class="allocation-row" style="--category-color:#54c998"><strong>국내 주식</strong><small>미연동</small></div>
+<div class="allocation-row" style="--category-color:#8791a0"><div><strong>예수금</strong><small id="cash-share"></small></div><div><strong id="cash-value">동기화 대기</strong><small id="cash-breakdown"></small></div></div>
 </section>
 
 </section>
 </div>
 </div>
-<dialog id="holdings-dialog" aria-labelledby="holdings-title">
-<div class="sheet-header"><div><h2 id="holdings-title">US equities</h2><p id="holdings-summary"></p></div></div>
+<dialog id="watch-editor" aria-labelledby="watch-editor-title" lang="en">
+<div class="watch-editor-shell">
+<header><div><h2 id="watch-editor-title">Edit watchlist</h2><p id="watch-selection">0 selected</p></div><button type="button" id="watch-editor-done">Done</button></header>
+<div class="watch-editor-lists"><label>Watchlist <select id="watch-active-list"></select></label><button type="button" id="watch-new-list">New list</button></div>
+<form id="watch-create-list" hidden>
+<label>List name<input name="title" maxlength="30" required></label><button type="submit">Create</button>
+</form>
+<div id="watch-tools">
+<form id="watch-form" class="watch-form"><label for="watch-symbol">Search stocks and ETFs</label>
+<div><input id="watch-symbol" maxlength="80" placeholder="Symbol or company name" autocomplete="off" required><button type="submit">Search</button></div>
+<ul id="watch-results" class="watch-results" aria-live="polite"></ul></form>
+<p id="home-value" class="watch-status" role="status"></p></div>
+
+<ul id="watch-editor-rows" aria-label="Watchlist symbols"></ul>
+<div class="watch-bulk"><label><input type="checkbox" id="watch-select-all">Select all</label><button type="button" id="watch-move">Move to…</button><button type="button" id="watch-delete">Delete</button></div>
+<form id="watch-move-form" hidden><label>Destination <select id="watch-destination" required></select></label><button type="submit">Move</button></form>
+</div></dialog>
+<dialog id="holdings-dialog" lang="ko" aria-labelledby="holdings-title">
+<div class="sheet-header"><div><h2 id="holdings-title">미국주식</h2><p id="holdings-summary"></p></div></div>
 <ul id="holdings-list"></ul>
-<button id="close-holdings" class="sheet-close" type="button">Close</button>
+<button id="close-holdings" class="sheet-close" type="button">닫기</button>
+</dialog>
+<dialog id="order-dialog" lang="ko" aria-labelledby="order-title">
+<h2 id="order-title">미국주식 지정가 주문</h2>
+<form id="order-form">
+<label>종목코드<input name="symbol" maxlength="12" autocomplete="off" autocapitalize="characters" required></label>
+<label>거래소<select name="exchange" required><option value="">선택</option><option value="ND">NASDAQ</option><option value="NY">NYSE</option><option value="NA">NYSE American</option></select></label>
+<label>매매 구분<select name="side" required><option value="">선택</option><option value="buy">매수</option><option value="sell">매도</option></select></label>
+<label>수량 (주)<input name="quantity" type="number" min="1" max="999999999" step="1" required></label>
+<label>지정가 (USD)<input name="price" type="number" min="0.0001" step="0.0001" max="9999999" required></label>
+<button type="submit">주문 내용 확인</button>
+</form>
+<section id="order-review" hidden>
+<p id="order-details"></p>
+<button type="button" id="order-confirm">실계좌 주문 전송</button>
+<button type="button" id="order-edit">수정</button>
+</section>
+<p id="order-status" role="status"></p>
+<button type="button" id="order-close">닫기</button>
 </dialog>
 <dialog id="stock-detail" aria-labelledby="stock-symbol" lang="en">
 <div class="instrument">
@@ -125,6 +152,7 @@
 <section id="chart-panel">
 <div id="chart-area"><img draggable="false" id="daily-reference" src="./assets/quotes/skhy-daily.webp" alt="SKHY daily candlesticks, exponential moving averages, volume and RSI from the November 20 reference chart" hidden>
 <canvas id="market-chart" role="img" aria-label="Candlesticks, volume and RSI"></canvas><div id="external-chart" hidden></div><p id="chart-status" role="status" hidden></p></div>
+<figure id="dual-market-chart" hidden><figcaption id="dual-market-caption"></figcaption><canvas id="secondary-market-chart" role="img" aria-label="Second symbol chart"></canvas></figure>
 <div id="chart-history" hidden>
 <span id="chart-dates"></span><div class="chart-jumps"><button type="button" id="chart-first">First</button><button type="button" id="chart-latest">Latest</button></div>
 <input type="range" min="0" step="1" id="chart-position" aria-label="Scroll chart history">
@@ -132,25 +160,49 @@
 </div>
 <div class="frame-bar"><div id="stock-frames" aria-label="Chart interval">
 <button data-frame="minute">1 min</button><button data-frame="five">5 min</button><button data-frame="hour">1 hour</button><button data-frame="day" aria-pressed="true">Daily</button><button data-frame="week">Weekly</button><button data-frame="month">Monthly</button><button data-frame="quarter">Quarterly</button>
-</div><button id="stock-expand" aria-pressed="false" aria-label="Expand chart">⛶</button></div>
+</div><button type="button" id="chart-type" aria-label="Chart type" aria-haspopup="dialog">
+<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2v20m12-20v20" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="6" width="6" height="8" rx="1.5" fill="currentColor"/><rect x="15" y="10" width="6" height="8" rx="1.5" fill="currentColor"/></svg></button>
+<button type="button" id="chart-tools" aria-label="Chart Toolbox" aria-haspopup="dialog">
+<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
+<button id="stock-expand" aria-pressed="false" aria-label="Expand chart">⛶</button></div>
+<div id="chart-task" hidden>
+<p id="chart-tool-status" role="status"></p>
+<button type="button" id="chart-finish">Finish</button>
+<button type="button" id="chart-step">Next candle</button>
+<button type="button" id="chart-play">Play</button>
+<button type="button" id="chart-stop">Done</button>
+</div>
 <section class="quote-summary"><h3 id="summary-title">Technical Summary</h3><p id="stock-summary"></p><a id="quote-source" target="_blank" rel="noopener noreferrer">Quote source ↗</a></section>
 </section>
 <section class="market-panel" id="sigma-panel" aria-labelledby="sigma-heading" hidden>
-<h3 id="sigma-heading">Weekly expected range</h3>
+<h3 id="sigma-heading">Weekly Sigma</h3>
 <div id="sigma-content" aria-live="polite"></div>
-<a class="market-source" id="sigma-source" href="https://sigmarange.com/#watchlist" target="_blank" rel="noopener noreferrer">SigmaRange ↗</a>
+<a class="market-source" id="sigma-source" href="https://www.nasdaq.com/market-activity" target="_blank" rel="noopener noreferrer">Nasdaq option chain ↗</a>
+<details class="sigma-calculator"><summary>Calculate with option quotes</summary>
+<form id="sigma-calculator">
+<label>Anchor close<input type="number" min="0.001" step="any" name="anchor" required></label>
+<label>Observed close<input type="number" min="0.001" step="any" name="close" required></label>
+<label>ATM call midpoint<input type="number" min="0.001" step="any" name="call" required></label>
+<label>ATM put midpoint<input type="number" min="0.001" step="any" name="put" required></label>
+<label>Anchor date<input type="date" name="fromDate" required></label>
+<label>Band end<input type="date" name="through" required></label>
+<label>Option expiration<input type="date" name="expiry" required></label>
+<button type="submit">Calculate</button><p id="sigma-error" role="status"></p>
+</form></details>
 </section>
 <section class="market-panel" id="sentiment-panel" aria-labelledby="sentiment-heading" hidden>
 <h3 id="sentiment-heading">Fear &amp; Greed Index</h3>
 <div id="sentiment-content" aria-live="polite"></div>
 <a class="market-source" href="https://edition.cnn.com/markets/fear-and-greed" target="_blank" rel="noopener noreferrer">CNN Fear &amp; Greed ↗</a>
 </section>
-<div class="instrument-actions"><div><button id="symbol-account">Open Account</button><a href="https://www.webull.com/paper-trading" target="_blank" rel="noopener noreferrer">paperTrade</a></div><button id="symbol-actions" aria-label="More symbol actions" aria-expanded="false" aria-controls="symbol-action-menu">•••</button></div>
-<div id="symbol-action-menu" hidden><button id="symbol-copy">Copy symbol</button><a id="symbol-finance">View quote ↗</a></div>
+<dialog id="chart-tool-dialog" aria-labelledby="chart-tool-title">
+<div class="chart-tool-head"><h3 id="chart-tool-title"></h3><button type="button" id="chart-tool-close" aria-label="Close chart tools">×</button></div>
+<div id="chart-tool-body"></div>
+</dialog>
 </div></dialog>
 <nav id="bottom-nav" lang="en" aria-label="Main navigation">
 <button type="button" data-view="home" aria-current="page"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path fill="currentColor" stroke="none" d="M12 21 2.7 12A5.8 5.8 0 0 1 12 5 5.8 5.8 0 0 1 21.3 12Z"/></svg><span>Watchlists</span></button>
-<button type="button" data-view="account"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="m3 8 15-5v5M3 8h18v13H3z"/><circle cx="17" cy="14" r="1" fill="currentColor"/></svg><span>Open Account</span></button>
+<button type="button" data-view="account"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="m3 8 15-5v5M3 8h18v13H3z"/><circle cx="17" cy="14" r="1" fill="currentColor"/></svg><span>Account</span></button>
 <button type="button" data-view="profit" title="Realized P&amp;L"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M2 4h17v12H6l-4 3zM9 19h9l4 3V8"/></svg><span>Feeds</span></button>
 <button type="button" data-view="more"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg><span>Menu</span></button>
 </nav>

@@ -1,5 +1,5 @@
-const sigmaSnapshot = "./assets/market/sigma.json?v=47";
-const sigmaFeed = "https://raw.githubusercontent.com/NaJaeMin92/jm-invest/refs/heads/market-data/sigma.json";
+const sigmaSnapshot = "./assets/market/sigma-inputs.json?v=49";
+const sigmaFeed = "https://raw.githubusercontent.com/NaJaeMin92/jm-invest/refs/heads/market-data/sigma-inputs.json";
 const cnnSnapshot = "./assets/market/fear-and-greed.json?v=47";
 const cnnFeed = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata";
 const inTimeZone = new Intl.DateTimeFormat("en-US", {
@@ -44,25 +44,70 @@ function meter(position, labels, className = "") {
   return scale;
 }
 
-function renderSigma(container, data, symbol) {
-  const level = data.symbols[symbol];
+export function calculateSigma({anchor,close,call,put,fromDate,through,expiry}) {
+  const elapsed = Date.parse(expiry) - Date.parse(fromDate);
+  const horizon = Date.parse(through) - Date.parse(fromDate);
+  if (![anchor,close,call,put,elapsed,horizon].every(value => Number.isFinite(value) && value > 0)) {
+    throw new Error("Enter positive prices and dates after the anchor");
+  }
+  // ATM straddle ≈ sqrt(2/π) σ in the short-term normal approximation.
+  const width = (call + put) * Math.sqrt(Math.PI / 2) * Math.sqrt(horizon / elapsed);
+  return { low:anchor-width, high:anchor+width, move:100*width/anchor, z:(close-anchor)/width };
+}
+
+function renderSigma(container, data, symbol, name) {
+  const level = data?.symbols?.[symbol];
   const source = document.querySelector("#sigma-source");
-  source.href = level ? "https://sigmarange.com/symbol/" + encodeURIComponent(symbol) : "https://sigmarange.com/#watchlist";
+  source.href = "https://www.nasdaq.com/market-activity/stocks/" + encodeURIComponent(symbol.toLowerCase()) + "/option-chain";
   if (!level) {
-    container.textContent = "SigmaRange does not publish a weekly range for " + symbol + ".";
+    container.replaceChildren(node("p", "No option quote from the anchor session. Enter raw ATM option prices below to calculate its band.", "market-date"));
     return;
   }
-  const { low, high, close, change, move, z } = level;
-  const block = node("div", "", "market-card");
+  const { low, high, move, z } = calculateSigma(level);
+  const { anchor, close, change } = level;
+  const status = z >= 1.5 ? "Overheated" : z >= 1 ? "Above range" : z <= -1.5 ? "Oversold" : z <= -1 ? "Below range" : "Normal";
+  const block = node("article", "", "sigma-overview");
+  const heading = node("div", "", "sigma-heading");
+  const identity = node("div", "", "sigma-identity");
+  identity.append(node("strong", symbol), node("p", name === symbol ? "" : name));
+  heading.append(identity, node("span", status, "sigma-status"));
+  const details = facts([
+    ["Last close", usd.format(close)], ["Session change", Number.isFinite(change) ? signed(change, 2) + "%" : "—"],
+    ["Position on band", signed(z, 2) + "σ"], ["Expected range", usd.format(low) + " – " + usd.format(high)],
+    ["Band width", "±" + move.toFixed(1) + "%"], ["Anchor close", usd.format(anchor)]
+  ], "sigma-details");
+  details.children[1].lastElementChild.dataset.change = change < 0 ? "negative" : change > 0 ? "positive" : "flat";
   block.append(
-    node("p", data.from + " → " + data.through, "market-date"),
-    node("strong", usd.format(low) + " – " + usd.format(high), "market-number"),
-    node("p", signed(z, 2) + "σ · ±" + move.toFixed(1) + "% implied move", "market-subtitle"),
-    meter(50 + 25 * z, ["−2σ", "−1σ", "0σ", "+1σ", "+2σ"], "sigma-meter"),
-    facts([["Last close", usd.format(close)], ["Session change", signed(change, 2) + "%"]]),
-    node("p", "US session close · " + data.asOf, "market-date")
+    heading, node("p", "Band window · " + level.fromDate + " → " + level.through, "market-date"),
+    meter(50 + 25 * z, ["−2σ", "−1σ", "0σ", "+1σ", "+2σ"], "sigma-meter"), details,
+    node("p", level.manual ? "Calculated from your option prices" :
+      "Calculated from Nasdaq option quotes · " + usd.format(level.strike) + " strike · Expiry " + level.expiry, "market-date"),
+    node("p", "Stock close · " + level.asOf, "market-date")
   );
   container.replaceChildren(block);
+}
+
+function showSigmaCalculator(symbol, name) {
+  const form = document.querySelector("#sigma-calculator");
+  form.reset();
+  form.onsubmit = event => {
+    event.preventDefault();
+    const fields = new FormData(form);
+    const level = Object.fromEntries(fields);
+    for (const field of ["anchor","close","call","put"]) level[field] = Number(level[field]);
+    const error = document.querySelector("#sigma-error");
+    try {
+      calculateSigma(level);
+      level.manual = true;
+      level.asOf = "Entered price";
+      const target = document.querySelector("#sigma-content");
+      target.marketRequest = null;
+      renderSigma(target,{symbols:{[symbol]:level}},symbol,name);
+      error.textContent = "";
+    } catch (problem) {
+      error.textContent = problem.message;
+    }
+  };
 }
 
 const components = [
@@ -76,22 +121,37 @@ const components = [
 ];
 function renderSentiment(container, data, saved) {
   const index = data.fear_and_greed;
-  const block = node("div", "", "market-card");
+  const block = node("article", "", "sentiment-overview");
+  const scale = node("div", "", "sentiment-gauge");
+  const ring = node("div", "", "sentiment-arc");
+  ring.setAttribute("aria-hidden", "true");
+  const marker = node("span", "", "sentiment-marker");
+  marker.style.setProperty("--angle", (1.8 * Math.min(100, Math.max(0, index.score)) - 90) + "deg");
+  ring.append(marker);
+  const reading = node("div", "", "sentiment-reading");
+  const rating = node("p", titleCase(index.rating), "sentiment-rating");
+  rating.dataset.rating = index.rating;
+  reading.append(node("strong", String(Math.round(index.score)), "market-number"), rating);
+  scale.append(ring, reading);
+  const endpoints = node("div", "", "sentiment-endpoints");
+  endpoints.append(node("span", "0 · Extreme fear"), node("span", "Extreme greed · 100"));
   block.append(
-    node("p", "US market sentiment", "market-date"),
-    node("strong", String(Math.round(index.score)), "market-number"),
-    node("p", titleCase(index.rating), "market-subtitle sentiment-rating"),
-    meter(index.score, ["0", "25", "50", "75", "100"], "sentiment-meter"),
+    node("p", "US Market Sentiment", "market-date"),
+    scale, endpoints,
     facts([
       ["Previous close", index.previous_close], ["1 week ago", index.previous_1_week],
       ["1 month ago", index.previous_1_month], ["1 year ago", index.previous_1_year]
-    ].map(([name, value]) => [name, Number.isFinite(value) ? String(Math.round(value)) : "—"])),
+    ].map(([name, value]) => [name, Number.isFinite(value) ? String(Math.round(value)) : "—"]), "sentiment-history"),
     node("p", (saved ? "Saved reading · " : "Observed · ") + inTimeZone.format(new Date(index.timestamp)) + " ET", "market-date")
   );
   const drivers = components.filter(([key]) => data[key]?.rating)
     .map(([key, label]) => [label, titleCase(data[key].rating)]);
   container.replaceChildren(block);
-  if (drivers.length) container.append(node("h4", "Index components"), facts(drivers, "market-drivers"));
+  if (drivers.length) {
+    const list = facts(drivers, "market-drivers");
+    for (const item of list.children) item.lastElementChild.dataset.rating = item.lastElementChild.textContent.toLowerCase();
+    container.append(node("h4", "Index components"), list);
+  }
 }
 
 function cachedFeed(fallback, remote, isValid, timestamp, refreshAfter) {
@@ -118,26 +178,29 @@ function cachedFeed(fallback, remote, isValid, timestamp, refreshAfter) {
 }
 
 const loadSigma = cachedFeed(
-  sigmaSnapshot, sigmaFeed, data => Boolean(data.symbols && data.from && data.through && data.asOf),
-  data => data.from + data.asOf, 300_000
+  sigmaSnapshot, sigmaFeed, data => Boolean(data.symbols && Object.values(data.symbols).some(item => item.anchor && item.call && item.put)),
+  data => Object.values(data.symbols).reduce((latest, item) => item.asOf > latest ? item.asOf : latest, ""), 300_000
 );
 const loadSentiment = cachedFeed(
   cnnSnapshot, cnnFeed, data => Number.isFinite(data.fear_and_greed?.score) && Number.isFinite(Date.parse(data.fear_and_greed?.timestamp)),
   data => Date.parse(data.fear_and_greed.timestamp), 60_000
 );
 
-export function showMarketPanel(panel, symbol) {
+export function showMarketPanel(panel, symbol, name) {
   const target = document.querySelector("#" + panel + "-content");
+  if (panel === "sigma") showSigmaCalculator(symbol, name);
   const request = {};
   target.dataset.symbol = symbol;
   target.marketRequest = request;
   target.textContent = "Loading market data…";
   const render = (data, saved) => {
     if (target.marketRequest !== request) return;
-    if (panel === "sigma") renderSigma(target, data, symbol);
+    if (panel === "sigma") renderSigma(target, data, symbol, name);
     else renderSentiment(target, data, saved);
   };
   (panel === "sigma" ? loadSigma : loadSentiment)(render).catch(() => {
-    if (target.marketRequest === request) target.textContent = "Market data is temporarily unavailable.";
+    if (target.marketRequest !== request) return;
+    if (panel === "sigma") renderSigma(target, null, symbol, name);
+    else target.textContent = "Market data is temporarily unavailable.";
   });
 }
