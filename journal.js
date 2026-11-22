@@ -366,7 +366,13 @@ async function loadValuation(accessToken) {
     const stocks = Number(balance.value_krw);
     const hasCash = balance.cash_domestic_krw != null && balance.cash_foreign_krw != null;
     const cash = hasCash ? Number(balance.cash_domestic_krw) + Number(balance.cash_foreign_krw) : 0;
-    const total = stocks + cash;
+    const estimate = balance.estimated_assets_krw;
+    const candidate = estimate == null || !hasCash ? null : Number(estimate) - stocks - cash;
+    const rp = candidate != null && Number.isFinite(candidate) && candidate >= 0 ? candidate : null;
+    const total = rp == null ? stocks + cash : Number(estimate);
+    document.querySelector("#rp-value").textContent = rp == null ? "확인 필요" : won.format(rp);
+    document.querySelector("#rp-note").textContent = rp == null ? "총자산·예수금 확인 필요" : "차액 추정 · 영웅문 대조 필요";
+    document.querySelector("#rp-share").textContent = rp != null && total > 0 ? new Intl.NumberFormat("ko-KR", { style: "percent", maximumFractionDigits: 1 }).format(rp / total) : "";
     const canCompare = stocks >= 0 && cash >= 0 && total > 0;
     const stockWeight = canCompare ? stocks / total : 0;
     value.textContent = accountValue.textContent = won.format(total);
@@ -385,7 +391,7 @@ async function loadValuation(accessToken) {
         : usd.format(balance.cash_usd);
       document.querySelector("#cash-breakdown").textContent =
         `${won.format(balance.cash_domestic_krw)} KRW\n${foreignLabel}`;
-      if (canCompare) document.querySelector("#cash-share").textContent = percent.format(1 - stockWeight);
+      if (canCompare) document.querySelector("#cash-share").textContent = percent.format(cash / total);
     }
     performance.dataset.direction = Number(balance.return_pct) < 0 ? "down" : "up";
     note.textContent = new Date(balance.observed_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) + " KST 기준";

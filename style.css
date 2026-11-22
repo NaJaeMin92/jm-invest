@@ -291,3 +291,5 @@ button.broker-row:hover { background:#2a2c31; }
 .watch-form input { min-width:0; flex:1; }
 .watch-form button,.watch-list button { flex:none; }
 .watch-list li { grid-template-columns:minmax(0,1fr) auto; }
+
+#rp-note { max-width:12rem; }
