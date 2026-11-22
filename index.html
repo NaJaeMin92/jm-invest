@@ -5,39 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#f2f5fa">
 <title>JM Invest</title>
-<link rel="stylesheet" href="./style.css?v=5">
-<script type="module" src="./app.js"></script>
-<script type="module" src="./journal.js?v=5"></script>
+<link rel="stylesheet" href="./style.css?v=6">
+<script type="module" src="./journal.js?v=6"></script>
 </head>
-<body>
-<header><div class="head"><a href="./"><span class="logo" aria-hidden="true">JM</span> JM Invest</a><button id="account-link" type="button">로그인</button><button id="logout" type="button" hidden>로그아웃</button></div></header>
-<main id="market">
-<section class="intro"><h1>주간 예상 범위</h1><p>예시 데이터</p></section>
-<div class="layout">
-<section class="panel" aria-labelledby="detail-title">
-<h2 id="detail-title">미국주식</h2>
-<div class="symbols" id="symbols" aria-label="예시 종목"></div>
-<div id="details" aria-live="polite"></div>
-</section>
-<section class="panel" aria-labelledby="calc-title">
-<h2 id="calc-title">시그마 계산기</h2>
-<p class="muted">기준가, 관측가, 주간 예상 변동폭을 입력하세요.</p>
-<form id="calculator">
-<label>기준가 ($)<input name="anchor" type="number" min="0.000001" step="any" value="100" required></label>
-<label>관측가 ($)<input name="price" type="number" min="0" step="any" value="94" required></label>
-<label>주간 예상 변동폭 (±%)<input name="width" type="number" min="0.000001" step="any" value="5" required></label>
-<button class="primary">계산하기</button>
-</form>
-<div id="result" aria-live="polite"></div>
-</section>
-</div>
-<footer>σ 위치 = (관측가 − 기준가) ÷ 예상 변동폭(달러). 예상 범위의 상·하단은 기준가에서 예상 변동폭을 더하고 뺀 값입니다.</footer>
-</main>
-<main id="account" hidden>
+<body class="trade-page">
+<header><div class="head"><a href="./"><span class="logo" aria-hidden="true">JM</span> JM Invest</a><button id="logout" type="button" hidden>로그아웃</button></div></header>
+<main id="account">
 <h1 id="page-heading">내 계좌</h1>
 <section class="panel">
 <form id="login">
-<button id="cancel-login" type="button">시그마 보드로 돌아가기</button>
 <label>이메일<input name="email" type="email" autocomplete="username" required></label>
 <label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label>
 <label class="remember"><input type="checkbox" name="remember">이 기기에서 로그인 유지</label>
@@ -47,11 +23,11 @@
 <section id="account-home" aria-label="투자 계좌">
 <div class="total-row">
 <span class="ledger-icon" aria-hidden="true"><i></i><i></i><i></i></span>
-<div><h2>전체 투자</h2><strong class="portfolio-value">평가액 미연동</strong></div>
+<div><h2>키움 미국주식 평가액</h2><strong id="portfolio-value" class="portfolio-value">조회 중…</strong><p id="valuation-note"></p></div>
 </div>
 <button class="broker-row" id="open-kiwoom" type="button" aria-controls="trade-detail">
 <span class="broker-icon kiwoom" aria-hidden="true">K</span>
-<span class="broker-name"><strong>키움증권</strong><small id="kiwoom-caption">미국주식</small></span>
+<span class="broker-name"><strong>키움증권</strong><small id="kiwoom-return"></small><small id="kiwoom-caption">미국주식</small></span>
 <span class="row-action">체결 보기 <span aria-hidden="true">›</span></span>
 </button>
 <div class="broker-row">
@@ -59,7 +35,7 @@
 <div class="broker-name"><strong>삼성증권</strong><small>종합매매</small></div>
 <span class="row-status">미연동</span>
 </div>
-<nav class="account-nav" aria-label="계좌 메뉴"><strong aria-current="page">계좌</strong><button type="button" id="market-link">시그마 보드</button></nav>
+
 </section>
 <section id="trade-detail" hidden>
 <button type="button" id="back-accounts">‹ 계좌 목록</button>
