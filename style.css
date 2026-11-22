@@ -72,7 +72,6 @@ footer { margin: 22px 0 36px; font-size: .875rem; }
 .trade-page header { background: linear-gradient(110deg,#141920,#1a2a44); border: 0; }
 .trade-page .head, .trade-page main { max-width: 620px; padding-inline: clamp(14px,4vw,26px); }
 .trade-page .head { min-height: 68px; }
-.jm-mark { display: grid; place-items:center; background:#c2d8ff; color:#19243c; width:30px; height:30px; border-radius:10px; font-size:.75rem; }
 .trade-page #page-heading { margin: 28px 4px 14px; font-size:1.5rem; }
 .trade-page .panel { padding:0; border-radius:22px; overflow:hidden; border:1px solid #2a2c32; }
 .trade-page #login, #trade-detail { padding:22px; }
@@ -89,9 +88,7 @@ button.broker-row:hover { background:#2a2c31; }
 .broker-name small,.row-status { font-size:.875rem; color:var(--muted); }
 .row-action,#logout,#back-accounts { background:#33363e; color:#e2e5eb; border:0; border-radius:10px; padding:8px 10px; font-size:.875rem; }
 .row-action span { margin-left:3px; }
-.broker-icon,.ledger-icon { height:44px; width:44px; border-radius:14px; display:grid; place-content:center; font-weight:750; }
-.kiwoom { background:#183b3a; color:#7fe6cb; }
-.samsung { background:#243457; color:#9cbcff; }
+.ledger-icon { height:44px; width:44px; border-radius:14px; display:grid; place-content:center; font-weight:750; }
 .ledger-icon { background:#253655; gap:3px; }
 .ledger-icon i { background:#80abff; width:19px; height:3px; border-radius:2px; }
 .ledger-icon i:nth-child(2) { width:14px; }
@@ -113,3 +110,51 @@ button.broker-row:hover { background:#2a2c31; }
 .row-action { white-space:nowrap; padding:8px 9px; }
 .balance-footer { border-top:1px solid var(--line); display:flex; align-items:center; gap:10px; justify-content:space-between; padding:14px 18px; color:var(--muted); font-size:.8rem; }
 .balance-footer strong { white-space:nowrap; color:#d2d9e6; }
+
+.brand-home { min-width:44px; min-height:44px; }
+.identity-mark {
+  display:inline-grid;
+  place-items:center;
+  isolation:isolate;
+  position:relative;
+  overflow:hidden;
+  width:44px;
+  height:44px;
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:14px;
+  font-family:Inter,system-ui,sans-serif;
+  font-size:1.35rem;
+  font-weight:850;
+  line-height:1;
+}
+.identity-mark::before {
+  content:"";
+  position:absolute;
+  z-index:-1;
+}
+.identity-jm {
+  background:#c4ffdf;
+  color:#102d27;
+  letter-spacing:-.13em;
+  padding-right:.12em;
+}
+.identity-jm::before {
+  width:31px;
+  height:31px;
+  border:1px solid #6aba99;
+  transform:rotate(45deg);
+  border-radius:8px;
+}
+.identity-kiwoom { background:#422037; color:#ffb0d8; font-style:italic; }
+.identity-kiwoom::before {
+  inset:0;
+  background:linear-gradient(145deg,transparent 54%,#602a4e 55%);
+}
+.identity-samsung { background:#19325d; color:#e0ebff; }
+.identity-samsung::before {
+  width:35px;
+  height:24px;
+  border:1px solid #6595df;
+  border-radius:50%;
+  transform:rotate(-23deg);
+}

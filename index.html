@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#f2f5fa">
-<title>JM Invest</title>
-<link rel="stylesheet" href="./style.css?v=7">
+<title>내 계좌</title>
+<link rel="stylesheet" href="./style.css?v=8">
 <script type="module" src="./journal.js?v=7"></script>
 </head>
 <body class="trade-page">
-<header><div class="head"><a href="./"><span class="logo" aria-hidden="true">JM</span> JM Invest</a><button id="logout" type="button" hidden>로그아웃</button></div></header>
+<header><div class="head"><a href="./" class="brand-home" aria-label="내 계좌 홈"><span class="identity-mark identity-jm" aria-hidden="true">JM</span></a><button id="logout" type="button" hidden>로그아웃</button></div></header>
 <main id="account">
 <h1 id="page-heading">내 계좌</h1>
 <section class="panel">
@@ -29,12 +29,12 @@
 </div>
 </div>
 <button class="broker-row" id="open-kiwoom" type="button" aria-controls="trade-detail">
-<span class="broker-icon kiwoom" aria-hidden="true">K</span>
+<span class="identity-mark identity-kiwoom" aria-hidden="true">K</span>
 <span class="broker-name"><strong id="kiwoom-value" hidden></strong><span class="broker-caption">키움증권 <small id="kiwoom-return"></small></span></span>
 <span class="row-action">체결 보기</span>
 </button>
 <div class="broker-row">
-<span class="broker-icon samsung" aria-hidden="true">S</span>
+<span class="identity-mark identity-samsung" aria-hidden="true">S</span>
 <div class="broker-name"><strong>삼성증권</strong><small>종합매매</small></div>
 <span class="row-status">미연동</span>
 </div>
