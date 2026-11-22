@@ -177,11 +177,11 @@ function showHoldings(balance) {
     const right = document.createElement("div");
     const value = document.createElement("strong");
     const profit = document.createElement("small");
-    name.textContent = holding.name;
-    quantity.textContent = `${Number(holding.quantity).toLocaleString("ko-KR")}주 · ${holding.symbol}`;
+    name.textContent = holding.name === ticker ? ticker : `${holding.name} (${ticker})`;
+    quantity.textContent = `${Number(holding.quantity).toLocaleString("ko-KR")}주`;
     value.textContent = won.format(Number(holding.value_krw));
     const amount = Number(holding.profit_krw);
-    profit.textContent = `${amount > 0 ? "+" : ""}${won.format(amount)} · ${Number(holding.return_pct).toFixed(2)}%`;
+    profit.textContent = `${amount > 0 ? "+" : ""}${won.format(amount)} (${Math.abs(Number(holding.return_pct)).toFixed(2)}%)`;
     profit.dataset.direction = amount < 0 ? "down" : "up";
     labels.append(name, quantity);
     left.append(logo, labels);
