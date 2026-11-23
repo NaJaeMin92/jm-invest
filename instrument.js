@@ -2,7 +2,7 @@ import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-cha
 import {showMarketPanel} from "./market-panels.js?v=68";
 
 import {setupChartTools} from "./chart-tools.js?v=73";
-import {orderKinds, needsPrice, populateKinds} from "./orders.js?v=73";
+import {orderKinds, needsPrice, populateKinds} from "./orders.js?v=74";
 
 const get = id => document.getElementById(id);
 const savedQuotes = new Set("ANT SKHY SPCX MRVL BZMAIN CLMAIN AAL UAL DAL NVDA AMZN".split(" "));
@@ -72,7 +72,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     style: "currency", currency: "USD", maximumFractionDigits: 4
   });
   const won = new Intl.NumberFormat("ko-KR", {style: "currency", currency: "KRW"});
-  const sideName = {buy: "매수", sell: "매도"};
+  const sideName = {buy: "Buy", sell: "Sell"};
   const previewOnly = "미리보기 모드입니다. 실계좌 주문은 이 Mac의 비공개 서버에서 할 수 있습니다.";
   let tradeSide, orderContext, reviewId, tradeBusy = false, tradeVersion = 0;
   let unsubscribeBook, pendingBook, bookPaint, bookRevision = 0, liveTradePrice, displayedBook;
@@ -80,8 +80,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
   function selectTradeSide(side) {
     tradeSide = side;
     trade.dataset.side = side;
-    get("trade-preview-title").textContent = sideName[side] + " 주문";
-    tradeNext.textContent = sideName[side] + " 검토";
+    tradeNext.textContent = "Review " + side + " order";
     for (const button of ticketSides) {
       button.setAttribute("aria-pressed", String(button.dataset.ticketSide === side));
     }
@@ -99,7 +98,6 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
       "37":"시간을 나눠 시장가로 분할 체결"
     })[kind.value] || "";
     get("trade-limit-field").hidden = price.disabled;
-    get("trade-use-quote").parentElement.hidden = price.disabled;
     for (const button of bookLevels.querySelectorAll("button")) button.disabled = price.disabled;
     updateTradeTotal();
   }
@@ -157,11 +155,15 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     });
   }
 
+  function setTicketQuote(value, label) {
+    get("trade-preview-quote").hidden = !Number.isFinite(value);
+    get("trade-quote-value").textContent = Number.isFinite(value) ? dollars.format(value) : "";
+    get("trade-quote-label").textContent = label;
+  }
+
   function showTradeQuote(value) {
     if (!Number.isFinite(value)) return;
-    const currentPrice = get("trade-preview-quote");
-    currentPrice.hidden = false;
-    currentPrice.textContent = "키움 현재가 · " + dollars.format(value);
+    setTicketQuote(value, "현재가");
     get("trade-use-quote").hidden = false;
     get("trade-book-price").textContent = dollars.format(value);
     get("trade-book-krw").textContent = orderContext?.fx > 0 ? won.format(value * orderContext.fx) : "";
@@ -175,7 +177,11 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     bookStatus.textContent = "표시할 호가가 없습니다.";
     bookMode.textContent = book.live ? "실시간" : bookLevels.hidden ? "" : "최근 호가";
     bookMode.dataset.live = String(Boolean(book.live));
-    get("trade-book-time").textContent = [book.date, book.time].filter(Boolean).join(" ");
+    const timestamp = get("trade-book-time");
+    const day = book.date?.replace(/^\d{4}(\d{2})(\d{2})$/, "$1/$2");
+    const clock = book.time?.replace(/^(\d{2})(\d{2})(\d{2})$/, "$1:$2:$3");
+    timestamp.textContent = [day, clock].filter(Boolean).join(" ");
+    timestamp.title = [book.date, book.time].filter(Boolean).join(" ");
     renderBookSide(get("trade-book-asks"), [...(book.asks ?? [])].reverse());
     renderBookSide(get("trade-book-bids"), book.bids ?? []);
     if (centerBook && !bookLevels.hidden) {
@@ -265,11 +271,9 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     get("trade-book-time").textContent = "";
     get("trade-use-quote").hidden = true;
     get("trade-preview-symbol").textContent = displaySymbol(current);
+    get("trade-company").textContent = quote?.name || nameFor(current) || "";
     tradeStatus.textContent = "키움 주문 정보를 확인 중입니다.";
-    const referencePrice = get("trade-preview-quote");
-    referencePrice.hidden = !Number.isFinite(quote?.price);
-    referencePrice.textContent = referencePrice.hidden ? ""
-      : (quote.fromKiwoom ? "키움 조회가 · " : "저장된 종가 · ") + dollars.format(quote.price);
+    setTicketQuote(quote?.price, quote?.fromKiwoom ? "최근 조회가" : "저장된 종가");
     updateTradeTotal();
     trade.showModal();
     unsubscribeBook = subscribeOrderBook(current, onBookUpdate);
@@ -296,7 +300,9 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     };
   }
   get("trade-use-quote").onclick = () => setTradePrice(liveTradePrice ?? orderContext?.price);
-  get("trade-pending").onclick = get("trade-review-pending").onclick = orders.openPending;
+  get("trade-pending").onclick = get("trade-review-pending").onclick = () => {
+    if (!tradeBusy) orders.openPending();
+  };
   for (const button of tradeForm.querySelectorAll("[data-trade-step]")) {
     button.onclick = () => {
       if (button.dataset.tradeStep === "price") {
@@ -343,8 +349,8 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     }
     if (version !== tradeVersion || !trade.open) return;
     reviewId = order.id ?? null;
-    get("trade-review-title").textContent = displaySymbol(current) + " " + sideName[order.side] + " 확인";
-    tradeConfirm.textContent = "실계좌 " + sideName[order.side] + " 전송";
+    get("trade-review-title").textContent = "주문 확인";
+    tradeConfirm.textContent = "Place " + order.side + " order";
     get("trade-review-side").textContent = sideName[order.side];
     get("trade-review-kind").textContent = orderKinds.get(order.kind);
     get("trade-review-quantity").textContent = Number(order.quantity).toLocaleString("ko-KR") + "주";
@@ -353,7 +359,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     tradeForm.hidden = true;
     tradeReview.hidden = false;
     tradeConfirm.disabled = !reviewId;
-    tradeStatus.textContent = reviewId ? "주문 종류와 수량을 확인한 뒤 전송하세요." : previewOnly;
+    tradeStatus.textContent = reviewId ? "전송하면 키움 실계좌에 주문이 접수됩니다." : previewOnly;
     get("trade-review-title").focus();
   });
 

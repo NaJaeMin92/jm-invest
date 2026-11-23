@@ -1,4 +1,4 @@
-import {setupPendingOrders} from "./pending-orders.js?v=73";
+import {setupPendingOrders} from "./pending-orders.js?v=74";
 
 export const orderKinds = new Map([
   ["00", "지정가"], ["03", "시장가"], ["26", "VWAP 지정가"], ["27", "TWAP 지정가"],

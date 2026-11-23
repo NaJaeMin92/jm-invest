@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=73">
-<script type="module" src="./journal.js?v=73"></script>
+<link rel="stylesheet" href="./style.css?v=74">
+<script type="module" src="./journal.js?v=74"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header><div class="head"><a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -96,16 +96,52 @@
 <div class="watch-bulk"><label><input type="checkbox" id="watch-select-all">Select all</label><button type="button" id="watch-move">Move to…</button><button type="button" id="watch-delete">Delete</button></div>
 <form id="watch-move-form" hidden><label>Destination <select id="watch-destination" required></select></label><button type="submit">Move</button></form>
 </div></dialog>
-<dialog id="pending-orders" lang="ko" aria-labelledby="pending-title">
-<header class="pending-head"><h2 id="pending-title">미체결 주문</h2><button type="button" id="pending-close" aria-label="미체결 주문 닫기">닫기</button></header>
-<section id="pending-list-panel"><div class="pending-list-head"><span>미국주식 · 당일</span><button id="pending-refresh" type="button">새로고침</button></div><ul id="pending-list"></ul></section>
+<dialog id="pending-orders" class="order-sheet" lang="ko" aria-labelledby="pending-title">
+<header class="order-sheet-head">
+  <div><p class="order-scope">미국주식 · 당일</p><h2 id="pending-title">미체결 주문</h2></div>
+  <div class="sheet-tools">
+    <button id="pending-refresh" class="sheet-icon" type="button" aria-label="미체결 주문 새로고침" title="새로고침">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 10a8 8 0 1 0-.9 6M20 4v6h-6"/></svg>
+    </button>
+    <button id="pending-close" class="sheet-icon" type="button" aria-label="미체결 주문 닫기">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+</header>
+<section id="pending-list-panel" aria-labelledby="pending-title">
+  <div id="pending-filters" role="group" aria-label="미체결 주문 필터" hidden>
+    <button type="button" data-filter="all" aria-pressed="true">전체 <span></span></button>
+    <button type="button" data-filter="buy" aria-pressed="false" lang="en">Buy <span></span></button>
+    <button type="button" data-filter="sell" aria-pressed="false" lang="en">Sell <span></span></button>
+  </div>
+  <ul id="pending-list"></ul>
+  <template id="pending-order-row">
+    <li>
+      <div class="pending-position">
+        <div><div class="pending-identity"><strong class="pending-symbol"></strong><span class="pending-side" lang="en"></span></div><p class="pending-terms"></p></div>
+        <div class="pending-remaining"><span>미체결 수량</span><strong></strong></div>
+      </div>
+      <div class="pending-meta"><span></span><time></time></div>
+      <div class="pending-row-actions">
+        <button type="button" data-action="amend">가격 정정</button>
+        <button type="button" data-action="cancel">주문 취소</button>
+      </div>
+      <small class="pending-reason" hidden></small>
+    </li>
+  </template>
+  <div id="pending-placeholder" role="status" hidden>
+    <svg aria-hidden="true" viewBox="0 0 48 48"><path d="M13 8h22v32l-4-3-4 3-4-3-5 3-5-3zM19 17h10m-10 6h10m-10 6h5"/></svg>
+    <strong id="pending-placeholder-title"></strong><p id="pending-placeholder-detail"></p>
+  </div>
+</section>
 <form id="pending-action" hidden>
-<h3 id="pending-action-title"></h3><p id="pending-original"></p>
-<label id="pending-price-label">새 지정가 (USD)<input id="pending-price" type="number" min="0.0001" step="0.0001" max="9999999" inputmode="decimal"></label>
-<p id="pending-summary" hidden></p>
-<div class="pending-buttons"><button id="pending-back" type="button">목록으로</button><button id="pending-next" type="submit"></button></div>
+  <h3 id="pending-action-title" tabindex="-1"></h3>
+  <dl id="pending-original" class="order-facts"></dl>
+  <label id="pending-price-label">새 지정가 (USD)<input id="pending-price" type="number" min="0.0001" step="0.0001" max="9999999" inputmode="decimal"></label>
+  <p id="pending-summary" role="status" hidden></p>
+  <div class="pending-buttons"><button id="pending-back" type="button">목록으로</button><button id="pending-next" type="submit"></button></div>
 </form>
-<p id="pending-status" role="status"></p>
+<p id="pending-status" class="order-notice" role="status"></p>
 </dialog>
 <dialog id="stock-detail" aria-labelledby="stock-symbol" lang="en">
 <div class="instrument">
@@ -182,30 +218,35 @@
 <div id="sentiment-content" aria-live="polite"></div>
 <a class="market-source" href="https://edition.cnn.com/markets/fear-and-greed" target="_blank" rel="noopener noreferrer">CNN Fear &amp; Greed ↗</a>
 </section>
-<div id="stock-order-bar" lang="ko" role="group" aria-label="종목 주문">
+<div id="stock-order-bar" role="group" aria-label="Stock order">
 <button id="stock-buy" type="button" aria-haspopup="dialog" aria-controls="trade-preview">
-<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"><path d="M5 12h14M12 5v14"/></svg>매수
+<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 17 11-11M8 6h9v9"/></svg>Buy
 </button>
 <button id="stock-sell" type="button" aria-haspopup="dialog" aria-controls="trade-preview">
-<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"><path d="M5 12h14"/></svg>매도
+<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 7 11 11M8 18h9V9"/></svg>Sell
 </button>
 </div>
-<dialog id="trade-preview" lang="ko" aria-labelledby="trade-preview-title">
-<header class="trade-preview-head">
-<div><p id="trade-preview-symbol"></p><h3 id="trade-preview-title">주문 미리보기</h3></div>
-<p id="trade-preview-quote" class="trade-preview-quote" hidden></p>
-<button type="button" id="trade-preview-close" aria-label="주문 화면 닫기">×</button>
+<dialog id="trade-preview" class="order-sheet" lang="ko" aria-labelledby="trade-preview-title trade-preview-symbol">
+<header class="order-sheet-head">
+  <h3 id="trade-preview-title">주식 주문</h3>
+  <div class="sheet-tools">
+    <button type="button" id="trade-pending" aria-haspopup="dialog" aria-controls="pending-orders">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h14v15l-3-2-4 2-4-2-3 2zM9 9h6m-6 4h5"/></svg>미체결
+    </button>
+    <button type="button" id="trade-preview-close" class="sheet-icon" aria-label="주문 화면 닫기">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
 </header>
-<form id="trade-preview-form" method="dialog">
-<div class="trade-side-switch" role="group" aria-label="매매 구분">
-<button type="button" data-ticket-side="buy" aria-pressed="false">매수</button>
-<button type="button" data-ticket-side="sell" aria-pressed="false">매도</button>
-<button type="button" id="trade-pending" aria-haspopup="dialog" aria-controls="pending-orders">미체결</button>
+<div class="ticket-instrument">
+  <div><strong id="trade-preview-symbol"></strong><small id="trade-company"></small></div>
+  <div id="trade-preview-quote" hidden><strong id="trade-quote-value"></strong><small id="trade-quote-label"></small></div>
 </div>
+<form id="trade-preview-form" method="dialog">
 <div class="trade-workspace">
 <section id="trade-book" aria-label="키움 호가">
 <div class="trade-book-head"><div><strong>10호가</strong><span id="trade-book-mode"></span><time id="trade-book-time"></time></div>
-<button id="trade-book-refresh" type="button" aria-label="호가 새로고침" title="호가 새로고침">↻</button></div>
+<button id="trade-book-refresh" type="button" aria-label="호가 새로고침" title="호가 새로고침"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 10a8 8 0 1 0-.9 6M20 4v6h-6"/></svg></button></div>
 <div class="trade-book-columns"><span>호가</span><span>전일 대비</span></div>
 <p id="trade-book-status" role="status"></p>
 <div id="trade-book-levels" hidden>
@@ -215,17 +256,36 @@
 </div>
 </section>
 <div class="trade-entry">
-<div class="trade-fields">
-<label>주문 종류<select id="trade-kind" name="kind" aria-describedby="trade-kind-help" required></select><small id="trade-kind-help"></small></label>
-<div id="trade-limit-field"><label for="trade-limit">지정가 (USD)</label>
-<div class="trade-stepper"><button type="button" data-trade-step="price" value="-1" aria-label="지정가 한 단위 내리기">−</button><input id="trade-limit" type="number" name="price" inputmode="decimal" min="0.0001" max="9999999" step="0.0001" placeholder="0.00" aria-describedby="trade-price-hint" required><button type="button" data-trade-step="price" value="1" aria-label="지정가 한 단위 올리기">+</button></div>
-<small id="trade-limit-krw"></small><small id="trade-price-hint" role="status"></small></div>
-<div class="trade-price-shortcuts">
-<button id="trade-use-quote" type="button" hidden>현재가</button>
-</div>
-<div><label for="trade-quantity" id="trade-quantity-label">수량 (주)</label>
-<div class="trade-stepper"><button type="button" data-trade-step="quantity" value="-1" aria-label="수량 한 주 줄이기">−</button><input id="trade-quantity" type="number" name="quantity" inputmode="numeric" min="1" max="999999" step="1" value="1" required><button type="button" data-trade-step="quantity" value="1" aria-label="수량 한 주 늘리기">+</button></div></div>
-</div>
+  <div class="trade-side-switch" role="group" aria-label="매매 구분" lang="en">
+    <button type="button" data-ticket-side="buy" aria-pressed="false">Buy</button>
+    <button type="button" data-ticket-side="sell" aria-pressed="false">Sell</button>
+  </div>
+  <div class="trade-fields">
+    <label for="trade-kind">주문 종류</label>
+    <div class="trade-select"><select id="trade-kind" name="kind" aria-describedby="trade-kind-help" required></select>
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg>
+    </div>
+    <small id="trade-kind-help"></small>
+  </div>
+  <div id="trade-limit-field" class="trade-fields">
+    <label for="trade-limit">지정가 <span>USD</span></label>
+    <input id="trade-limit" type="number" name="price" inputmode="decimal" min="0.0001" max="9999999" step="0.0001" placeholder="0.00" aria-describedby="trade-price-hint" required>
+    <small id="trade-limit-krw"></small>
+    <div class="trade-stepper">
+      <button id="trade-use-quote" type="button" hidden>현재가</button>
+      <button type="button" data-trade-step="price" value="-1" aria-label="지정가 한 단위 내리기">−</button>
+      <button type="button" data-trade-step="price" value="1" aria-label="지정가 한 단위 올리기">+</button>
+    </div>
+    <small id="trade-price-hint" role="status"></small>
+  </div>
+  <div class="trade-fields">
+    <label for="trade-quantity" id="trade-quantity-label">수량 (주)</label>
+    <div class="trade-stepper quantity-stepper">
+      <button type="button" data-trade-step="quantity" value="-1" aria-label="수량 한 주 줄이기">−</button>
+      <input id="trade-quantity" type="number" name="quantity" inputmode="numeric" min="1" max="999999" step="1" value="1" required>
+      <button type="button" data-trade-step="quantity" value="1" aria-label="수량 한 주 늘리기">+</button>
+    </div>
+  </div>
 </div>
 </div>
 <div class="trade-ticket-footer">
@@ -235,7 +295,7 @@
 </form>
 <section id="trade-preview-review" hidden aria-labelledby="trade-review-title">
 <h4 id="trade-review-title" tabindex="-1">주문 확인</h4>
-<dl class="trade-review-details">
+<dl class="order-facts trade-review-details">
 <dt>매매 구분</dt><dd id="trade-review-side"></dd>
 <dt>주문 종류</dt><dd id="trade-review-kind"></dd>
 <dt>수량</dt><dd id="trade-review-quantity"></dd>
@@ -248,7 +308,7 @@
 <button type="button" id="trade-preview-confirm" disabled>실계좌 주문 전송</button>
 </div>
 </section>
-<p class="trade-preview-note" id="trade-preview-status" role="status"></p>
+<p class="order-notice" id="trade-preview-status" role="status"></p>
 </dialog>
 <dialog id="chart-tool-dialog" aria-labelledby="chart-tool-title">
 <div class="chart-tool-head"><h3 id="chart-tool-title"></h3><button type="button" id="chart-tool-close" aria-label="Close chart tools">×</button></div>
