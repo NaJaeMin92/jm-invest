@@ -208,6 +208,7 @@ def kiwoom_ticks(socket, items, timeout_error):
 
 
 class App(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
     orders = None
     quote_broker = None
     quote_lock = Lock()
@@ -216,6 +217,7 @@ class App(BaseHTTPRequestHandler):
     origin = ""
 
     def allowed_host(self):
+        self.close_connection = True
         if self.headers.get("Host") != self.host:
             self.send_error(403)
             return False
@@ -285,6 +287,7 @@ class App(BaseHTTPRequestHandler):
             self.send_header("Vary", "Origin")
 
     def stream_quotes(self):
+        self.close_connection = True
         opened = False
         acquired = False
         socket = None
@@ -304,7 +307,7 @@ class App(BaseHTTPRequestHandler):
             ):
                 raise Problem(400, "종목과 거래소를 확인하세요.")
             items = [{"jmcode": item["jmcode"], "stex_tp": item["stex_tp"]} for item in items]
-            acquired = self.quote_lock.acquire(blocking=False)
+            acquired = self.quote_lock.acquire(timeout=3)
             if not acquired:
                 raise Problem(409, "키움 시세 세션을 다른 탭에서 사용 중입니다.")
             import websocket
@@ -315,6 +318,8 @@ class App(BaseHTTPRequestHandler):
             first = next(ticks, None)
             self.send_response(200)
             self.send_header("Content-Type", "application/x-ndjson")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.send_header("Connection", "close")
             self.quote_headers()
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
@@ -324,7 +329,9 @@ class App(BaseHTTPRequestHandler):
             for tick in chain((first,), ticks):
                 if time.monotonic() >= deadline:
                     break
-                self.wfile.write((json.dumps(tick) + "\n").encode())
+                payload = (json.dumps(tick) + "\n").encode()
+                self.wfile.write(f"{len(payload):X}\r\n".encode() + payload + b"\r\n")
+            self.wfile.write(b"0\r\n\r\n")
         except Problem as error:
             if not opened:
                 self.write_json(error.status, {"message": str(error)})

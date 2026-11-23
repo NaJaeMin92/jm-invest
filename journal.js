@@ -383,6 +383,18 @@ const kiwoomEndpoint = location.hostname === "127.0.0.1" ? "./api/quotes/stream"
 const kiwoomPhases = {"0": "Regular", "1": "Pre", "2": "After"};
 let kiwoomStream;
 let redrawQuotes;
+let kiwoomRetry;
+
+function stopKiwoomQuotes() {
+  clearTimeout(kiwoomRetry);
+  kiwoomRetry = undefined;
+  kiwoomStream?.controller.abort();
+  kiwoomStream = null;
+  kiwoomTicks.clear();
+}
+
+window.addEventListener("pagehide", stopKiwoomQuotes);
+window.addEventListener("pageshow", refreshWatchlistQuotes);
 
 async function syncKiwoomQuotes() {
   if (!kiwoomEndpoint) return;
@@ -393,12 +405,9 @@ async function syncKiwoomQuotes() {
   }).slice(0, 200) : [];
   const key = JSON.stringify(items);
   if (kiwoomStream?.key === key && kiwoomStream.token === token) return;
-  kiwoomStream?.controller.abort();
-  kiwoomStream = null;
-  if (kiwoomTicks.size) {
-    kiwoomTicks.clear();
-    renderWatchlist();
-  }
+  const hadTicks = kiwoomTicks.size > 0;
+  stopKiwoomQuotes();
+  if (hadTicks) renderWatchlist();
   if (!items.length) {
     kiwoomQuoteStatus.textContent = active && readWatchlist().length ? "Waiting for supported Kiwoom symbols…" : "";
     return;
@@ -417,6 +426,11 @@ async function syncKiwoomQuotes() {
     });
     if (!response.ok || !response.body) {
       const issue = await response.json().catch(() => null);
+      if (response.status === 409 && kiwoomStream === stream) {
+        kiwoomRetry = setTimeout(syncKiwoomQuotes, 2_000);
+        kiwoomQuoteStatus.textContent = "Kiwoom is in use in another tab. Retrying…";
+        return;
+      }
       throw new Error(issue?.message ?? `Kiwoom HTTP ${response.status}`);
     }
     kiwoomQuoteStatus.textContent = "Kiwoom connected. Waiting for a trade in this session…";
