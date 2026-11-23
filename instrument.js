@@ -283,14 +283,8 @@ export function setupInstrument({search,nameFor,readList,saveList}) {
     get("stock-frames").hidden=false;
     setFrame(frame);
   }
-  function fallback(symbol) {
-    const container=get("external-chart");container.hidden=false;canvas.hidden=true;
-    const iframe=document.createElement("iframe");
-    iframe.title=displaySymbol(symbol)+" market chart";
-    iframe.referrerPolicy="no-referrer";
-    iframe.src="https://s.tradingview.com/widgetembed/?"+new URLSearchParams({symbol,interval:"D",theme:"dark",style:"1",range:"ALL",locale:"en",timezone:"America/New_York"});
-    container.replaceChildren(iframe);
-    get("stock-time").textContent="Chart by TradingView";
+  function fallback() {
+    get("stock-time").textContent="Chart unavailable";
     document.querySelector(".quote-time small").hidden=true;
     get("stock-frames").hidden=true;
   }
@@ -315,7 +309,7 @@ export function setupInstrument({search,nameFor,readList,saveList}) {
     const data=await publicQuote(symbol);
     if(current!==symbol)return;
     quote=data;
-    if (quote) renderQuote();else fallback(symbol);
+    if (quote) renderQuote();else fallback();
   }
   function sync() {
     const symbol=new URLSearchParams(location.hash.slice(1)).get("stock")?.toUpperCase();

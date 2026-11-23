@@ -1,7 +1,7 @@
 import {setupWatchEditor} from "./watch-editor.js?v=49";
 import {setupOrders} from "./orders.js?v=55";
-import { publicQuote, setupInstrument, sparkline } from "./instrument.js?v=58";
-import {fetchWatchQuotes, usMarketSession, watchQuoteForSession} from "./watch-quotes.js?v=61";
+import { setupInstrument, sparkline } from "./instrument.js?v=64";
+import {usMarketSession} from "./watch-quotes.js?v=64";
 
 const service = "https://mfycpprqyaidoixytdim.supabase.co";
 const publicKey = "sb_publishable_KIxbzozNkk50oEZ9GehtZA_E484E5Lr";
@@ -156,7 +156,6 @@ document.querySelector("#logout").addEventListener("click", () => {
   document.querySelector("#portfolio-value").textContent = "";
   document.querySelector("#valuation-note").textContent = "";
   document.querySelector("#kiwoom-return").textContent = "";
-  watchHoldings = [];
   renderWatchlist();
   setDetail(false);
   login.reset();
@@ -316,12 +315,11 @@ function showProfit(data) {
   }
 }
 
-let watchHoldings = [];
 const watchKey = "jm-invest:watchlist:v1";
 const watchList = document.querySelector("#home-holdings");
 const watchStatus = document.querySelector("#home-value");
 const watchForm = document.querySelector("#watch-form");
-// The sample watchlist still supplies logos and historical mini charts.
+// Preserve the existing logos and default watchlist.
 const featured = [
   ["ANT", "Anthropic PBC"],
   ["SKHY", "SK Hynix Inc"],
@@ -337,6 +335,11 @@ const suggestedWatchlist = featured.map(([symbol]) => symbol);
 const snapshots = new Map(featured.map(([symbol, name], index) =>
   [symbol, {name, index}]
 ));
+const marketSymbols = [
+  {symbol: "VIX", name: "Cboe Volatility Index"},
+  {symbol: "BZMAIN", name: "Brent Crude Oil Futures"},
+  {symbol: "CLMAIN", name: "WTI Crude Oil Futures"},
+];
 let sortDirection = 0;
 document.querySelector("#watch-sort").addEventListener("click", (event) => {
   sortDirection = sortDirection === 0 ? -1 : sortDirection === -1 ? 1 : 0;
@@ -357,29 +360,28 @@ try {
   }
 } catch {}
 
-const marketQuotes = new Map();
 const watchDollars = new Intl.NumberFormat("en-US", {
   style: "currency", currency: "USD", maximumFractionDigits: 4
 });
-const nameFor = symbol => snapshots.get(symbol)?.name || marketQuotes.get(symbol)?.description
+const nameFor = symbol => snapshots.get(symbol)?.name
+  || marketSymbols.find(item => item.symbol === symbol)?.name
   || stockDirectory?.find(item => item.symbol === symbol)?.name || symbol;
 const watchEditor = setupWatchEditor({watchKey, nameFor, refresh() {
   renderWatchlist();
   refreshWatchlistQuotes();
 }});
 const readWatchlist = watchEditor.readList;
-let nvidiaHistory;
-publicQuote("NVDA").then(quote => {
-  if (!quote?.intraday?.length) return;
-  nvidiaHistory = quote;
-  renderWatchlist();
-});
-
 const kiwoomTicks = new Map();
+const lastKiwoomPrices = new Map();
+const kiwoomDaily = new Map();
+const kiwoomRegular = new Map();
+const externalPrices = new Map();
+const unavailableSymbols = new Set();
 const kiwoomQuoteStatus = document.querySelector("#kiwoom-quote-status");
 // Set the HTTPS URL of the authenticated, quote-only gateway when provisioned.
 const kiwoomGateway = document.querySelector('meta[name="kiwoom-quote-gateway"]')?.content;
-const kiwoomEndpoint = location.hostname === "127.0.0.1" ? "./api/quotes/stream" : kiwoomGateway;
+const kiwoomEndpoint = location.hostname === "127.0.0.1" ? "./api/quotes/stream"
+  : location.origin === "https://najaemin92.github.io" ? kiwoomGateway : null;
 const kiwoomPhases = {"0": "Regular", "1": "Pre", "2": "After"};
 let kiwoomStream;
 let redrawQuotes;
@@ -391,6 +393,10 @@ function stopKiwoomQuotes() {
   kiwoomStream?.controller.abort();
   kiwoomStream = null;
   kiwoomTicks.clear();
+  lastKiwoomPrices.clear();
+  kiwoomDaily.clear();
+  externalPrices.clear();
+  unavailableSymbols.clear();
 }
 
 window.addEventListener("pagehide", stopKiwoomQuotes);
@@ -399,17 +405,14 @@ window.addEventListener("pageshow", refreshWatchlistQuotes);
 async function syncKiwoomQuotes() {
   if (!kiwoomEndpoint) return;
   const active = token && !document.hidden && document.body.dataset.view === "home";
-  const items = active ? [...new Set(readWatchlist())].sort().flatMap(symbol => {
-    const exchange = marketQuotes.get(symbol)?.exchange;
-    return exchange ? [{jmcode: symbol, stex_tp: exchange}] : [];
-  }).slice(0, 200) : [];
-  const key = JSON.stringify(items);
+  const symbols = active ? [...new Set(readWatchlist())].sort().slice(0, 200) : [];
+  const key = JSON.stringify(symbols);
   if (kiwoomStream?.key === key && kiwoomStream.token === token) return;
-  const hadTicks = kiwoomTicks.size > 0;
   stopKiwoomQuotes();
-  if (hadTicks) renderWatchlist();
-  if (!items.length) {
-    kiwoomQuoteStatus.textContent = active && readWatchlist().length ? "Waiting for supported Kiwoom symbols…" : "";
+  if (!symbols.length) {
+    if (!token) kiwoomRegular.clear();
+    kiwoomQuoteStatus.textContent = "";
+    renderWatchlist();
     return;
   }
   kiwoomQuoteStatus.textContent = "Connecting to Kiwoom…";
@@ -444,9 +447,22 @@ async function syncKiwoomQuotes() {
         const lines = (pending + decoder.decode(value, {stream: true})).split("\n");
         pending = lines.pop();
         for (const line of lines) {
-          const tick = JSON.parse(line);
-          if (!tick || !Number.isFinite(tick.price)) continue;
-          kiwoomTicks.set(tick.symbol, tick);
+          const update = JSON.parse(line);
+          if (!update) continue;
+          if (Array.isArray(update.unsupported)) {
+            for (const symbol of update.unsupported) unavailableSymbols.add(symbol);
+          } else if (Array.isArray(update.daily)) {
+            kiwoomDaily.set(update.symbol, update.daily);
+          } else if (Number.isFinite(update.price)) {
+            if (update.marketType) {
+              externalPrices.set(update.symbol, update);
+            } else if (update.snapshot) {
+              lastKiwoomPrices.set(update.symbol, {...update, received: usMarketSession()});
+            } else {
+              kiwoomTicks.set(update.symbol, update);
+              if (update.session === "0") kiwoomRegular.set(update.symbol, update);
+            }
+          }
           redrawQuotes ??= setTimeout(() => {
             redrawQuotes = undefined;
             renderWatchlist();
@@ -462,53 +478,22 @@ async function syncKiwoomQuotes() {
   } finally {
     if (kiwoomStream === stream) {
       kiwoomStream = null;
-      kiwoomTicks.clear();
       renderWatchlist();
     }
   }
 }
 
-let watchQuoteRequest;
 let lastWatchSession;
-async function refreshWatchlistQuotes() {
-  if (document.hidden || document.body.dataset.view !== "home") {
-    syncKiwoomQuotes();
-    return;
-  }
-  const session = usMarketSession();
-  const sessionKey = session.date + session.phase;
-  if (lastWatchSession !== sessionKey) {
-    lastWatchSession = sessionKey;
-    renderWatchlist();
-  }
-  const symbols = [...new Set(readWatchlist())].sort();
-  const key = symbols.join(",");
-  if (key === watchQuoteRequest?.key) {
-    syncKiwoomQuotes();
-    return;
-  }
-  watchQuoteRequest?.controller.abort();
-  const controller = new AbortController();
-  const pending = { key, controller };
-  watchQuoteRequest = pending;
-  const timeout = setTimeout(() => controller.abort(), 12_000);
-  try {
-    const updates = await fetchWatchQuotes(symbols, controller.signal);
-    if (watchQuoteRequest !== pending) return;
-    for (const [symbol, quote] of updates) {
-      if (quote) marketQuotes.set(symbol, quote);
-      else marketQuotes.delete(symbol);
-    }
-  } catch (error) {
-    console.warn("Unable to update watchlist quotes", error);
-  } finally {
-    clearTimeout(timeout);
-    if (watchQuoteRequest === pending) {
-      watchQuoteRequest = null;
-      syncKiwoomQuotes();
+function refreshWatchlistQuotes() {
+  if (!document.hidden && document.body.dataset.view === "home") {
+    const session = usMarketSession();
+    const sessionKey = session.date + session.phase;
+    if (lastWatchSession !== sessionKey) {
+      lastWatchSession = sessionKey;
       renderWatchlist();
     }
   }
+  syncKiwoomQuotes();
 }
 setInterval(refreshWatchlistQuotes, 30_000);
 document.addEventListener("visibilitychange", refreshWatchlistQuotes);
@@ -530,14 +515,25 @@ function renderWatchlist() {
   const session = usMarketSession();
   const date = session.date.replaceAll("-", "");
   const quotes = new Map(symbols.map(symbol => {
-    const tick = token && kiwoomTicks.get(symbol);
-    const label = tick && kiwoomPhases[tick.session];
-    if (label === session.phase && tick.date === date) {
-      return [symbol, {...tick, label, fromKiwoom: true}];
-    }
-    return [symbol, watchQuoteForSession(marketQuotes.get(symbol), session)];
+    if (!token) return [symbol, null];
+    const external = externalPrices.get(symbol);
+    if (external) return [symbol, {...external, label: external.marketType}];
+    const tick = kiwoomTicks.get(symbol);
+    const snapshot = lastKiwoomPrices.get(symbol);
+    const daily = kiwoomDaily.get(symbol)?.find(row => row.date < date);
+    const regular = kiwoomRegular.get(symbol);
+    const live = tick?.date === date && kiwoomPhases[tick.session] === session.phase ? tick : null;
+    const change = regular?.date === date ? regular.change
+      : snapshot?.received.date === session.date && snapshot.received.phase === "Regular" && session.phase === "Regular"
+        ? snapshot.change : daily?.change;
+    const price = live?.price ?? snapshot?.price ?? daily?.price;
+    const label = live ? kiwoomPhases[live.session] : snapshot ? "Last" : "Close";
+    return [symbol, price != null || Number.isFinite(change)
+      ? {price, change, label, live: Boolean(live), changeDate: regular?.date === date ? date : daily?.date}
+      : null];
   }));
-  if ([...quotes.values()].some(quote => quote?.fromKiwoom)) {
+  if (kiwoomQuoteStatus.textContent.startsWith("Kiwoom connected")
+      && (kiwoomTicks.size || lastKiwoomPrices.size || externalPrices.size)) {
     kiwoomQuoteStatus.textContent = "";
   }
   if (sortDirection) symbols.sort((a, b) => {
@@ -581,38 +577,43 @@ function renderWatchlist() {
     if (market) {
       const tag = document.createElement("span");
       tag.textContent = market.label;
-      tag.className = market.futures ? "session-tag futures" : "session-tag";
-      if (!market.futures && ["Pre", "After"].includes(session.phase) && market.label !== session.phase) {
+      tag.className = market.marketType ? "session-tag futures" : "session-tag";
+      if (!market.marketType && ["Pre", "After"].includes(session.phase) && market.label !== session.phase) {
         tag.title = session.phase + " quote pending";
       }
       caption.append(tag);
     }
     identity.append(name, caption);
     const chart = document.createElement("span");
-    chart.className = snapshot ? "mini-chart reference-chart" : "mini-chart";
+    chart.className = "mini-chart";
     chart.setAttribute("aria-hidden", "true");
+    const daily = token && kiwoomDaily.get(symbol)?.filter(row => row.date < date);
+    if (daily?.length > 1) {
+      chart.style.color = market?.change < 0 ? "var(--down)" : "var(--up)";
+      chart.append(sparkline(daily.map(row => row.price).reverse()));
+    }
     const quote = document.createElement("div");
     quote.className = "watch-quote";
     const priceLabel = document.createElement("strong");
     const priceNote = document.createElement("small");
-    const holding = watchHoldings.find((item) => item.symbol === symbol);
-    const price = holding?.current_price;
-    const hasPrice = price != null && price !== "" && Number.isFinite(Number(price));
     if (market) {
-      const {change, delayMinutes} = market;
-      priceLabel.textContent = watchDollars.format(market.price);
-      const percent = Number.isFinite(change) ? `${change > 0 ? "+" : ""}${change.toFixed(2)}%` : "";
-      const stale = Date.now() - market.receivedAt >= 90_000;
-      const delay = market.fromKiwoom ? "Kiwoom" : stale ? "Last quote" : delayMinutes ? `${delayMinutes}m delay` : "";
-      priceNote.textContent = [percent, delay].filter(Boolean).join(" · ");
-      if (Number.isFinite(change)) quote.dataset.direction = change < 0 ? "down" : "up";
+      const {change} = market;
+      const hasChange = Number.isFinite(change);
+      const price = !Number.isFinite(market.price) ? ""
+        : market.marketType === "Index" ? market.price.toFixed(2) : watchDollars.format(market.price);
+      priceLabel.textContent = hasChange ? `${change > 0 ? "+" : ""}${change.toFixed(2)}%` : "—";
+      if (hasChange && !market.marketType) {
+        priceLabel.title = "Regular-session change from the prior close"
+          + (market.changeDate ? ` (${market.changeDate})` : "");
+      }
+      const source = market.marketType ? "Yahoo · Delayed" : market.live ? "Kiwoom" : "Kiwoom · Last";
+      priceNote.textContent = [price, source].filter(Boolean).join(" · ");
+      if (market.quoteTime) priceNote.title = new Date(market.quoteTime * 1000).toLocaleString();
+      if (hasChange) quote.dataset.direction = change < 0 ? "down" : "up";
     } else {
-      priceLabel.textContent = hasPrice ? watchDollars.format(Number(price)) : "—";
-      priceNote.textContent = hasPrice ? "Last account sync" : "No quote";
-    }
-    if (symbol === "NVDA" && nvidiaHistory) {
-      chart.style.color = nvidiaHistory.percent < 0 ? "var(--down)" : "var(--up)";
-      chart.append(sparkline(nvidiaHistory.intraday));
+      priceLabel.textContent = "—";
+      priceNote.textContent = !token ? "Sign in for quotes"
+        : unavailableSymbols.has(symbol) ? "Unavailable on Kiwoom" : "Waiting for quote";
     }
     quote.append(priceLabel, priceNote);
     const referenceSymbols = { BZMAIN: "BZmain", CLMAIN: "CLmain" };
@@ -639,7 +640,7 @@ function renderWatchlist() {
 var stockDirectory;
 watchForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const query = document.querySelector("#watch-symbol").value.trim().toUpperCase();
+  const query = document.querySelector("#watch-symbol").value.trim().toUpperCase().replace(/^\^/, "");
   const results = document.querySelector("#watch-results");
   results.replaceChildren();
   if (!query) return;
@@ -650,7 +651,7 @@ watchForm.addEventListener("submit", async (event) => {
       if (!response.ok) throw new Error("directory unavailable");
       stockDirectory = await response.json();
     }
-    const matches = stockDirectory.filter((item) =>
+    const matches = [...marketSymbols, ...stockDirectory].filter((item) =>
       item.symbol.includes(query) || item.name.toUpperCase().includes(query)
     ).sort((a, b) => {
       const rank = (item) => item.symbol === query ? 0 : item.symbol.startsWith(query) ? 1 : 2;
@@ -764,7 +765,6 @@ async function loadValuation(accessToken) {
     allocationReturn.dataset.direction = performance.dataset.direction;
     allocation.hidden = false;
     showHoldings(balance);
-    watchHoldings = Array.isArray(balance.holdings) ? balance.holdings : [];
     renderWatchlist();
 
     showProfit(balance.realized_profit);

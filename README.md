@@ -26,8 +26,9 @@ Open `http://127.0.0.1:8765/`, sign in to **Account** and select **미국주식 
 Install `websocket-client` in the Python environment that runs the server, then
 run `python3 scripts/order-server.py --quotes` from the repository root. Open
 `http://127.0.0.1:8765/` and sign in through Account. My Watchlist uses the
-Kiwoom FE WebSocket for supported US equities and labels received prices
-**Kiwoom**. This mode enables quotes only. The existing `--live` mode enables
+Kiwoom current-quote and daily APIs to fill US equity rows, and the FE WebSocket
+to update traded prices. Brent and WTI crude oil futures and the VIX index use
+Yahoo Finance delayed quotes. This mode enables quotes only. The existing `--live` mode enables
 quotes and orders. The local server uses the same mode-600 credentials file
 and registered IP as the order service.
 
