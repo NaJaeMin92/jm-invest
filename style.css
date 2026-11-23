@@ -315,7 +315,7 @@ button.broker-row:hover { background:#2a2c31; }
 .watch-quote strong { min-width:min(100%,85px); padding:2px 6px; background:#29384f; border-radius:4px; text-align:right; font-size:16px; line-height:20px; font-weight:670; color:white; }
 .watch-quote[data-direction="down"] strong { background:var(--down); }
 .watch-quote[data-direction="up"] strong { background:var(--up); }
-.watch-quote small { font-size:12px; color:#aab4c9; }
+.watch-quote small { max-width:100%; white-space:normal; text-align:right; font-size:12px; color:#aab4c9; }
 .watch-quote small[data-direction="down"] { color:var(--down); }
 .watch-quote small[data-direction="up"] { color:var(--up); }
 .without-charts .mini-chart { visibility:hidden; }

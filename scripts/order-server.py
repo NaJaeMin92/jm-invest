@@ -24,6 +24,7 @@ OWNER = "9fc22c69-b253-406a-be2b-eb8ad9526a3c"
 STATIC = {
     "index.html", "journal.html", "style.css", "journal.js", "instrument.js", "instrument-chart.js",
     "market-panels.js", "chart-tools.js", "chart-annotations.js", "technical-indicators.js", "orders.js", "watch-editor.js",
+    "watch-quotes.js",
 }
 
 

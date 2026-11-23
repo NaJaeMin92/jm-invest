@@ -1,6 +1,7 @@
 import {setupWatchEditor} from "./watch-editor.js?v=49";
 import {setupOrders} from "./orders.js?v=55";
 import { publicQuote, setupInstrument, sparkline } from "./instrument.js?v=58";
+import {fetchWatchQuotes, usMarketSession, watchQuoteForSession} from "./watch-quotes.js?v=60";
 
 const service = "https://mfycpprqyaidoixytdim.supabase.co";
 const publicKey = "sb_publishable_KIxbzozNkk50oEZ9GehtZA_E484E5Lr";
@@ -76,6 +77,7 @@ function selectView(view) {
     ["login-submit","Sign in","로그인"],
   ]) document.getElementById(id).textContent = korean ? translated : english;
   window.scrollTo(0, 0);
+  if (view === "home") refreshWatchlistQuotes();
 }
 for (const button of navButtons) {
   button.addEventListener("click", () => selectView(button.dataset.view));
@@ -318,21 +320,21 @@ const watchKey = "jm-invest:watchlist:v1";
 const watchList = document.querySelector("#home-holdings");
 const watchStatus = document.querySelector("#home-value");
 const watchForm = document.querySelector("#watch-form");
-// These display values and plots belong to the supplied reference snapshot.
+// The sample watchlist still supplies logos and historical mini charts.
 const featured = [
-  ["ANT", "Anthropic PBC", -8.50, "After: -1.25%"],
-  ["SKHY", "SK Hynix Inc", -13.11, "After: +2.81%"],
-  ["SPCX", "Space Exploration Technologies", -7.69, "After: +1.39%"],
-  ["MRVL", "Marvell Technology", -11.69, "After: +2.55%"],
-  ["BZMAIN", "Brent Last Day Main", 0.48, "89.87 +0.43"],
-  ["CLMAIN", "Crude Oil Main", 1.43, "83.62 +1.18"],
-  ["AAL", "American Airlines", -6.45, "After: +1.82%"],
-  ["UAL", "United Airlines Holdings", -4.26, "After: +1.84%"],
-  ["DAL", "Delta Air Lines Inc.", -3.80, "After: +1.18%"],
+  ["ANT", "Anthropic PBC"],
+  ["SKHY", "SK Hynix Inc"],
+  ["SPCX", "Space Exploration Technologies"],
+  ["MRVL", "Marvell Technology"],
+  ["BZMAIN", "Brent Last Day Main"],
+  ["CLMAIN", "Crude Oil Main"],
+  ["AAL", "American Airlines"],
+  ["UAL", "United Airlines Holdings"],
+  ["DAL", "Delta Air Lines Inc."],
 ];
 const suggestedWatchlist = featured.map(([symbol]) => symbol);
-const snapshots = new Map(featured.map(([symbol, name, change, after], index) =>
-  [symbol, {name, change, after, index}]
+const snapshots = new Map(featured.map(([symbol, name], index) =>
+  [symbol, {name, index}]
 ));
 let sortDirection = 0;
 document.querySelector("#watch-sort").addEventListener("click", (event) => {
@@ -354,16 +356,63 @@ try {
   }
 } catch {}
 
-const nameFor = symbol => snapshots.get(symbol)?.name || stockDirectory?.find(item => item.symbol === symbol)?.name || symbol;
-const watchEditor = setupWatchEditor({watchKey, nameFor, refresh:renderWatchlist});
+const marketQuotes = new Map();
+const watchDollars = new Intl.NumberFormat("en-US", {
+  style: "currency", currency: "USD", maximumFractionDigits: 4
+});
+const nameFor = symbol => snapshots.get(symbol)?.name || marketQuotes.get(symbol)?.description
+  || stockDirectory?.find(item => item.symbol === symbol)?.name || symbol;
+const watchEditor = setupWatchEditor({watchKey, nameFor, refresh() {
+  renderWatchlist();
+  refreshWatchlistQuotes();
+}});
 const readWatchlist = watchEditor.readList;
-let nvidiaQuote;
+let nvidiaHistory;
 publicQuote("NVDA").then(quote => {
-  if (!quote) return;
-  nvidiaQuote = quote;
+  if (!quote?.intraday?.length) return;
+  nvidiaHistory = quote;
   renderWatchlist();
 });
-const percentageFor = symbol => symbol === "NVDA" ? nvidiaQuote?.percent : snapshots.get(symbol)?.change;
+
+let watchQuoteRequest;
+let lastWatchSession;
+async function refreshWatchlistQuotes() {
+  if (document.hidden || document.body.dataset.view !== "home") return;
+  const session = usMarketSession();
+  const sessionKey = session.date + session.phase;
+  if (lastWatchSession !== sessionKey) {
+    lastWatchSession = sessionKey;
+    renderWatchlist();
+  }
+  const symbols = [...new Set(readWatchlist())].sort();
+  const key = symbols.join(",");
+  if (key === watchQuoteRequest?.key) return;
+  watchQuoteRequest?.controller.abort();
+  const controller = new AbortController();
+  const pending = { key, controller };
+  watchQuoteRequest = pending;
+  const timeout = setTimeout(() => controller.abort(), 12_000);
+  try {
+    const updates = await fetchWatchQuotes(symbols, controller.signal);
+    if (watchQuoteRequest !== pending) return;
+    for (const [symbol, quote] of updates) {
+      if (quote) marketQuotes.set(symbol, quote);
+      else marketQuotes.delete(symbol);
+    }
+  } catch (error) {
+    console.warn("Unable to update watchlist quotes", error);
+  } finally {
+    clearTimeout(timeout);
+    if (watchQuoteRequest === pending) {
+      watchQuoteRequest = null;
+      renderWatchlist();
+    }
+  }
+}
+setInterval(refreshWatchlistQuotes, 30_000);
+document.addEventListener("visibilitychange", refreshWatchlistQuotes);
+window.addEventListener("online", refreshWatchlistQuotes);
+
 const openInstrument = setupInstrument({
   search() {
     selectView("home");
@@ -377,11 +426,16 @@ const openInstrument = setupInstrument({
 function renderWatchlist() {
   watchEditor.renameHeading();
   const symbols = readWatchlist();
+  const session = usMarketSession();
+  const quotes = new Map(symbols.map(symbol => [symbol, watchQuoteForSession(marketQuotes.get(symbol), session)]));
   if (sortDirection) symbols.sort((a, b) => {
-    const left = percentageFor(a), right = percentageFor(b);
-    if (left == null || right == null) return Number(right != null) - Number(left != null);
+    const left = quotes.get(a)?.change, right = quotes.get(b)?.change;
+    if (!Number.isFinite(left) || !Number.isFinite(right)) {
+      return Number(Number.isFinite(right)) - Number(Number.isFinite(left));
+    }
     return sortDirection * (left - right);
   });
+  const focusedQuote = watchList.contains(document.activeElement) ? document.activeElement.href : null;
   watchList.replaceChildren();
   document.querySelector("#watch-empty").hidden = Boolean(symbols.length);
   for (const symbol of symbols) {
@@ -407,24 +461,19 @@ function renderWatchlist() {
     identity.className = "watch-identity";
     const name = document.createElement("strong");
     const subtitle = document.createElement("small");
-    const market = symbol === "NVDA" ? nvidiaQuote : null;
-    subtitle.textContent = market?.name || snapshot?.name || stockDirectory?.find((item) => item.symbol === symbol)?.name || symbol;
+    const market = quotes.get(symbol);
+    subtitle.textContent = nameFor(symbol);
     const caption = document.createElement("div");
     caption.className = "watch-caption";
     caption.append(subtitle);
-    if (snapshot || market) {
+    if (market) {
       const tag = document.createElement("span");
-      const future = symbol === "BZMAIN" || symbol === "CLMAIN";
-      tag.textContent = market ? "1D" : future ? "◷" : "24H";
-      tag.className = future ? "session-tag futures" : "session-tag";
-      caption.append(tag);
-      if (symbol === "MRVL") {
-        const globe = document.createElement("span");
-        globe.className = "session-tag global-session";
-        globe.textContent = "🌐";
-        globe.setAttribute("aria-hidden", "true");
-        caption.append(globe);
+      tag.textContent = market.label;
+      tag.className = market.futures ? "session-tag futures" : "session-tag";
+      if (!market.futures && ["Pre", "After"].includes(session.phase) && market.label !== session.phase) {
+        tag.title = session.phase + " quote pending";
       }
+      caption.append(tag);
     }
     identity.append(name, caption);
     const chart = document.createElement("span");
@@ -437,23 +486,21 @@ function renderWatchlist() {
     const holding = watchHoldings.find((item) => item.symbol === symbol);
     const price = holding?.current_price;
     const hasPrice = price != null && price !== "" && Number.isFinite(Number(price));
-    if (snapshot || market) {
-      const change = percentageFor(symbol);
-      quote.dataset.direction = change < 0 ? "down" : "up";
-      priceLabel.textContent = `${change > 0 ? "+" : ""}${change.toFixed(2)}%`;
-      if (snapshot) priceNote.textContent = snapshot.after;
-      else {
-        priceNote.textContent = market.afterPercent == null ? "Close $" + market.price.toFixed(2)
-          : `After: ${market.afterPercent >= 0 ? "+" : ""}${market.afterPercent.toFixed(2)}%`;
-        chart.style.color = change < 0 ? "var(--down)" : "var(--up)";
-        chart.append(sparkline(market.intraday));
-      }
-      priceNote.dataset.direction = priceNote.textContent.includes("-") ? "down" : "up";
+    if (market) {
+      const {change, delayMinutes} = market;
+      priceLabel.textContent = watchDollars.format(market.price);
+      const percent = Number.isFinite(change) ? `${change > 0 ? "+" : ""}${change.toFixed(2)}%` : "";
+      const stale = Date.now() - market.receivedAt >= 90_000;
+      const delay = stale ? "Last quote" : delayMinutes ? `${delayMinutes}m delay` : "";
+      priceNote.textContent = [percent, delay].filter(Boolean).join(" · ");
+      if (Number.isFinite(change)) quote.dataset.direction = change < 0 ? "down" : "up";
     } else {
-      priceLabel.textContent = hasPrice
-        ? new Intl.NumberFormat("en-US", { style:"currency", currency:"USD" }).format(Number(price))
-        : "—";
+      priceLabel.textContent = hasPrice ? watchDollars.format(Number(price)) : "—";
       priceNote.textContent = hasPrice ? "Last account sync" : "No quote";
+    }
+    if (symbol === "NVDA" && nvidiaHistory) {
+      chart.style.color = nvidiaHistory.percent < 0 ? "var(--down)" : "var(--up)";
+      chart.append(sparkline(nvidiaHistory.intraday));
     }
     quote.append(priceLabel, priceNote);
     const referenceSymbols = { BZMAIN: "BZmain", CLMAIN: "CLmain" };
@@ -474,6 +521,8 @@ function renderWatchlist() {
     row.append(badge, identity, chart, quote);
     watchList.append(row);
   }
+  if (focusedQuote) [...watchList.querySelectorAll(".symbol-link")].find(link => link.href === focusedQuote)
+    ?.focus({preventScroll: true});
 }
 var stockDirectory;
 watchForm.addEventListener("submit", async (event) => {
