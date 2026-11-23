@@ -597,7 +597,7 @@ async function loadValuation(accessToken) {
     performance.dataset.direction = Number(balance.return_pct) < 0 ? "down" : "up";
     note.textContent = new Date(balance.observed_at).toLocaleString("en-US", { timeZone: "Asia/Seoul" }) + " KST";
     performance.textContent = balance.return_pct == null ? "" : "수익률 " + Number(balance.return_pct).toFixed(2) + "%";
-    const allocation수익률 = document.querySelector("#allocation-return");
+    const allocationReturn = document.querySelector("#allocation-return");
     document.querySelector("#allocation-value").textContent = won.format(stocks);
     allocationReturn.textContent = formatStockProfit(balance, won);
     allocationReturn.dataset.direction = performance.dataset.direction;
