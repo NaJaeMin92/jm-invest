@@ -1,7 +1,7 @@
 import {setupWatchEditor} from "./watch-editor.js?v=49";
 import {setupOrders} from "./orders.js?v=67";
-import { setupInstrument, sparkline } from "./instrument.js?v=67";
-import {loadWatchSentiment} from "./market-panels.js?v=67";
+import { setupInstrument, sparkline } from "./instrument.js?v=68";
+import {loadWatchSentiment} from "./market-panels.js?v=68";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
 const service = "https://mfycpprqyaidoixytdim.supabase.co";
@@ -322,10 +322,8 @@ function showProfit(data) {
 const watchKey = "jm-invest:watchlist:v1";
 const watchList = document.querySelector("#home-holdings");
 const watchSentiment = document.querySelector("#watch-sentiment");
-const watchSentimentScore = document.querySelector("#watch-sentiment-score");
 const watchSentimentRating = document.querySelector("#watch-sentiment-rating");
 const watchSentimentSource = document.querySelector("#watch-sentiment-source");
-const watchSentimentMarker = document.querySelector("#watch-sentiment-marker");
 const watchStatus = document.querySelector("#home-value");
 const watchForm = document.querySelector("#watch-form");
 // Preserve the existing logos and default watchlist.
@@ -496,13 +494,10 @@ async function syncKiwoomQuotes() {
 let lastWatchSession;
 function refreshWatchlistQuotes() {
   if (!document.hidden && document.body.dataset.view === "home") {
-    loadWatchSentiment(({score, rating, angle, saved}) => {
-      watchSentimentScore.textContent = score;
+    loadWatchSentiment(({rating, saved}) => {
       watchSentimentRating.textContent = rating || "Rating unavailable";
       watchSentimentRating.dataset.rating = rating.toLowerCase();
-      watchSentimentSource.textContent = saved ? "CNN · Saved" : "CNN";
-      watchSentimentMarker.style.setProperty("--angle", `${angle}deg`);
-      watchSentimentMarker.hidden = false;
+      watchSentimentSource.hidden = !saved;
     }).catch(() => {
       watchSentimentRating.textContent = "Unavailable";
     });
@@ -551,7 +546,7 @@ function renderWatchlist() {
     const price = live?.price ?? snapshot?.price ?? daily?.price;
     const label = live ? kiwoomPhases[live.session] : snapshot ? "Last" : "Close";
     return [symbol, price != null || Number.isFinite(change)
-      ? {price, change, label, live: Boolean(live),
+      ? {price, change, label,
         extendedChange: label === "Pre" || label === "After" ? live.change : null,
         changeDate: regular?.date === date ? date : daily?.date}
       : null];
@@ -634,13 +629,12 @@ function renderWatchlist() {
         priceLabel.title = "Regular-session change from the prior close"
           + (market.changeDate ? ` (${market.changeDate})` : "");
       }
-      const source = market.marketType ? "Yahoo · Delayed" : market.live ? "Kiwoom" : "Kiwoom · Last";
       if (Number.isFinite(market.extendedChange)) {
         priceNote.textContent = `${market.label}: ${signedWatchPercent(market.extendedChange)}`;
-        priceNote.title = [price, source].filter(Boolean).join(" · ");
+        priceNote.title = price;
         priceNote.dataset.direction = market.extendedChange < 0 ? "down" : "up";
       } else {
-        priceNote.textContent = [price, source].filter(Boolean).join(" · ");
+        priceNote.textContent = market.marketType === "Futures" && price ? price + " · Delayed" : price;
         if (market.quoteTime) priceNote.title = new Date(market.quoteTime * 1000).toLocaleString();
       }
       if (hasChange) quote.dataset.direction = change < 0 ? "down" : "up";

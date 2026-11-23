@@ -188,13 +188,7 @@ const loadSentiment = cachedFeed(
 
 export function loadWatchSentiment(render) {
   return loadSentiment((data, saved) => {
-    const {score, rating} = data.fear_and_greed;
-    render({
-      score: Math.round(score),
-      rating: titleCase(rating),
-      angle: 1.8 * Math.min(100, Math.max(0, score)) - 90,
-      saved
-    });
+    render({rating: titleCase(data.fear_and_greed.rating), saved});
   });
 }
 

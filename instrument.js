@@ -1,5 +1,5 @@
 import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=58";
-import {showMarketPanel} from "./market-panels.js?v=67";
+import {showMarketPanel} from "./market-panels.js?v=68";
 
 import {setupChartTools} from "./chart-tools.js?v=58";
 
