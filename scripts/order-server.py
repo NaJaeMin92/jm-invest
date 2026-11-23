@@ -1,5 +1,6 @@
 """Serve TradeInSight and its owner-only Kiwoom order endpoint."""
 import argparse
+from datetime import datetime, timedelta
 from decimal import Decimal
 from fcntl import LOCK_EX, flock
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -18,9 +19,12 @@ import time
 from urllib.error import HTTPError
 from urllib.parse import parse_qs, unquote, urlsplit
 from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 KIWOOM = "https://api.kiwoom.com"
+EASTERN = ZoneInfo("America/New_York")
+CHART_INTERVALS = {"minute": "1", "five": "5", "hour": "60"}
 SUPABASE = "https://mfycpprqyaidoixytdim.supabase.co"
 PUBLIC_KEY = "sb_publishable_KIxbzozNkk50oEZ9GehtZA_E484E5Lr"
 PAGES_ORIGIN = "https://najaemin92.github.io"
@@ -169,14 +173,57 @@ class Kiwoom:
                 daily.append({"date": row["dt"], "change": change, "price": price})
         return {"symbol": item["symbol"], "daily": daily} if daily else None
 
-    def order_context(self, symbol):
-        token = self.access_token()
+    def resolve_us_stock(self, token, symbol):
         directory = self.symbol_directory(token)
         ticker = next((candidate for candidate in (symbol, symbol.replace("-", "."), symbol.replace(".", "-"))
                        if candidate in directory), None)
         if ticker is None:
-            raise Problem(404, "키움 미국주식 주문을 지원하지 않는 종목입니다.")
-        item = {"jmcode": ticker, "stex_tp": directory[ticker]}
+            raise Problem(404, "키움 미국주식 API에서 지원하지 않는 종목입니다.")
+        return {"jmcode": ticker, "stex_tp": directory[ticker]}
+
+    def instrument_chart(self, symbol, frame):
+        token = self.access_token()
+        item = self.resolve_us_stock(token, symbol)
+        now = datetime.now(EASTERN)
+        intraday = frame in CHART_INTERVALS
+        transaction = "usa06011" if intraday else "usa06012"
+        query = {"stex_tp": item["stex_tp"], "stk_cd": item["jmcode"],
+                 "strt_dt": now.strftime("%Y%m%d"), "upd_stkpc_tp": "1", "exrt_appl_tp": "0"}
+        if intraday:
+            query["tic_scope"] = CHART_INTERVALS[frame]
+        wait_for_kiwoom_read(self.read_schedule)
+        result = read_json(KIWOOM + "/api/us/chart", {
+            "api-id": transaction, "Authorization": "Bearer " + token,
+        }, query)
+        if str(result.get("return_code")) != "0":
+            raise Problem(502, "키움 차트 데이터를 불러오지 못했습니다.")
+        bars = chart_bars(result.get("result_list", []), intraday, now)
+        if not bars:
+            raise Problem(404, "이 종목에 표시할 차트 데이터가 없습니다.")
+        if intraday:
+            return {"bars": bars}
+
+        try:
+            info = self.market_quote(token, item, "usa20100")
+        except (OSError, ValueError):
+            info = {}
+        market_cap = positive_quote(info.get("mac"))
+        return {
+            "name": info.get("stk_enm") or symbol,
+            "exchange": {"ND": "NASDAQ", "NY": "NYSE", "NA": "NYSE American"}[item["stex_tp"]],
+            "price": positive_quote(info.get("cur_prc")),
+            "percent": finite_quote(info.get("flu_rt")),
+            "high": positive_quote(info.get("high_pric")) or positive_quote(info.get("pre_high_pric")),
+            "low": positive_quote(info.get("low_pric")) or positive_quote(info.get("pre_low_pric")),
+            "volume": finite_quote(info.get("acc_trde_qty")),
+            "marketCap": market_cap * 1000 if market_cap else None,
+            "daily": bars,
+        }
+
+    def order_context(self, symbol):
+        token = self.access_token()
+        item = self.resolve_us_stock(token, symbol)
+        ticker = item["jmcode"]
         context = {"symbol": ticker, "exchange": item["stex_tp"]}
         for transaction in ("usa20101", "usa20100"):
             try:
@@ -313,11 +360,40 @@ def kiwoom_ticks(socket, items, timeout_error):
 
 
 def positive_quote(raw):
+    value = finite_quote(raw)
+    return abs(value) if value else None
+
+
+def finite_quote(raw):
     try:
-        value = abs(float(raw))
+        value = float(raw)
     except (ValueError, TypeError):
         return None
-    return value if math.isfinite(value) and value > 0 else None
+    return value if math.isfinite(value) else None
+
+
+def chart_bars(rows, intraday, now):
+    bars = {}
+    for row in rows:
+        date = row.get("cntr_tm" if intraday else "dt")
+        if not isinstance(date, str) or not re.fullmatch(r"\d{14}" if intraday else r"\d{8}", date):
+            continue
+        try:
+            start = datetime.strptime(date[:8], "%Y%m%d").replace(tzinfo=EASTERN)
+        except ValueError:
+            continue
+        if intraday:
+            start += timedelta(hours=int(date[8:10]), minutes=int(date[10:12]), seconds=int(date[12:]))
+        elif start.date() == now.date() and (now.hour, now.minute) < (9, 30):
+            continue
+        opening, high, low, closing = (positive_quote(row.get(key))
+            for key in ("open_pric", "high_pric", "low_pric", "cur_prc"))
+        if None in (opening, high, low, closing) or not low <= min(opening, closing) <= max(opening, closing) <= high:
+            continue
+        stamp = int(start.timestamp())
+        volume = finite_quote(row.get("trde_qty" if intraday else "acc_trde_qty"))
+        bars[stamp] = [stamp, opening, high, low, closing, abs(volume or 0)]
+    return [bars[stamp] for stamp in sorted(bars)]
 
 
 def order_book_levels(result, side):
@@ -415,6 +491,8 @@ class App(BaseHTTPRequestHandler):
             self.handle_order("status")
         elif not self.quotes_only and path.path == "/api/orders/context":
             self.handle_order_context(parse_qs(path.query).get("symbol", [""])[0])
+        elif path.path == "/api/quotes/instrument":
+            self.handle_instrument_chart(parse_qs(path.query))
         else:
             self.serve_static(True)
 
@@ -433,12 +511,13 @@ class App(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         if not self.allowed_host():
             return
-        if not self.quotes_only or self.path != "/api/quotes/stream" or self.headers.get("Origin") != self.origin:
+        method = {"/api/quotes/stream": "POST", "/api/quotes/instrument": "GET"}.get(urlsplit(self.path).path)
+        if not self.quotes_only or not method or self.headers.get("Origin") != self.origin:
             self.send_error(403)
             return
         self.send_response(204)
         self.quote_headers()
-        self.send_header("Access-Control-Allow-Methods", "POST")
+        self.send_header("Access-Control-Allow-Methods", method)
         self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
         self.end_headers()
 
@@ -582,6 +661,23 @@ class App(BaseHTTPRequestHandler):
             self.write_json(error.status, {"message": str(error)})
         except (OSError, ValueError):
             self.write_json(503, {"message": "키움 주문 정보를 불러오지 못했습니다."})
+
+    def handle_instrument_chart(self, query):
+        try:
+            if self.quotes_only and self.headers.get("Origin") != self.origin:
+                raise Problem(403, "허용되지 않은 시세 요청입니다.")
+            owner_session(self.headers.get("Authorization"))
+            if self.quote_broker is None:
+                raise Problem(503, "키움 시세 서버가 연결되어 있지 않습니다.")
+            symbol = query.get("symbol", [""])[0]
+            frame = query.get("frame", ["day"])[0]
+            if not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,11}", symbol) or frame not in ("day", *CHART_INTERVALS):
+                raise Problem(400, "종목 또는 차트 간격을 확인하세요.")
+            self.write_json(200, self.quote_broker.instrument_chart(symbol, frame))
+        except Problem as error:
+            self.write_json(error.status, {"message": str(error)})
+        except (OSError, ValueError):
+            self.write_json(503, {"message": "키움 차트 데이터를 불러오지 못했습니다."})
 
     def write_json(self, status, result):
         content = json.dumps(result, ensure_ascii=False).encode()

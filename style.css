@@ -318,7 +318,13 @@ button.broker-row:hover { background:#2a2c31; }
 .watch-quote small { max-width:100%; white-space:normal; text-align:right; font-size:12px; color:#aab4c9; }
 .watch-quote small[data-direction="down"] { color:var(--down); }
 .watch-quote small[data-direction="up"] { color:var(--up); }
-#watch-sentiment-rating { grid-column:3 / -1; justify-self:end; text-align:right; font-size:14px; line-height:1.3; }
+#watch-sentiment-rating {
+  flex:none; margin:0 4px 0 8px; padding:5px 10px; border:1px solid;
+  border-color:color-mix(in srgb,currentColor 36%,transparent); border-radius:999px;
+  background:color-mix(in srgb,currentColor 12%,transparent);
+  font-size:12px; font-weight:650; line-height:1.3; white-space:nowrap;
+}
+#stock-chart-sign-in { min-height:32px; padding:4px 9px; font-size:12px; background:#253c59; color:#cce6ff; }
 #watch-sentiment-rating[data-rating="extreme fear"] { color:#e66677; }
 #watch-sentiment-rating[data-rating="fear"] { color:#efad72; }
 #watch-sentiment-rating[data-rating="neutral"] { color:#dfd5a1; }

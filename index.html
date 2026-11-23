@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=68">
-<script type="module" src="./journal.js?v=68"></script>
+<link rel="stylesheet" href="./style.css?v=69">
+<script type="module" src="./journal.js?v=69"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header><div class="head"><a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -29,19 +29,14 @@
 <section id="tab-home" class="tab-panel" lang="en" aria-labelledby="watch-title">
 <div class="watch-heading">
 <h2 id="watch-title"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M2 4h12M2 20h12M9 12h5"/><path d="m2 9 4 3-4 3z" fill="currentColor" stroke="none"/></svg>My Watchlist</h2>
+<span id="watch-sentiment-rating" hidden></span>
 </div>
 <div class="watch-toolbar">
 <button id="watch-edit" type="button" aria-haspopup="dialog" aria-controls="watch-editor"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M10 4H4v16h16v-7M11 13l9-9"/></svg><span>Edit Watchlist</span></button>
 <button id="watch-sort" type="button" aria-label="Sort by percentage change">%Change <svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="m5 10 7-7 7 7zm0 4h14l-7 7z" fill="currentColor" stroke="none"/></svg></button>
 </div>
 <p id="watch-empty" hidden>No symbols in this watchlist.</p>
-<ul id="home-holdings" class="watch-list">
-<li id="watch-sentiment">
-<span class="watch-ticker-icon" aria-hidden="true">FG</span>
-<div class="watch-identity"><strong>Fear &amp; Greed</strong><div class="watch-caption"><small id="watch-sentiment-source" hidden>Saved reading</small></div></div>
-<strong id="watch-sentiment-rating">Loading…</strong>
-</li>
-</ul>
+<ul id="home-holdings" class="watch-list"></ul>
 </section>
 <section id="tab-profit" class="tab-panel" hidden>
 <h2>US equity realized P&L</h2>
@@ -152,7 +147,7 @@
 </div>
 <div class="instrument-quote"><div><strong id="stock-price">—</strong><b id="stock-change"></b></div>
 <dl><dt>H/L</dt><dd id="stock-range">—</dd><dt>Volume</dt><dd id="stock-volume">—</dd><dt>Mkt Cap</dt><dd id="stock-cap">—</dd></dl></div>
-<div class="quote-time"><span id="stock-time"></span><small>Snapshot</small></div>
+<div class="quote-time"><span id="stock-time"></span><small id="stock-quote-source">Snapshot</small><button id="stock-chart-sign-in" type="button" hidden>Sign in</button></div>
 <nav class="instrument-tabs" aria-label="Symbol information">
 <button type="button" id="chart-tab" data-panel="chart" aria-current="page" aria-controls="chart-panel">Chart</button><button type="button" data-panel="sigma" aria-controls="sigma-panel">Sigma</button><button type="button" data-panel="sentiment" aria-controls="sentiment-panel">Fear &amp; Greed</button>
 </nav>

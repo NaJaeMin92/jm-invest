@@ -1,6 +1,6 @@
 import {setupWatchEditor} from "./watch-editor.js?v=49";
 import {setupOrders} from "./orders.js?v=67";
-import { setupInstrument, sparkline } from "./instrument.js?v=68";
+import { setupInstrument, sparkline } from "./instrument.js?v=69";
 import {loadWatchSentiment} from "./market-panels.js?v=68";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -321,9 +321,7 @@ function showProfit(data) {
 
 const watchKey = "jm-invest:watchlist:v1";
 const watchList = document.querySelector("#home-holdings");
-const watchSentiment = document.querySelector("#watch-sentiment");
 const watchSentimentRating = document.querySelector("#watch-sentiment-rating");
-const watchSentimentSource = document.querySelector("#watch-sentiment-source");
 const watchStatus = document.querySelector("#home-value");
 const watchForm = document.querySelector("#watch-form");
 // Preserve the existing logos and default watchlist.
@@ -495,12 +493,11 @@ let lastWatchSession;
 function refreshWatchlistQuotes() {
   if (!document.hidden && document.body.dataset.view === "home") {
     loadWatchSentiment(({rating, saved}) => {
-      watchSentimentRating.textContent = rating || "Rating unavailable";
+      watchSentimentRating.hidden = !rating;
+      watchSentimentRating.textContent = rating;
       watchSentimentRating.dataset.rating = rating.toLowerCase();
-      watchSentimentSource.hidden = !saved;
-    }).catch(() => {
-      watchSentimentRating.textContent = "Unavailable";
-    });
+      watchSentimentRating.title = saved ? "Fear & Greed · Saved reading" : "Fear & Greed";
+    }).catch(() => {});
     const session = usMarketSession();
     const sessionKey = session.date + session.phase;
     if (lastWatchSession !== sessionKey) {
@@ -515,8 +512,19 @@ document.addEventListener("visibilitychange", refreshWatchlistQuotes);
 window.addEventListener("online", refreshWatchlistQuotes);
 
 const orders = setupOrders(() => token);
-const openInstrument = setupInstrument({
+const instrument = setupInstrument({
   orders,
+  canLoadChart: () => Boolean(token && kiwoomEndpoint),
+  async loadChart(symbol, frame) {
+    if (!token || !kiwoomEndpoint) return null;
+    const endpoint = new URL("instrument", new URL(kiwoomEndpoint, location.href));
+    endpoint.search = new URLSearchParams({symbol, frame});
+    const response = await fetch(endpoint, {headers: {Authorization: "Bearer " + token}, cache: "no-store"});
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.message || "Kiwoom chart unavailable.");
+    return payload;
+  },
+  signIn: () => selectView("account"),
   search() {
     selectView("home");
     watchEditor.open();
@@ -655,14 +663,13 @@ function renderWatchlist() {
       link.addEventListener("click", event => {
         if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
         event.preventDefault();
-        openInstrument(symbol);
+        instrument.open(symbol);
       });
       name.replaceChildren(link);
     }
     row.append(badge, identity, chart, quote);
     watchList.append(row);
   }
-  watchList.insertBefore(watchSentiment, watchList.children[1] ?? null);
   if (focusedQuote) [...watchList.querySelectorAll(".symbol-link")].find(link => link.href === focusedQuote)
     ?.focus({preventScroll: true});
 }
@@ -822,6 +829,7 @@ async function openWorkspace(session, remember) {
   workspace.hidden = false;
   navigation.hidden = false;
   selectView(document.body.dataset.view || "home");
+  instrument.refresh();
   loadValuation(token);
   orders.refresh();
   message.textContent = remember && !stored ? "This browser could not save your session." : "";

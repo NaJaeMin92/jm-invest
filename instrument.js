@@ -31,9 +31,9 @@ const signed = n => (n>=0?"+":"")+n.toFixed(2);
 const displaySymbol = s => ({BZMAIN:"BZmain",CLMAIN:"CLmain"}[s] || s);
 const validSymbol = /^[A-Z][A-Z0-9.\-]{0,11}$/;
 
-export function setupInstrument({search,nameFor,readList,saveList,orders}) {
+export function setupInstrument({search,nameFor,readList,saveList,orders,canLoadChart,loadChart,signIn}) {
   const dialog=get("stock-detail"), canvas=get("market-chart"), reference=get("daily-reference");
-  let current="", quote=null, frame="day", afterClose=null;
+  let current="", quote=null, frame="day", afterClose=null, quoteRequest=0;
   const trade = get("trade-preview");
   const tradeForm = get("trade-preview-form"), tradeReview = get("trade-preview-review");
   const tradeStatus = get("trade-preview-status"), tradeNext = get("trade-preview-next");
@@ -128,7 +128,8 @@ export function setupInstrument({search,nameFor,readList,saveList,orders}) {
     tradeStatus.textContent = "키움 주문 정보를 확인 중입니다.";
     const referencePrice = get("trade-preview-quote");
     referencePrice.hidden = !Number.isFinite(quote?.price);
-    referencePrice.textContent = referencePrice.hidden ? "" : "저장된 종가 · " + dollars.format(quote.price);
+    referencePrice.textContent = referencePrice.hidden ? ""
+      : (quote.fromKiwoom ? "키움 조회가 · " : "저장된 종가 · ") + dollars.format(quote.price);
     updateTradeTotal();
     trade.showModal();
     loadTradeContext();
@@ -357,7 +358,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders}) {
     if (chart) {
       const startDate = dateFormat.format(source[0][0] * 1000);
       const endDate = dateFormat.format(source.at(-1)[0] * 1000);
-      coverage.textContent = (isIntraday(frame) ? "Intraday snapshot" : "Available since first recorded session")
+      coverage.textContent = (isIntraday(frame) ? "Intraday snapshot" : quote?.fromKiwoom ? "Available history" : "Available since first recorded session")
         + " · " + startDate + " – " + endDate + " ET";
       draw();
     } else {
@@ -388,7 +389,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders}) {
     for (const button of get("stock-frames").children) {
       button.setAttribute("aria-pressed", String(button.dataset.frame === frame));
     }
-    if (!quote || value === "hour" || !isIntraday(value)) {
+    if (!quote || !isIntraday(value) || value === "hour" && !quote.fromKiwoom) {
       finishFrame(quote && (value === "hour" ? quote.hourly : quote.daily));
       return;
     }
@@ -396,33 +397,63 @@ export function setupInstrument({search,nameFor,readList,saveList,orders}) {
     chartStatus.textContent = "Loading intraday history…";
     chartStatus.hidden = false;
     try {
-      const source = await minuteBars(current);
+      const source = quote.fromKiwoom ? (await loadChart(current, value))?.bars : await minuteBars(current);
       if (id !== requestId) return;
-      chartStatus.hidden = true;
+      chartStatus.hidden = Boolean(source?.length);
+      if (!source?.length) chartStatus.textContent = "Intraday history is unavailable for this interval.";
       finishFrame(source);
     } catch {
       if (id === requestId) chartStatus.textContent = "Intraday history is temporarily unavailable. Select another interval.";
     }
   }
   function renderQuote() {
-    const pct=quote.percent, change=quote.price-quote.price/(1+pct/100);
-    get("stock-price").textContent=quote.price.toFixed(2);
-    get("stock-change").textContent=(pct<0?"▼ ":"▲ ")+signed(change)+"  "+signed(pct)+"%";
-    get("stock-price").parentElement.dataset.direction=pct<0?"down":"up";
-    get("stock-range").textContent=quote.high.toFixed(2)+"–"+quote.low.toFixed(2);
-    get("stock-volume").textContent=Intl.NumberFormat("en-US",{notation:"compact",maximumFractionDigits:2}).format(quote.volume);
-    get("stock-cap").textContent=current==="SKHY"?"754.89B":"—";
-    get("stock-name").textContent=(current==="SKHY"?"SK Hynix Inc":quote.name)+"  "+(quote.exchange==="NasdaqGS"?"NASDAQ":quote.exchange);
-    document.querySelector(".quote-time small").hidden=false;
-    const when=new Date(quote.asOf*1000).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",year:"numeric"});
-    get("stock-time").textContent=current==="SKHY"?"Closed 19:59 11/20 ET":"Closed · "+when+" ET";
+    const pct = quote.percent, price = quote.price;
+    const hasChange = Number.isFinite(price) && Number.isFinite(pct) && pct > -100;
+    const compact = new Intl.NumberFormat("en-US", {notation:"compact",maximumFractionDigits:2});
+    get("stock-price").textContent = Number.isFinite(price) ? price.toFixed(2) : "—";
+    get("stock-change").textContent = hasChange
+      ? (pct < 0 ? "▼ " : "▲ ") + signed(price - price / (1 + pct / 100)) + "  " + signed(pct) + "%" : "";
+    if (hasChange) get("stock-price").parentElement.dataset.direction = pct < 0 ? "down" : "up";
+    get("stock-range").textContent = Number.isFinite(quote.high) && Number.isFinite(quote.low)
+      ? quote.high.toFixed(2) + "–" + quote.low.toFixed(2) : "—";
+    get("stock-volume").textContent = Number.isFinite(quote.volume) ? compact.format(quote.volume) : "—";
+    get("stock-cap").textContent = Number.isFinite(quote.marketCap) ? compact.format(quote.marketCap)
+      : current === "SKHY" ? "754.89B" : "—";
+    get("stock-name").textContent = (current === "SKHY" ? "SK Hynix Inc" : quote.name)
+      + "  " + (quote.exchange === "NasdaqGS" ? "NASDAQ" : quote.exchange);
+    get("stock-quote-source").hidden = false;
+    get("stock-quote-source").textContent = quote.fromKiwoom ? "Kiwoom" : "Snapshot";
+    get("stock-chart-sign-in").hidden = true;
+    const when = Number.isFinite(quote.asOf) ? dateFormat.format(quote.asOf * 1000) : "";
+    get("stock-time").textContent = quote.fromKiwoom ? "Latest quote"
+      : current === "SKHY" ? "Closed 19:59 11/20 ET" : "Closed · " + when + " ET";
     get("stock-frames").hidden=false;
     setFrame(frame);
   }
-  function fallback() {
-    get("stock-time").textContent="Chart unavailable";
-    document.querySelector(".quote-time small").hidden=true;
-    get("stock-frames").hidden=true;
+  async function loadInstrumentQuote(symbol) {
+    const id = ++quoteRequest;
+    let message = "Chart unavailable";
+    try {
+      let data = await publicQuote(symbol);
+      if (id !== quoteRequest) return;
+      if (!data && canLoadChart()) {
+        const result = await loadChart(symbol, "day");
+        if (result) data = {...result, fromKiwoom: true};
+      }
+      if (id !== quoteRequest) return;
+      if (data) {
+        quote = data;
+        renderQuote();
+        return;
+      }
+    } catch (error) {
+      message = error.message;
+    }
+    if (id !== quoteRequest) return;
+    get("stock-time").textContent = canLoadChart() ? message : "Sign in to load the chart.";
+    get("stock-quote-source").hidden = true;
+    get("stock-chart-sign-in").hidden = canLoadChart();
+    get("stock-frames").hidden = true;
   }
   async function open(symbol) {
     if (trade.open) trade.close();
@@ -439,13 +470,12 @@ export function setupInstrument({search,nameFor,readList,saveList,orders}) {
     get("stock-name").textContent=nameFor(symbol);
     for (const id of ["stock-price","stock-range","stock-volume","stock-cap"]) get(id).textContent="—";
     get("stock-change").textContent="";get("stock-time").textContent="Loading quote…";
+    get("stock-quote-source").hidden = true;
+    get("stock-chart-sign-in").hidden = true;
     get("external-chart").replaceChildren();get("external-chart").hidden=true;
     canvas.hidden=true;reference.hidden=true;get("stock-frames").hidden=true;
     setFavorite();setFrame("day");
-    const data=await publicQuote(symbol);
-    if(current!==symbol)return;
-    quote=data;
-    if (quote) renderQuote();else fallback();
+    await loadInstrumentQuote(symbol);
   }
   function sync() {
     const symbol=new URLSearchParams(location.hash.slice(1)).get("stock")?.toUpperCase();
@@ -454,6 +484,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders}) {
       return;
     }
     requestId += 1;
+    quoteRequest += 1;
     if (trade.open) trade.close();
     current="";quote=null;chart=null;endDrag();
     tools.updateSeries(null,current,frame);
@@ -471,6 +502,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders}) {
   get("stock-back").onclick=()=>back();
   dialog.addEventListener("cancel",e=>{e.preventDefault();back();});
   get("stock-search").onclick=()=>back(search);
+  get("stock-chart-sign-in").onclick = () => back(signIn);
   get("stock-buy").onclick = () => openTrade("buy");
   get("stock-sell").onclick = () => openTrade("sell");
   get("stock-star").onclick=()=>{
@@ -486,8 +518,13 @@ export function setupInstrument({search,nameFor,readList,saveList,orders}) {
   window.addEventListener("hashchange",sync);
   window.addEventListener("popstate",sync);
   sync();
-  return symbol=>{
-    history.pushState({stockEntry:true},"","#stock="+encodeURIComponent(symbol));
-    sync();
+  return {
+    open(symbol) {
+      history.pushState({stockEntry:true},"","#stock="+encodeURIComponent(symbol));
+      sync();
+    },
+    refresh() {
+      if (current && !quote && canLoadChart()) loadInstrumentQuote(current);
+    }
   };
 }
