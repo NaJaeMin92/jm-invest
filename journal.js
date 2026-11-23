@@ -366,6 +366,7 @@ try {
 const watchDollars = new Intl.NumberFormat("en-US", {
   style: "currency", currency: "USD", maximumFractionDigits: 4
 });
+const signedWatchPercent = change => `${change > 0 ? "+" : ""}${change.toFixed(2)}%`;
 const nameFor = symbol => snapshots.get(symbol)?.name
   || marketSymbols.find(item => item.symbol === symbol)?.name
   || stockDirectory?.find(item => item.symbol === symbol)?.name || symbol;
@@ -532,7 +533,9 @@ function renderWatchlist() {
     const price = live?.price ?? snapshot?.price ?? daily?.price;
     const label = live ? kiwoomPhases[live.session] : snapshot ? "Last" : "Close";
     return [symbol, price != null || Number.isFinite(change)
-      ? {price, change, label, live: Boolean(live), changeDate: regular?.date === date ? date : daily?.date}
+      ? {price, change, label, live: Boolean(live),
+        extendedChange: label === "Pre" || label === "After" ? live.change : null,
+        changeDate: regular?.date === date ? date : daily?.date}
       : null];
   }));
   if (kiwoomQuoteStatus.textContent.startsWith("Kiwoom connected")
@@ -606,14 +609,20 @@ function renderWatchlist() {
       const hasChange = Number.isFinite(change);
       const price = !Number.isFinite(market.price) ? ""
         : market.marketType === "Index" ? market.price.toFixed(2) : watchDollars.format(market.price);
-      priceLabel.textContent = hasChange ? `${change > 0 ? "+" : ""}${change.toFixed(2)}%` : "—";
+      priceLabel.textContent = hasChange ? signedWatchPercent(change) : "—";
       if (hasChange && !market.marketType) {
         priceLabel.title = "Regular-session change from the prior close"
           + (market.changeDate ? ` (${market.changeDate})` : "");
       }
       const source = market.marketType ? "Yahoo · Delayed" : market.live ? "Kiwoom" : "Kiwoom · Last";
-      priceNote.textContent = [price, source].filter(Boolean).join(" · ");
-      if (market.quoteTime) priceNote.title = new Date(market.quoteTime * 1000).toLocaleString();
+      if (Number.isFinite(market.extendedChange)) {
+        priceNote.textContent = `${market.label}: ${signedWatchPercent(market.extendedChange)}`;
+        priceNote.title = [price, source].filter(Boolean).join(" · ");
+        priceNote.dataset.direction = market.extendedChange < 0 ? "down" : "up";
+      } else {
+        priceNote.textContent = [price, source].filter(Boolean).join(" · ");
+        if (market.quoteTime) priceNote.title = new Date(market.quoteTime * 1000).toLocaleString();
+      }
       if (hasChange) quote.dataset.direction = change < 0 ? "down" : "up";
     } else {
       priceLabel.textContent = "—";
