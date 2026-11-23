@@ -9,6 +9,8 @@ const login = document.querySelector("#login");
 const workspace = document.querySelector("#private");
 const message = document.querySelector("#status");
 let token = null;
+const heldWatchSymbols = new Set();
+const watchSymbolKey = symbol => symbol.trim().toUpperCase().replaceAll(".", "-");
 const storageKey = "jm-invest:private-refresh:v1";
 const ownerId = "9fc22c69-b253-406a-be2b-eb8ad9526a3c";
 
@@ -138,6 +140,7 @@ login.addEventListener("submit", async (event) => {
 document.querySelector("#logout").addEventListener("click", () => {
   const accessToken = token;
   token = null;
+  heldWatchSymbols.clear();
   orders.signOut();
   saveSession(null);
   if (holdingsDialog.open) holdingsDialog.close();
@@ -536,7 +539,9 @@ function renderWatchlist() {
       && (kiwoomTicks.size || lastKiwoomPrices.size || externalPrices.size)) {
     kiwoomQuoteStatus.textContent = "";
   }
-  if (sortDirection) symbols.sort((a, b) => {
+  symbols.sort((a, b) => {
+    const heldFirst = Number(heldWatchSymbols.has(watchSymbolKey(b))) - Number(heldWatchSymbols.has(watchSymbolKey(a)));
+    if (heldFirst || !sortDirection) return heldFirst;
     const left = quotes.get(a)?.change, right = quotes.get(b)?.change;
     if (!Number.isFinite(left) || !Number.isFinite(right)) {
       return Number(Number.isFinite(right)) - Number(Number.isFinite(left));
@@ -719,6 +724,14 @@ async function loadValuation(accessToken) {
   try {
     const [balance] = await request("/rest/v1/kiwoom_valuation?select=*&limit=1", { accessToken });
     if (token !== accessToken) return;
+    heldWatchSymbols.clear();
+    for (const holding of Array.isArray(balance?.holdings) ? balance.holdings : []) {
+      const quantity = Number(holding?.quantity);
+      if (typeof holding?.symbol === "string" && Number.isFinite(quantity) && quantity !== 0) {
+        heldWatchSymbols.add(watchSymbolKey(holding.symbol));
+      }
+    }
+    renderWatchlist();
     if (!balance) {
       value.textContent = allocationTotal.textContent = "잔고 동기화 대기";
       return;
@@ -765,7 +778,6 @@ async function loadValuation(accessToken) {
     allocationReturn.dataset.direction = performance.dataset.direction;
     allocation.hidden = false;
     showHoldings(balance);
-    renderWatchlist();
 
     showProfit(balance.realized_profit);
   } catch (error) {
