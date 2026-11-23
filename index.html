@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=72">
-<script type="module" src="./journal.js?v=72"></script>
+<link rel="stylesheet" href="./style.css?v=73">
+<script type="module" src="./journal.js?v=73"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header><div class="head"><a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -68,7 +68,7 @@
 <span class="account-chevron" aria-hidden="true">›</span>
 </button>
 <section id="account-holdings" aria-label="미국주식 보유종목" hidden>
-<div class="holdings-heading"><h3>보유종목</h3><button type="button" id="open-pending-account" hidden aria-haspopup="dialog" aria-controls="pending-orders">미체결 주문</button></div>
+<div class="holdings-heading"><h3>보유종목</h3><span id="holding-count"></span></div>
 <ul id="holdings-list"></ul>
 </section>
 <div class="broker-row">
@@ -142,8 +142,8 @@
 <canvas id="market-chart" role="img" aria-label="Candlesticks, volume and RSI"></canvas><div id="external-chart" hidden></div><p id="chart-status" role="status" hidden></p></div>
 <figure id="dual-market-chart" hidden><figcaption id="dual-market-caption"></figcaption><canvas id="secondary-market-chart" role="img" aria-label="Second symbol chart"></canvas></figure>
 <div id="chart-history" hidden>
-<span id="chart-dates"></span><div class="chart-jumps"><button type="button" id="chart-first">First</button><button type="button" id="chart-latest">Latest</button></div>
-<small id="chart-coverage"></small>
+<span id="chart-dates"></span><div class="chart-jumps"><button type="button" id="chart-first">First</button><button type="button" id="chart-all" aria-pressed="false">All</button><button type="button" id="chart-latest">Latest</button></div>
+<small id="chart-coverage"></small><button id="chart-history-retry" type="button" hidden>Retry history</button>
 </div>
 <div class="frame-bar"><div id="stock-frames" aria-label="Chart interval">
 <button data-frame="minute">1 min</button><button data-frame="five">5 min</button><button data-frame="hour">1 hour</button><button data-frame="day" aria-pressed="true">Daily</button><button data-frame="week">Weekly</button><button data-frame="month">Monthly</button><button data-frame="quarter">Quarterly</button>
@@ -152,6 +152,7 @@
 <button type="button" id="chart-tools" aria-label="Chart Toolbox" aria-haspopup="dialog">
 <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
 <button id="stock-expand" aria-pressed="false" aria-label="Expand chart">⛶</button></div>
+<label id="chart-session-picker" hidden>Trading date (ET)<input type="date" id="chart-session-date"></label>
 <div id="chart-task" hidden>
 <p id="chart-tool-status" role="status"></p>
 <button type="button" id="chart-finish">Finish</button>
@@ -209,16 +210,16 @@
 <p id="trade-book-status" role="status"></p>
 <div id="trade-book-levels" hidden>
 <div id="trade-book-asks" role="group" aria-label="매도 호가"></div>
-<div id="trade-book-market"><span>현재가</span><strong id="trade-book-price">—</strong></div>
+<div id="trade-book-market"><span>현재가</span><span><strong id="trade-book-price">—</strong><small id="trade-book-krw"></small></span></div>
 <div id="trade-book-bids" role="group" aria-label="매수 호가"></div>
 </div>
 </section>
 <div class="trade-entry">
 <div class="trade-fields">
-<label>주문 종류<select id="trade-kind" name="kind" required></select></label>
+<label>주문 종류<select id="trade-kind" name="kind" aria-describedby="trade-kind-help" required></select><small id="trade-kind-help"></small></label>
 <div id="trade-limit-field"><label for="trade-limit">지정가 (USD)</label>
 <div class="trade-stepper"><button type="button" data-trade-step="price" value="-1" aria-label="지정가 한 단위 내리기">−</button><input id="trade-limit" type="number" name="price" inputmode="decimal" min="0.0001" max="9999999" step="0.0001" placeholder="0.00" aria-describedby="trade-price-hint" required><button type="button" data-trade-step="price" value="1" aria-label="지정가 한 단위 올리기">+</button></div>
-<small id="trade-price-hint" role="status"></small></div>
+<small id="trade-limit-krw"></small><small id="trade-price-hint" role="status"></small></div>
 <div class="trade-price-shortcuts">
 <button id="trade-use-quote" type="button" hidden>현재가</button>
 </div>

@@ -48,5 +48,6 @@ logging it, and set the upstream Host to `127.0.0.1:8767`. Configure the
 public HTTPS URL ending in `/api/quotes/stream` as the
 `kiwoom-quote-gateway` meta tag in `index.html`. The gateway handles quote
 requests from the GitHub Pages origin and checks the signed-in owner session
-before subscribing to Kiwoom. Use only one active quote client across the
-local app and gateway, as Kiwoom limits simultaneous quote sessions.
+before subscribing to Kiwoom. The local app and gateway share one Kiwoom
+WebSocket slot. Additional clients refresh current quotes and open books via
+REST and resume push updates when the slot becomes available.

@@ -1,6 +1,6 @@
 import {setupWatchEditor} from "./watch-editor.js?v=49";
-import {setupOrders} from "./orders.js?v=72";
-import { setupInstrument, sparkline } from "./instrument.js?v=72";
+import {setupOrders} from "./orders.js?v=73";
+import { setupInstrument, sparkline } from "./instrument.js?v=73";
 import {loadWatchSentiment} from "./market-panels.js?v=68";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -162,6 +162,7 @@ function tradedQuantity(bought, sold) {
 function showHoldings(balance) {
   holdingsList.replaceChildren();
   const holdings = balance?.holdings;
+  document.getElementById("holding-count").textContent = Array.isArray(holdings) ? holdings.length + "종목" : "";
   if (!holdings?.length) {
     const item = document.createElement("li");
     item.textContent = Array.isArray(holdings) ? "보유 중인 미국주식이 없습니다." : "잔고 동기화 대기";
@@ -169,28 +170,32 @@ function showHoldings(balance) {
     return;
   }
   for (const holding of [...holdings].sort((a,b) => Number(b.value_krw) - Number(a.value_krw))) {
-    const item = document.createElement("li"), head = document.createElement("div");
-    head.className = "holding-title";
+    const item = document.createElement("li"), head = document.createElement("header");
+    item.className = "position-card";
+    head.className = "position-head";
     const name = document.createElement("strong"), ticker = document.createElement("span");
-    name.textContent = holding.name || holding.symbol;
-    ticker.textContent = holding.name !== holding.symbol ? holding.symbol : "";
+    name.textContent = holding.symbol || holding.name;
+    ticker.textContent = holding.name !== holding.symbol ? holding.name : "";
     head.append(name, ticker);
     const metrics = document.createElement("dl");
     metrics.className = "holding-values";
     const weight = numeric(holding.value_krw) && Number(balance.value_krw) > 0
       ? (100 * Number(holding.value_krw) / Number(balance.value_krw)).toFixed(2) + "%" : "—";
-    for (const [label, value, signedValue] of [
+    for (const [label, value, role, signedValue] of [
+      ["평가금액", formatHolding(holding.value_krw, holdingKRW), "valuation"],
+      ["평가손익", formatHolding(holding.profit_krw, holdingKRW), "profit", holding.profit_krw],
+      ["수익률", numeric(holding.return_pct) ? signedWatchPercent(Number(holding.return_pct)) : "—", "return", holding.return_pct],
       ["보유수량", numeric(holding.quantity) ? Number(holding.quantity).toLocaleString("ko-KR", {maximumFractionDigits:8}) + "주" : "—"],
+      ["매입금액", formatHolding(holding.cost_krw, holdingKRW)],
       ["매입가", formatHolding(holding.cost_price, holdingUSD)], ["현재가", formatHolding(holding.current_price, holdingUSD)],
-      ["평가손익", formatHolding(holding.profit_krw, holdingKRW), holding.profit_krw],
-      ["수익률", numeric(holding.return_pct) ? signedWatchPercent(Number(holding.return_pct)) : "—", holding.return_pct],
-      ["매입금액", formatHolding(holding.cost_krw, holdingKRW)], ["평가금액", formatHolding(holding.value_krw, holdingKRW)],
       ["전일 거래수량", tradedQuantity(holding.previous_buy_qty, holding.previous_sell_qty)],
-      ["금일 거래수량", tradedQuantity(holding.today_buy_qty, holding.today_sell_qty)], ["주식 내 비중", weight]
+      ["금일 거래수량", tradedQuantity(holding.today_buy_qty, holding.today_sell_qty)], ["주식 내 비중", weight, "weight"]
     ]) {
       const cell = document.createElement("div"), term = document.createElement("dt"), data = document.createElement("dd");
       term.textContent = label;
       data.textContent = value;
+      if (role) cell.className = "position-" + role;
+      if (role === "weight" && weight !== "—") cell.style.setProperty("--weight", weight);
       if (numeric(signedValue) && Number(signedValue) !== 0) data.dataset.direction = Number(signedValue) < 0 ? "down" : "up";
       cell.append(term, data);
       metrics.append(cell);
@@ -240,6 +245,9 @@ function showProfit(data) {
 
 const watchKey = "jm-invest:watchlist:v1";
 const watchList = document.querySelector("#home-holdings");
+const watchPriceKey = "jm-invest:watch-quote-display";
+let showWatchPrice = false;
+try { showWatchPrice = localStorage.getItem(watchPriceKey) === "price"; } catch {}
 const watchSentimentRating = document.querySelector("#watch-sentiment-rating");
 const watchStatus = document.querySelector("#home-value");
 const watchForm = document.querySelector("#watch-form");
@@ -391,7 +399,8 @@ async function syncKiwoomQuotes() {
         for (const line of lines) {
           const update = JSON.parse(line);
           if (!update) continue;
-          if (activeOrderBook?.symbol === update.symbol && (update.book || update.bookStatus || update.session != null)) {
+          if (activeOrderBook?.symbol === update.symbol && (update.book || update.bookStatus || update.session != null
+            || update.snapshot && !(kiwoomTicks.get(update.symbol)?.receivedAt > update.sampledAt))) {
             activeOrderBook.onUpdate(update);
           }
           if (update.book || update.bookStatus) continue;
@@ -405,7 +414,10 @@ async function syncKiwoomQuotes() {
             if (update.marketType) {
               externalPrices.set(update.symbol, update);
             } else if (update.snapshot) {
-              lastKiwoomPrices.set(update.symbol, {...update, received: usMarketSession()});
+              const received = usMarketSession(), previous = lastKiwoomPrices.get(update.symbol);
+              const sameSession = previous?.received.date === received.date && previous.received.phase === received.phase;
+              const moved = sameSession && (previous.moved || previous.price !== update.price);
+              lastKiwoomPrices.set(update.symbol, {...update, received, moved});
             } else {
               const prior = kiwoomTicks.get(update.symbol);
               if (prior?.tradedAt && update.tradedAt && prior.tradedAt > update.tradedAt) continue;
@@ -475,11 +487,13 @@ const instrument = setupInstrument({
   orders,
   subscribeOrderBook,
   canLoadChart: () => Boolean(token && kiwoomEndpoint),
-  async loadChart(symbol, frame) {
+  async loadChart(symbol, frame, before, signal, day) {
     if (!token || !kiwoomEndpoint) return null;
     const endpoint = new URL("instrument", new URL(kiwoomEndpoint, location.href));
     endpoint.search = new URLSearchParams({symbol, frame});
-    const response = await fetch(endpoint, {headers: {Authorization: "Bearer " + token}, cache: "no-store"});
+    if (before) endpoint.searchParams.set("before", before);
+    if (day) endpoint.searchParams.set("date", day.replaceAll("-",""));
+    const response = await fetch(endpoint, {headers: {Authorization: "Bearer " + token}, cache: "no-store", signal});
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.message || "Kiwoom chart unavailable.");
     return payload;
@@ -510,14 +524,18 @@ function renderWatchlist(changed) {
     const regular = kiwoomRegular.get(symbol);
     const freshOvernight = tick?.session === "4" && tick.tradedAt >= Date.now() / 1000 - 120;
     const live = tick?.date === date || freshOvernight ? tick : null;
-    const change = regular?.date === date ? regular.change
-      : snapshot?.received.date === session.date && snapshot.received.phase === "Regular" && session.phase === "Regular"
-        ? snapshot.change : daily?.change;
-    const price = live?.price ?? snapshot?.price ?? daily?.price;
-    const label = live ? (kiwoomPhases[live.session] || "Last") : snapshot ? "Last" : "Close";
+    const useTick = live && !(snapshot?.sampledAt > (live.receivedAt ?? live.tradedAt) && snapshot.price !== live.price);
+    const lastBar = minuteHistory.get(symbol)?.at(-1);
+    const barSession = lastBar && !useTick && usMarketSession(new Date(lastBar[0] * 1000));
+    const timedSnapshot = snapshot?.received.date === session.date && snapshot.received.phase === session.phase
+      && (snapshot.moved || barSession?.date === session.date && barSession.phase === session.phase);
+    const price = useTick ? live.price : snapshot?.price ?? daily?.price;
+    const label = useTick ? (kiwoomPhases[live.session] || "Last") : timedSnapshot ? session.phase : snapshot ? "Last" : "Close";
+    const change = label === "Regular" ? (useTick ? live.change : snapshot.change)
+      : regular?.date === date ? regular.change : daily?.change;
     return [symbol, price != null || Number.isFinite(change)
       ? {price, change, label,
-        extendedChange: ["Pre", "After", "Overnight"].includes(label) ? live.change : null,
+        extendedChange: ["Pre", "After", "Overnight", "Last"].includes(label) ? (useTick ? live.change : snapshot?.change) : null,
         changeDate: regular?.date === date ? date : daily?.date}
       : null];
   }));
@@ -590,7 +608,15 @@ function makeWatchRow(symbol) {
   chart.className = "mini-chart";
   chart.setAttribute("aria-hidden", "true");
   quote.className = "watch-quote";
-  quote.append(document.createElement("strong"), document.createElement("small"), document.createElement("small"));
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "watch-metric";
+  toggle.onclick = () => {
+    showWatchPrice = !showWatchPrice;
+    try { localStorage.setItem(watchPriceKey, showWatchPrice ? "price" : "percent"); } catch {}
+    renderWatchlist();
+  };
+  quote.append(toggle, document.createElement("small"), document.createElement("small"));
   row.append(badge, identity, chart, quote);
   return row;
 }
@@ -622,15 +648,18 @@ function paintWatchRow(row, symbol, market, session) {
 
   const quote = row.querySelector(".watch-quote"), [main, price, extra] = quote.children;
   const change = market?.change;
-  main.textContent = Number.isFinite(change) ? signedWatchPercent(change) : "—";
-  main.title = Number.isFinite(change) && !market.marketType ? "Regular-session change from the prior close" : "";
+  const quotePrice = Number.isFinite(market?.price)
+    ? market.marketType === "Index" ? market.price.toFixed(2) : watchDollars.format(market.price) : "—";
+  main.textContent = showWatchPrice ? quotePrice : Number.isFinite(change) ? signedWatchPercent(change) : "—";
+  main.title = showWatchPrice ? "Show percentage change" : "Show price";
+  main.setAttribute("aria-label", symbol + " " + main.textContent + ". " + main.title);
   quote.dataset.direction = Number.isFinite(change) ? (change < 0 ? "down" : "up") : "";
   if (market) {
-    price.textContent = !Number.isFinite(market.price) ? "" : market.marketType === "Index" ? market.price.toFixed(2)
-      : watchDollars.format(market.price) + (market.marketType === "Futures" ? " · Delayed" : "");
+    price.textContent = market.marketType === "Futures" ? "Delayed" : "";
   } else {
     price.textContent = !token ? "Sign in for quotes" : unavailableSymbols.has(symbol) ? "Unavailable on Kiwoom" : "Waiting for quote";
   }
+  price.hidden = !price.textContent;
   extra.hidden = !Number.isFinite(market?.extendedChange);
   extra.textContent = extra.hidden ? "" : market.label + ": " + signedWatchPercent(market.extendedChange);
   extra.dataset.direction = market?.extendedChange < 0 ? "down" : "up";
@@ -753,7 +782,6 @@ async function openWorkspace(session, remember) {
   selectView(document.body.dataset.view || "home");
   instrument.refresh();
   loadValuation(token);
-  orders.refresh();
   message.textContent = remember && !stored ? "This browser could not save your session." : "";
 }
 

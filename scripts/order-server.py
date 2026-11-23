@@ -1,8 +1,9 @@
 """Serve TradeInSight and its owner-only Kiwoom order endpoint."""
 import argparse
+from functools import lru_cache
 from datetime import datetime, timedelta
 from decimal import Decimal
-from fcntl import LOCK_EX, flock
+from fcntl import LOCK_EX, LOCK_NB, flock
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import math
@@ -125,18 +126,31 @@ def order_fields(data):
 
 def pending_row(row):
     remaining = int(row.get("ord_remnq") or 0)
-    if remaining <= 0 or row.get("ord_cntr_tp") == "12":
+    def field(name):
+        return str(row.get(name) or "").strip()
+    action = field("ord_cntr_tp")
+    if remaining <= 0 or action in ("12", "취소", "취소주문") or field("ord_stat") in ("체결완료", "취소완료", "무효주문", "거부"):
         return None
-    number, symbol = row["ord_no"].strip(), row["stk_cd"].strip()
-    side = {"1": "sell", "2": "buy"}.get(row.get("slby_tp"))
-    kind = row.get("frgn_trde_tp", "").strip()
-    amend_price = row.get("mdfy_uv") if row.get("ord_cntr_tp") == "11" else None
+    number, symbol = field("ord_no"), field("stk_cd")
+    side_codes = {"1":"sell", "2":"buy", "매도":"sell", "매수":"buy"}
+    side = side_codes.get(field("slby_tp")) or side_codes.get(field("slby_tp_nm"))
+    kind = field("frgn_trde_tp")
+    amend_price = row.get("mdfy_uv") if action in ("11", "정정", "정정주문") else None
     price = Decimal(amend_price or 0) or Decimal(row.get("ord_uv") or 0)
-    regular = (side is not None and row.get("rsrv_tp", "0").strip() in ("", "0")
-               and row.get("ord_cntr_tp") in ("10", "11") and re.fullmatch(r"\d{1,9}", number) is not None)
-    return dict(number=number, symbol=symbol, side=side, kind=kind, kindName=row.get("frgn_trde_nm", ""),
+    reservation = field("rsrv_tp").lstrip("0")
+    reason = ""
+    if reservation not in ("", "일반"):
+        reason = "예약주문은 키움 예약주문 내역에서 확인하세요." if reservation in ("1","예약") else "예약 구분을 확인할 수 없습니다."
+    elif not (re.fullmatch(r"[0-9]{1,9}", number) and int(number) and symbol):
+        reason = "원주문 식별 정보를 확인할 수 없습니다."
+    elif action not in ("10","11","원주문","정정주문","정정") and not (not action and field("ord_stat") == "접수"):
+        reason = "원주문 상태를 확인할 수 없습니다."
+    item = dict(number=number, symbol=symbol, side=side, kind=kind, kindName=row.get("frgn_trde_nm", ""),
                 remaining=remaining, price=format(price, "f") if price else "", time=row.get("ord_time", ""),
-                canCancel=regular, canAmend=regular and kind in LIMIT_TYPES)
+                canCancel=not reason, canAmend=not reason and kind in LIMIT_TYPES)
+    if reason:
+        item["cancelReason"] = reason
+    return item
 
 
 class Kiwoom:
@@ -188,6 +202,7 @@ class Kiwoom:
         }, {"stex_tp": item["stex_tp"], "stk_cd": item["jmcode"]})
 
     def current_quote(self, token, item):
+        sampled_at = time.time()
         result = self.market_quote(token, item, "usa20100")
         if str(result.get("return_code")) != "0":
             return None
@@ -195,7 +210,7 @@ class Kiwoom:
         if not math.isfinite(price) or not price:
             return None
         change = float(result["flu_rt"]) if result.get("flu_rt") else None
-        return {"symbol": item["symbol"], "price": price, "snapshot": True,
+        return {"symbol": item["symbol"], "price": price, "snapshot": True, "sampledAt": sampled_at,
                 "change": change if change is not None and math.isfinite(change) else None}
 
     def daily_quote(self, token, item):
@@ -234,6 +249,8 @@ class Kiwoom:
         return {"jmcode": ticker, "stex_tp": directory[ticker]}
 
     def instrument_chart(self, symbol, frame):
+        if symbol in YAHOO_SYMBOLS and frame == "day":
+            return self.external_daily(symbol, datetime.now(EASTERN).date())
         token = self.access_token()
         item = self.resolve_us_stock(token, symbol)
         now = datetime.now(EASTERN)
@@ -244,7 +261,7 @@ class Kiwoom:
         if intraday:
             query["tic_scope"] = CHART_INTERVALS[frame]
         wait_for_kiwoom_read(self.read_schedule)
-        result = read_json(KIWOOM + "/api/us/chart", {
+        result, page = read_page(KIWOOM + "/api/us/chart", {
             "api-id": transaction, "Authorization": "Bearer " + token,
         }, query)
         if str(result.get("return_code")) != "0":
@@ -269,8 +286,76 @@ class Kiwoom:
             "low": positive_quote(info.get("low_pric")) or positive_quote(info.get("pre_low_pric")),
             "volume": finite_quote(info.get("acc_trde_qty")),
             "marketCap": market_cap * 1000 if market_cap else None,
-            "daily": bars,
+            "daily": bars, "before": older_daily_date(result, page),
         }
+
+    @lru_cache(maxsize=256)
+    def earlier_daily(self, symbol, before, as_of):
+        token = self.access_token()
+        item = self.resolve_us_stock(token, symbol)
+        query = {"stex_tp": item["stex_tp"], "stk_cd": item["jmcode"], "strt_dt": before,
+                 "upd_stkpc_tp": "1", "exrt_appl_tp": "0"}
+        headers = {"api-id":"usa06012", "Authorization":"Bearer " + token}
+        bars = {}
+        boundary = None
+        for _ in range(8):
+            wait_for_kiwoom_read(self.read_schedule)
+            result, page = read_page(KIWOOM + "/api/us/chart", headers, query)
+            if str(result.get("return_code")) != "0":
+                raise Problem(502, "이전 일봉을 불러오지 못했습니다.")
+            for bar in chart_bars(result.get("result_list", []), False, datetime.now(EASTERN)):
+                bars[bar[0]] = bar
+            following = older_daily_date(result, page)
+            if following and following >= (boundary or before):
+                raise Problem(502, "이전 일봉 조회 날짜가 진행되지 않았습니다.")
+            boundary = following
+            if not boundary:
+                break
+            if not page.get("next-key"):
+                break
+            headers.update({"cont-yn":"Y", "next-key":page["next-key"]})
+        return {"bars":[bars[key] for key in sorted(bars)], "before":boundary}
+
+    def intraday_session(self, symbol, frame, day):
+        token = self.access_token()
+        item = self.resolve_us_stock(token, symbol)
+        query = {"stex_tp":item["stex_tp"], "stk_cd":item["jmcode"], "strt_dt":day,
+                 "tic_scope":CHART_INTERVALS[frame], "upd_stkpc_tp":"1", "exrt_appl_tp":"0"}
+        headers = {"api-id":"usa06011", "Authorization":"Bearer " + token}
+        bars, seen = {}, set()
+        while True:
+            wait_for_kiwoom_read(self.read_schedule)
+            result, page = read_page(KIWOOM + "/api/us/chart", headers, query)
+            if str(result.get("return_code")) != "0":
+                raise Problem(502, "선택한 날짜의 분봉을 조회하지 못했습니다.")
+            rows = result.get("result_list") or []
+            matching = [row for row in rows if str(row.get("cntr_tm", ""))[:8] == day]
+            for bar in chart_bars(matching, True, datetime.now(EASTERN)):
+                bars[bar[0]] = bar
+            if page.get("cont-yn") != "Y" or len(matching) != len(rows) or not rows:
+                return {"bars":[bars[key] for key in sorted(bars)]}
+            key = page.get("next-key")
+            if not key or key in seen:
+                raise Problem(502, "선택한 거래일의 다음 분봉을 확인할 수 없습니다.")
+            seen.add(key)
+            headers.update({"cont-yn":"Y", "next-key":key})
+
+    @lru_cache(maxsize=12)
+    def external_daily(self, symbol, as_of):
+        ticker, market_type = YAHOO_SYMBOLS[symbol]
+        data = read_json("https://query1.finance.yahoo.com/v8/finance/chart/" + ticker
+                         + "?period1=-2208988800&period2=" + str(int(time.time())) + "&interval=1d",
+                         {"User-Agent":"Mozilla/5.0"})["chart"]["result"][0]
+        meta = data["meta"]
+        series = data["indicators"]["quote"][0]
+        bars = [[stamp, o, h, l, c, v or 0] for stamp, o, h, l, c, v in zip(
+            data["timestamp"], *(series[k] for k in ("open","high","low","close","volume")))
+            if all(value is not None and math.isfinite(value) for value in (o,h,l,c))]
+        if not bars:
+            raise Problem(404, "제공되는 과거 시세가 없습니다.")
+        return {"daily":bars, "before":None, "source":"Yahoo Finance", "exchange":market_type,
+                "name":meta.get("longName") or meta.get("shortName") or symbol, "price":meta.get("regularMarketPrice"),
+                "asOf":meta.get("regularMarketTime")}
 
     def order_context(self, symbol):
         token = self.access_token()
@@ -517,6 +602,29 @@ def ft_levels(values, price_start, size_start):
     return levels
 
 
+def subscribe_quotes(broker, token, items, book, updates, stopped):
+    # Kiwoom allows one socket for the account. Both local services use this lock.
+    path = broker.read_schedule.with_name(".jm-invest-kiwoom-stream")
+    with os.fdopen(os.open(path, os.O_RDONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600), "rb") as lock:
+        while not stopped.is_set():
+            try:
+                flock(lock, LOCK_EX | LOCK_NB)
+            except BlockingIOError:
+                if book:
+                    try:
+                        raw = broker.market_quote(token, book, "usa20101")
+                        if str(raw.get("return_code")) == "0":
+                            updates.put({"symbol":book["symbol"], "book":{
+                                "snapshot":True, "asks":order_book_levels(raw,"sel"),
+                                "bids":order_book_levels(raw,"buy"), "time":str(raw.get("bid_tm") or "")}})
+                    except (OSError, ValueError):
+                        pass
+                stopped.wait(2)
+                continue
+            publish_kiwoom_stream(token, items, book, updates, stopped)
+            return
+
+
 def publish_kiwoom_stream(token, items, book, updates, stopped):
     import websocket
     while not stopped.is_set():
@@ -543,6 +651,15 @@ def publish_kiwoom_stream(token, items, book, updates, stopped):
                 socket.close(timeout=0)
         if stopped.wait(2):
             return
+
+def older_daily_date(result, page):
+    if page.get("cont-yn") != "Y":
+        return None
+    dates = [row["dt"] for row in result.get("result_list", []) if re.fullmatch(r"\d{8}", row.get("dt") or "")]
+    if not dates:
+        raise Problem(502, "이전 일봉의 조회 날짜를 확인할 수 없습니다.")
+    return (datetime.strptime(min(dates), "%Y%m%d") - timedelta(days=1)).strftime("%Y%m%d")
+
 
 def chart_bars(rows, intraday, now):
     bars = {}
@@ -587,8 +704,28 @@ def watch_series(points):
     return [[stamp, price] for stamp, price in points if stamp >= cutoff]
 
 
+def refresh_watch_prices(broker, token, items, updates, stopped, last_trade):
+    last_read = {}
+    while not stopped.is_set():
+        for item in items:
+            if stopped.is_set():
+                return
+            symbol = item["symbol"]
+            now = time.monotonic()
+            if symbol in last_read and now - max(last_read[symbol], last_trade.get(symbol, 0)) < 15:
+                continue
+            last_read[symbol] = now
+            try:
+                snapshot = broker.current_quote(token, item)
+                if snapshot:
+                    updates.put(snapshot)
+            except (OSError, KeyError, ValueError, TypeError):
+                continue
+        stopped.wait(1)
+
+
 def seed_kiwoom_quotes(broker, token, items, snapshots, stopped):
-    for read_quote in (broker.current_quote, broker.minute_quote, broker.daily_quote):
+    for read_quote in (broker.daily_quote, broker.minute_quote):
         for item in items:
             if stopped.is_set():
                 return
@@ -632,7 +769,6 @@ class App(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     orders = None
     quote_broker = None
-    quote_lock = Lock()
     quotes_only = False
     host = ""
     origin = ""
@@ -721,7 +857,6 @@ class App(BaseHTTPRequestHandler):
     def stream_quotes(self):
         self.close_connection = True
         opened = False
-        acquired = False
         worker = None
         stopped = Event()
         try:
@@ -744,9 +879,6 @@ class App(BaseHTTPRequestHandler):
                 raise Problem(400, "종목 코드를 확인하세요.")
             if book_symbol is not None and book_symbol not in requested:
                 raise Problem(400, "호가 조회 종목을 확인하세요.")
-            acquired = self.quote_lock.acquire(timeout=3)
-            if not acquired:
-                raise Problem(409, "키움 시세 세션을 다른 탭에서 사용 중입니다.")
             token = self.quote_broker.access_token()
             external = [symbol for symbol in dict.fromkeys(requested) if symbol in YAHOO_SYMBOLS]
             equities = [symbol for symbol in dict.fromkeys(requested) if symbol not in YAHOO_SYMBOLS]
@@ -770,11 +902,14 @@ class App(BaseHTTPRequestHandler):
             opened = True
             self.connection.settimeout(10)
             updates = SimpleQueue()
+            last_trade = {}
             updates.put({"unsupported": unsupported})
             if items:
+                Thread(target=refresh_watch_prices, args=(self.quote_broker, token, items, updates, stopped, last_trade),
+                       daemon=True).start()
                 Thread(target=seed_kiwoom_quotes, args=(self.quote_broker, token, items, updates, stopped),
                        daemon=True).start()
-                worker = Thread(target=publish_kiwoom_stream, args=(token, items, book, updates, stopped),
+                worker = Thread(target=subscribe_quotes, args=(self.quote_broker, token, items, book, updates, stopped),
                                 daemon=True)
                 worker.start()
             if external:
@@ -785,6 +920,9 @@ class App(BaseHTTPRequestHandler):
                     frame = updates.get(timeout=1)
                 except Empty:
                     frame = None
+                if frame and frame.get("session") is not None:
+                    last_trade[frame["symbol"]] = time.monotonic()
+                    frame["receivedAt"] = time.time()
                 payload = (json.dumps(frame) + "\n").encode()
                 self.wfile.write(f"{len(payload):X}\r\n".encode() + payload + b"\r\n")
                 if not items and not external:
@@ -803,8 +941,6 @@ class App(BaseHTTPRequestHandler):
             stopped.set()
             if worker is not None:
                 worker.join(timeout=2)
-            if acquired:
-                self.quote_lock.release()
 
     def handle_order(self, action):
         try:
@@ -861,7 +997,21 @@ class App(BaseHTTPRequestHandler):
             frame = query.get("frame", ["day"])[0]
             if not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,11}", symbol) or frame not in ("day", *CHART_INTERVALS):
                 raise Problem(400, "종목 또는 차트 간격을 확인하세요.")
-            self.write_json(200, self.quote_broker.instrument_chart(symbol, frame))
+            before = query.get("before", [None])[0]
+            day = query.get("date", [None])[0]
+            if day is not None:
+                if before or frame not in CHART_INTERVALS or not re.fullmatch(r"\d{8}", day):
+                    raise Problem(400, "분봉 거래일을 확인하세요.")
+                datetime.strptime(day, "%Y%m%d")
+                result = self.quote_broker.intraday_session(symbol, frame, day)
+            elif before is not None:
+                if frame != "day" or not re.fullmatch(r"\d{8}", before):
+                    raise Problem(400, "일봉 조회 날짜를 확인하세요.")
+                datetime.strptime(before, "%Y%m%d")
+                result = self.quote_broker.earlier_daily(symbol, before, datetime.now(EASTERN).date())
+            else:
+                result = self.quote_broker.instrument_chart(symbol, frame)
+            self.write_json(200, result)
         except Problem as error:
             self.write_json(error.status, {"message": str(error)})
         except (OSError, ValueError):

@@ -25,6 +25,44 @@ class BrokerOrdersTest(unittest.TestCase):
         self.send = patcher.start()
         self.addCleanup(patcher.stop)
 
+    def test_pending_cancel_normalizes_broker_fields(self):
+        raw = dict(ord_no="000000003", stk_cd="GOOG", ord_cntr_tp=" 원주문 ", ord_remnq="0002",
+                   ord_stat="접수", rsrv_tp="일반", slby_tp_nm="매수", frgn_trde_tp="00")
+        row = server.pending_row(raw)
+        self.assertTrue(row["canCancel"])
+        self.assertEqual(row["side"], "buy")
+        self.broker.pending.return_value = [row]
+        self.orders.submit(self.orders.preview(dict(action="cancel", original=row)))
+        self.assertEqual(self.send.call_args.args[2]["orig_ord_no"], raw["ord_no"])
+        self.assertIn("cancelReason", server.pending_row(dict(raw, rsrv_tp="예약")))
+        self.assertIsNone(server.pending_row(dict(raw, ord_stat="취소완료")))
+        self.assertIsNone(server.pending_row(dict(raw, ord_cntr_tp=" 취소주문 ")))
+
+    def test_history_exhausts_pages_and_deduplicates_dates(self):
+        def candle(day):
+            return dict(dt=day, open_pric="10", high_pric="12", low_pric="9", cur_prc="11", acc_trde_qty="15")
+        def page(*days):
+            return dict(return_code=0, result_list=[candle(day) for day in days])
+        pages = [(page("19990126","19990125"), {"cont-yn":"Y","next-key":"next"}),
+                 (page("19990125","19990122"), {"cont-yn":"N"})]
+        with patch.object(server,"wait_for_kiwoom_read"), patch.object(server,"read_page",side_effect=pages):
+            history = self.broker.earlier_daily("GOOG","19990127","20261123")
+        self.assertIsNone(history["before"])
+        self.assertEqual(len(history["bars"]),3)
+        self.assertEqual(history["bars"],sorted(history["bars"]))
+
+    def test_quiet_watch_symbol_refreshes_without_waiting_for_fill(self):
+        from queue import SimpleQueue
+        clock = [100.0]
+        stop = Mock()
+        stop.is_set.side_effect = lambda: clock[0] > 131
+        stop.wait.side_effect = lambda delay: clock.__setitem__(0, clock[0] + delay)
+        broker = Mock()
+        updates = SimpleQueue()
+        with patch.object(server.time,"monotonic",side_effect=lambda:clock[0]):
+            server.refresh_watch_prices(broker,"token",[{"symbol":"AVGG"}],updates,stop,{"AVGG":110})
+        self.assertEqual(broker.current_quote.call_count,2)
+
     def test_buy_and_sell_wire_payload(self):
         for side, tr in (("buy", "ust20000"), ("sell", "ust20001")):
             for kind in ("00", "03", "26", "27", "30", "36", "37"):

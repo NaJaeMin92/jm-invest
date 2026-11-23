@@ -1,8 +1,8 @@
-import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=71";
+import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=73";
 import {showMarketPanel} from "./market-panels.js?v=68";
 
-import {setupChartTools} from "./chart-tools.js?v=58";
-import {orderKinds, needsPrice, populateKinds} from "./orders.js?v=72";
+import {setupChartTools} from "./chart-tools.js?v=73";
+import {orderKinds, needsPrice, populateKinds} from "./orders.js?v=73";
 
 const get = id => document.getElementById(id);
 const savedQuotes = new Set("ANT SKHY SPCX MRVL BZMAIN CLMAIN AAL UAL DAL NVDA AMZN".split(" "));
@@ -43,10 +43,19 @@ export function sparkline(points, container) {
 const signed = n => (n>=0?"+":"")+n.toFixed(2);
 const displaySymbol = s => ({BZMAIN:"BZmain",CLMAIN:"CLmain"}[s] || s);
 const validSymbol = /^[A-Z][A-Z0-9.\-]{0,11}$/;
+function mergeDaily(oldBars, newBars) {
+  const days = new Map();
+  for (const bars of [oldBars, newBars]) {
+    for (const bar of bars ?? []) days.set(Math.floor(bar[0] / 86400), bar);
+  }
+  return [...days.values()].sort((a,b) => a[0] - b[0]);
+}
 
 export function setupInstrument({search,nameFor,readList,saveList,orders,subscribeOrderBook,canLoadChart,loadChart,signIn}) {
   const dialog=get("stock-detail"), canvas=get("market-chart"), reference=get("daily-reference");
   let current="", quote=null, frame="day", afterClose=null, quoteRequest=0;
+  const fullHistory = new Map();
+  let historyAbort, historyState = "", rangeMode = "";
   const trade = get("trade-preview");
   const tradeForm = get("trade-preview-form"), tradeReview = get("trade-preview-review");
   const tradeStatus = get("trade-preview-status"), tradeNext = get("trade-preview-next");
@@ -83,6 +92,12 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     quantity.min = algo ? "5" : "1";
     get("trade-quantity-label").textContent = algo ? "수량 (최소 5주)" : "수량 (주)";
     price.disabled = !needsPrice(kind.value);
+    get("trade-kind-help").textContent = ({
+      "00":"지정한 가격 또는 더 유리한 가격에 체결", "03":"체결 시점에 주문 금액 결정",
+      "26":"거래량에 맞춰 지정가 범위에서 분할 체결", "27":"시간을 나눠 지정가 범위에서 분할 체결",
+      "30":"종가가 지정가 조건을 충족하면 체결", "36":"거래량에 맞춰 시장가로 분할 체결",
+      "37":"시간을 나눠 시장가로 분할 체결"
+    })[kind.value] || "";
     get("trade-limit-field").hidden = price.disabled;
     get("trade-use-quote").parentElement.hidden = price.disabled;
     for (const button of bookLevels.querySelectorAll("button")) button.disabled = price.disabled;
@@ -95,6 +110,8 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     const valid = quantity.validity.valid && price.validity.valid && Number.isFinite(amount);
     get("trade-preview-total").textContent = price.disabled ? "체결 시 결정" : valid ? dollars.format(amount) : "—";
     const converted = get("trade-preview-krw");
+    get("trade-limit-krw").textContent = !price.disabled && price.valueAsNumber > 0 && orderContext?.fx > 0
+      ? "1주 약 " + won.format(price.valueAsNumber * orderContext.fx) : "";
     converted.hidden = price.disabled || !valid || !Number.isFinite(orderContext?.fx);
     converted.textContent = converted.hidden ? "" : "약 " + won.format(amount * orderContext.fx);
     for (const button of bookLevels.querySelectorAll("button")) {
@@ -147,6 +164,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     currentPrice.textContent = "키움 현재가 · " + dollars.format(value);
     get("trade-use-quote").hidden = false;
     get("trade-book-price").textContent = dollars.format(value);
+    get("trade-book-krw").textContent = orderContext?.fx > 0 ? won.format(value * orderContext.fx) : "";
   }
 
   function showOrderBook(book) {
@@ -175,7 +193,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     }
     if (update.book) {
       bookRevision += 1;
-      pendingBook = {...update.book, live: true,
+      pendingBook = {...update.book, live: !update.book.snapshot,
         time: update.book.time.replace(/^(\d\d)(\d\d)(\d\d)$/, "$1:$2:$3")};
     } else if (Number.isFinite(update.price)) {
       liveTradePrice = update.price;
@@ -235,6 +253,9 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     tradeReview.hidden = true;
     tradeNext.disabled = true;
     tradeConfirm.disabled = true;
+    tradeConfirm.hidden = false;
+    get("trade-book-price").textContent = "—";
+    get("trade-book-krw").textContent = "";
     tradeEdit.disabled = false;
     tradeEdit.hidden = false;
     get("trade-review-pending").hidden = true;
@@ -322,6 +343,8 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     }
     if (version !== tradeVersion || !trade.open) return;
     reviewId = order.id ?? null;
+    get("trade-review-title").textContent = displaySymbol(current) + " " + sideName[order.side] + " 확인";
+    tradeConfirm.textContent = "실계좌 " + sideName[order.side] + " 전송";
     get("trade-review-side").textContent = sideName[order.side];
     get("trade-review-kind").textContent = orderKinds.get(order.kind);
     get("trade-review-quantity").textContent = Number(order.quantity).toLocaleString("ko-KR") + "주";
@@ -354,6 +377,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     tradeStatus.textContent = "키움에 주문을 전송 중입니다.";
     try {
       const order = await orders.submit(id);
+      get("trade-review-title").textContent = sideName[tradeSide] + " 주문 접수";
       tradeStatus.textContent = "키움 주문 접수 · 주문번호 " + order.number;
     } catch (error) {
       tradeStatus.textContent = error instanceof TypeError || error instanceof SyntaxError
@@ -362,6 +386,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     } finally {
       tradeBusy = false;
       tradeEdit.hidden = true;
+      tradeConfirm.hidden = true;
       get("trade-review-pending").hidden = false;
     }
   };
@@ -377,6 +402,8 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
   });
   const first = get("chart-first"), coverage = get("chart-coverage");
   const chartStatus = get("chart-status");
+  const sessionDate = get("chart-session-date");
+  sessionDate.onchange = () => setFrame(frame);
   const minuteCache = new Map();
   const tabs = [...dialog.querySelectorAll("[data-panel]")];
   let chart = null, start = 0, lastStart = 0, windowSize = visibleBars, drag = null, requestId = 0;
@@ -407,7 +434,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
   function draw() {
     area.classList.toggle("moving-drawing",tools.drawingOptions());
     if (!chart || !chart.bars.length || !dialog.open) return;
-    const snapshot = current === "SKHY" && frame === "day" && start === lastStart
+    const snapshot = current === "SKHY" && !quote?.fromKiwoom && frame === "day" && start === lastStart
       && windowSize === visibleBars && tools.canUseSnapshot();
     reference.hidden = !snapshot;
     canvas.hidden = snapshot;
@@ -417,8 +444,10 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     drawSecondary(start,end,options);
     const dates = [start, end].map(i => dateFormat.format(chart.bars[i][0] * 1000));
     get("chart-dates").textContent = dates.join(" – ");
-    latest.disabled = options.end != null || start === lastStart;
-    first.disabled = start === 0;
+    latest.disabled = options.end != null || start === lastStart && rangeMode !== "all";
+    first.disabled = start === 0 && rangeMode !== "all";
+    get("chart-all").disabled = options.end != null;
+    get("chart-all").setAttribute("aria-pressed", String(rangeMode === "all"));
   }
   function drawSecondary(start,end,options) {
     const secondary = tools.secondary();
@@ -441,6 +470,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     const limit = tools.replayEnd() == null ? lastStart : Math.min(lastStart, tools.replayEnd() - 1);
     const next = Math.min(limit, Math.max(0, Math.round(index)));
     if (next !== start) {
+      rangeMode = "";
       start = next;
       draw();
     }
@@ -501,7 +531,8 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
       if (pinch && chart && touchPoints.size === 2) {
         const {distance, anchor} = pinchGeometry();
         const count = tools.replayEnd() ?? chart.bars.length;
-        const max = Math.min(240, count);
+        const max = count;
+        rangeMode = "";
         windowSize = Math.max(Math.min(8, max), Math.min(max,
           Math.round(pinch.windowSize * pinch.distance / Math.max(1, distance))));
         lastStart = Math.max(0, chart.bars.length - windowSize);
@@ -534,25 +565,46 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
       endDrag();
     });
   }
-  latest.addEventListener("click", () => moveTo(lastStart));
-  first.addEventListener("click", () => moveTo(0));
+  function selectRange(mode) {
+    if (!chart) return;
+    rangeMode = mode;
+    windowSize = mode === "all" ? chart.bars.length : visibleBars;
+    lastStart = Math.max(0, chart.bars.length - windowSize);
+    start = mode === "latest" ? lastStart : 0;
+    area.classList.toggle("pannable", lastStart > 0);
+    draw();
+  }
+  latest.addEventListener("click", () => selectRange("latest"));
+  first.addEventListener("click", () => selectRange("first"));
+  get("chart-all").onclick = () => selectRange("all");
+  get("chart-history-retry").onclick = () => loadInstrumentQuote(current);
   new ResizeObserver(draw).observe(area);
-  function finishFrame(source) {
+  function finishFrame(source, preserve = false) {
+    const anchor = preserve && chart?.bars[start]?.[0];
+    const atLatest = start === lastStart;
     chart = source?.length ? prepareChart(source, frame) : null;
-    windowSize = visibleBars;
+    if (!preserve) { windowSize = visibleBars; rangeMode = ""; }
+    else if (rangeMode === "all" && chart) windowSize = chart.bars.length;
     touchPoints.clear();
     pinch = null;
     lastStart = Math.max(0, (chart?.bars.length || 0) - windowSize);
     start = lastStart;
+    if (preserve && chart && (rangeMode === "first" || rangeMode === "all")) start = 0;
+    else if (anchor && chart && !atLatest) {
+      const index = chart.bars.findIndex(bar => bar[0] >= anchor);
+      if (index >= 0) start = Math.min(index,lastStart);
+    }
     get("chart-history").hidden = !chart;
     area.classList.toggle("pannable", lastStart > 0);
     area.classList.toggle("zoomable", Boolean(chart));
-    tools.updateSeries(chart,current,frame);
+    if (anchor && chart) tools.extendSeries(chart);
+    else tools.updateSeries(chart,current,frame);
     if (chart) {
       const startDate = dateFormat.format(source[0][0] * 1000);
       const endDate = dateFormat.format(source.at(-1)[0] * 1000);
-      coverage.textContent = (isIntraday(frame) ? "Intraday snapshot" : quote?.fromKiwoom ? "Available history" : "Available since first recorded session")
+      coverage.textContent = (isIntraday(frame) ? "Intraday history" : historyState || "Available history")
         + " · " + startDate + " – " + endDate + " ET";
+      get("chart-history-retry").hidden = isIntraday(frame) || historyState !== "Partial history";
       draw();
     } else {
       reference.hidden = true;
@@ -578,6 +630,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     const id = ++requestId;
     endDrag();
     frame = value;
+    get("chart-session-picker").hidden = !isIntraday(value) || !quote?.fromKiwoom;
     chartStatus.hidden = true;
     for (const button of get("stock-frames").children) {
       button.setAttribute("aria-pressed", String(button.dataset.frame === frame));
@@ -590,16 +643,16 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     chartStatus.textContent = "Loading intraday history…";
     chartStatus.hidden = false;
     try {
-      const source = quote.fromKiwoom ? (await loadChart(current, value))?.bars : await minuteBars(current);
+      const source = quote.fromKiwoom ? (await loadChart(current, value, null, historyAbort?.signal, sessionDate.value))?.bars : await minuteBars(current);
       if (id !== requestId) return;
       chartStatus.hidden = Boolean(source?.length);
-      if (!source?.length) chartStatus.textContent = "Intraday history is unavailable for this interval.";
+      if (!source?.length) chartStatus.textContent = sessionDate.value ? "No intraday bars for this trading date." : "Intraday history is unavailable for this interval.";
       finishFrame(source);
     } catch {
       if (id === requestId) chartStatus.textContent = "Intraday history is temporarily unavailable. Select another interval.";
     }
   }
-  function renderQuote() {
+  function renderQuote(preserve = false) {
     const pct = quote.percent, price = quote.price;
     const hasChange = Number.isFinite(price) && Number.isFinite(pct) && pct > -100;
     const compact = new Intl.NumberFormat("en-US", {notation:"compact",maximumFractionDigits:2});
@@ -612,35 +665,62 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     get("stock-volume").textContent = Number.isFinite(quote.volume) ? compact.format(quote.volume) : "—";
     get("stock-cap").textContent = Number.isFinite(quote.marketCap) ? compact.format(quote.marketCap)
       : current === "SKHY" ? "754.89B" : "—";
-    get("stock-name").textContent = (current === "SKHY" ? "SK Hynix Inc" : quote.name)
-      + "  " + (quote.exchange === "NasdaqGS" ? "NASDAQ" : quote.exchange);
+    get("stock-name").textContent = [quote.name || nameFor(current), quote.exchange === "NasdaqGS" ? "NASDAQ" : quote.exchange].filter(Boolean).join("  ");
     get("stock-quote-source").hidden = false;
-    get("stock-quote-source").textContent = quote.fromKiwoom ? "Kiwoom" : "Snapshot";
+    get("stock-quote-source").textContent = quote.source || (quote.fromKiwoom ? "Kiwoom" : "Snapshot");
     get("stock-chart-sign-in").hidden = true;
     const when = Number.isFinite(quote.asOf) ? dateFormat.format(quote.asOf * 1000) : "";
     get("stock-time").textContent = quote.fromKiwoom ? "Latest quote"
       : current === "SKHY" ? "Closed 19:59 11/20 ET" : "Closed · " + when + " ET";
     get("stock-frames").hidden=false;
-    setFrame(frame);
+    if (!preserve || !chart) setFrame(frame);
+    else if (!isIntraday(frame)) finishFrame(quote.daily, true);
   }
   async function loadInstrumentQuote(symbol) {
     const id = ++quoteRequest;
+    historyAbort?.abort();
+    historyAbort = new AbortController();
+    const signal = historyAbort.signal;
     let message = "Chart unavailable";
     try {
-      let data = await publicQuote(symbol);
+      const saved = await publicQuote(symbol);
       if (id !== quoteRequest) return;
-      if (!data && canLoadChart()) {
-        const result = await loadChart(symbol, "day");
-        if (result) data = {...result, fromKiwoom: true};
-      }
-      if (id !== quoteRequest) return;
-      if (data) {
-        quote = data;
+      if (saved && !quote) {
+        quote = saved;
         renderQuote();
+      }
+      if (canLoadChart()) {
+        const result = await loadChart(symbol, "day", null, signal);
+        if (id !== quoteRequest || !result) return;
+        const asOf = new Date().toISOString().slice(0,10);
+        const cached = fullHistory.get(symbol);
+        let before = cached?.asOf === asOf ? null : result.before;
+        let bars = mergeDaily(cached?.asOf === asOf ? cached.bars : saved?.daily, result.daily);
+        quote = {...saved, ...result, daily:bars, fromKiwoom:!result.source};
+        historyState = before ? "Loading earlier history…" : "";
+        renderQuote(Boolean(chart));
+        while (before) {
+          const part = await loadChart(symbol, "day", before, signal);
+          if (id !== quoteRequest) return;
+          if (!Array.isArray(part?.bars) || part.before && part.before >= before) throw Error("Invalid history page");
+          before = part.before;
+          bars = mergeDaily(bars, part.bars);
+          quote.daily = bars;
+          historyState = before ? "Loading earlier history…" : "";
+          if (!isIntraday(frame)) finishFrame(bars, Boolean(chart));
+        }
+        if (fullHistory.size >= 24) fullHistory.delete(fullHistory.keys().next().value);
+        fullHistory.set(symbol, {asOf,bars});
         return;
       }
+      if (saved) return;
     } catch (error) {
       message = error.message;
+      if (id === quoteRequest && quote?.daily?.length) {
+        historyState = "Partial history";
+        if (!isIntraday(frame)) finishFrame(quote.daily, Boolean(chart));
+        return;
+      }
     }
     if (id !== quoteRequest) return;
     get("stock-time").textContent = canLoadChart() ? message : "Sign in to load the chart.";
@@ -650,7 +730,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
   }
   async function open(symbol) {
     if (trade.open) trade.close();
-    current=symbol;quote=null;
+    current=symbol;quote=null;historyState="";sessionDate.value="";
     selectPanel("chart");
     document.body.classList.add("instrument-open");
     if (!dialog.open) dialog.showModal();
@@ -678,6 +758,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     }
     requestId += 1;
     quoteRequest += 1;
+    historyAbort?.abort();
     if (trade.open) trade.close();
     current="";quote=null;chart=null;endDrag();
     tools.updateSeries(null,current,frame);
@@ -717,7 +798,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
       sync();
     },
     refresh() {
-      if (current && !quote && canLoadChart()) loadInstrumentQuote(current);
+      if (current && canLoadChart()) loadInstrumentQuote(current);
     }
   };
 }

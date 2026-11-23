@@ -1,4 +1,4 @@
-import {setupPendingOrders} from "./pending-orders.js?v=72";
+import {setupPendingOrders} from "./pending-orders.js?v=73";
 
 export const orderKinds = new Map([
   ["00", "지정가"], ["03", "시장가"], ["26", "VWAP 지정가"], ["27", "TWAP 지정가"],
@@ -15,8 +15,6 @@ export function populateKinds(select) {
 }
 
 export function setupOrders(readToken, quoteEndpoint) {
-  const get = id => document.getElementById(id);
-  const pendingLaunch = get("open-pending-account");
   const publicSite = location.hostname === "najaemin92.github.io";
   async function call(path, body, endpoint = "./api/orders/" + path) {
     const session = readToken();
@@ -30,17 +28,7 @@ export function setupOrders(readToken, quoteEndpoint) {
     return result;
   }
   const pending = setupPendingOrders(call, () => !publicSite && Boolean(readToken()), orderKinds);
-  pendingLaunch.onclick = pending.open;
   return {
-    async refresh() {
-      const token = readToken();
-      if (!token || publicSite) return;
-      try {
-        const settings = await call("status");
-        pendingLaunch.hidden = readToken() !== token || settings.enabled !== true;
-      }
-      catch { pendingLaunch.hidden=true; }
-    },
     stockContext(symbol) {
       if (!readToken()) return Promise.resolve(null);
       if (publicSite) {
@@ -54,6 +42,6 @@ export function setupOrders(readToken, quoteEndpoint) {
     preview: data => call("preview", data),
     submit: id => call("submit", {id}),
     openPending: pending.open,
-    signOut() { pending.close(); pendingLaunch.hidden=true; }
+    signOut: pending.close
   };
 }

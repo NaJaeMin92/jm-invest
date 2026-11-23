@@ -107,10 +107,15 @@ export function drawChart(canvas, chart, frame, start, options) {
   const normalized = firstMatch >= 0 && comparison[firstMatch] !== 0
     ? comparison.map(close => close == null ? null : shown[firstMatch][4] * close / comparison[firstMatch])
     : [];
-  const extent = priceBars.flatMap(bar => [bar[2], bar[3]]);
-  extent.push(...normalized.filter(Number.isFinite));
-  extent.push(...overlayLines.flatMap(line => line.values).filter(Number.isFinite));
-  const rawLow = Math.min(...extent), rawHigh = Math.max(...extent);
+  let rawLow = Infinity, rawHigh = -Infinity;
+  function include(value) {
+    if (!Number.isFinite(value)) return;
+    rawLow = Math.min(rawLow, value);
+    rawHigh = Math.max(rawHigh, value);
+  }
+  for (const bar of priceBars) { include(bar[2]); include(bar[3]); }
+  normalized.forEach(include);
+  for (const overlay of overlayLines) overlay.values.forEach(include);
   const logarithmic = options.log && rawLow > 0;
   const units = logarithmic ? Math.log : value => value;
   const low = units(rawLow), high = units(rawHigh), spread = high - low || 1;
@@ -160,7 +165,7 @@ export function drawChart(canvas, chart, frame, start, options) {
     if (legendY < top - 2) legendX += label(text, legendX, legendY, overlay.color) + 8;
   }
   const bodyWidth = Math.min(10,Math.max(1,step * .55));
-  const volumeMax = Math.max(1,...shown.map(bar=>bar[5]));
+  const volumeMax = shown.reduce((max, bar) => Math.max(max,bar[5]),1);
   const [gain, loss] = options.greenUp ? ["#57c49e","#eb4e79"] : ["#eb4e79","#57c49e"];
   const continuous = ["line","area","baseline"].includes(options.type);
   for (let i=0;i<priceBars.length;i+=1) {

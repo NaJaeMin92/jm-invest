@@ -27,30 +27,44 @@ export function setupPendingOrders(call, available, kinds) {
     price.value = amend ? row.price : "";
     next.textContent = amend ? "정정 내용 확인" : "취소 내용 확인";
     next.disabled = false;
+    price.readOnly = false;
     panel.hidden = true;
     form.hidden = false;
     status.textContent = "";
     (amend ? price : next).focus();
+    if (!amend) form.requestSubmit();
   }
 
   function draw(rows) {
     const elements = rows.map(row => {
       const item = document.createElement("li");
-      const name = document.createElement("strong"), details = document.createElement("small");
-      name.textContent = row.symbol + " · " + ({buy:"매수", sell:"매도"}[row.side] ?? "주문");
-      details.textContent = [kinds.get(row.kind) || row.kindName, row.price && "$" + row.price,
-        "잔여 " + row.remaining + "주", row.time, "주문번호 " + row.number].filter(Boolean).join(" · ");
-      const identity = document.createElement("div");
-      identity.append(name, details);
-      item.append(identity);
-      for (const [type, label, enabled] of [["amend","정정",row.canAmend], ["cancel","취소",row.canCancel]]) {
-        if (!enabled) continue;
+      const name = document.createElement("strong"), side = document.createElement("span"), remaining = document.createElement("b");
+      const identity = document.createElement("header"), terms = document.createElement("p"), details = document.createElement("small");
+      name.textContent = row.symbol;
+      side.textContent = {buy:"매수", sell:"매도"}[row.side] ?? "주문";
+      side.dataset.side = row.side || "";
+      remaining.textContent = "잔여 " + row.remaining.toLocaleString("ko-KR") + "주";
+      identity.append(name, side, remaining);
+      terms.textContent = [kinds.get(row.kind) || row.kindName, row.price && "$" + row.price].filter(Boolean).join(" · ");
+      details.textContent = [row.time,"주문번호 " + row.number].filter(Boolean).join(" · ");
+      const actions = document.createElement("div");
+      actions.className = "pending-row-actions";
+      item.append(identity, terms, details, actions);
+      for (const [type, label, enabled] of [["amend","가격 정정",row.canAmend], ["cancel","주문 취소",row.canCancel]]) {
+        if (type === "amend" && !enabled) continue;
         const button = document.createElement("button");
         button.type = "button";
+        button.disabled = !enabled;
+        button.dataset.action = type;
         button.textContent = label;
         button.setAttribute("aria-label", row.symbol + " 주문 " + row.number + " " + label);
         button.onclick = () => edit(row, type);
-        item.append(button);
+        actions.append(button);
+      }
+      if (!row.canCancel) {
+        const reason = document.createElement("small");
+        reason.textContent = row.cancelReason || "키움에서 취소 가능 여부를 확인할 수 없습니다.";
+        item.append(reason);
       }
       return item;
     });
@@ -72,7 +86,7 @@ export function setupPendingOrders(call, available, kinds) {
       const result = await call("pending");
       if (id !== version || !dialog.open) return;
       draw(result.orders);
-      status.textContent = [receipt, result.orders.length ? "" : "미체결 주문이 없습니다."].filter(Boolean).join(" · ");
+      status.textContent = [receipt, result.orders.length ? "" : "현재 취소할 미체결 주문이 없습니다."].filter(Boolean).join(" · ");
     } catch (error) {
       if (id === version) {
         list.replaceChildren();

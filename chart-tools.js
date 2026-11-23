@@ -355,6 +355,14 @@ export function setupChartTools({redraw,moveTo,getView,alternatives,loadComparis
   dialog.addEventListener("cancel",event=>event.stopPropagation());
   dialog.addEventListener("close",()=>{compareRequest+=1;});
   return {
+    extendSeries(next) {
+      if (replay) {
+        const stamp = series.bars[replay.end - 1]?.[0];
+        const index = next.bars.findIndex(bar => bar[0] >= stamp);
+        if (index >= 0) replay.end = index + 1;
+      }
+      series = next;
+    },
     updateSeries(next, nextSymbol, nextFrame) {
       comparison = null;
       compareRequest += 1;
