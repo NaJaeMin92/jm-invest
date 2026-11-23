@@ -1,6 +1,6 @@
 import {setupWatchEditor} from "./watch-editor.js?v=49";
 import {setupOrders} from "./orders.js?v=74";
-import { setupInstrument, sparkline } from "./instrument.js?v=75";
+import { setupInstrument, sparkline } from "./instrument.js?v=76";
 import {loadWatchSentiment} from "./market-panels.js?v=68";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -53,7 +53,7 @@ const navButtons = [...navigation.querySelectorAll("button")];
 function selectView(view) {
   const needsLogin = view !== "home" && !token;
   document.body.dataset.view = view;
-  setDetail(false);
+  setDetail(view === "account" && !needsLogin);
   login.hidden = !needsLogin;
   workspace.hidden = needsLogin;
   message.textContent = "";
@@ -138,7 +138,7 @@ document.querySelector("#logout").addEventListener("click", () => {
   document.querySelector("#profit-updated").textContent = "";
   document.querySelector("#profit-total").textContent = "Awaiting sync";
   workspace.hidden = true;
-  document.querySelector("#kiwoom-value").textContent = "";
+  document.querySelector("#account-performance").hidden = true;
   document.querySelector("#portfolio-value").textContent = "";
   document.querySelector("#kiwoom-return").textContent = "";
   renderWatchlist();
@@ -159,50 +159,81 @@ function tradedQuantity(bought, sold) {
   return (Number(bought) + Number(sold)).toLocaleString("ko-KR") + "주";
 }
 
+const holdingSort = document.getElementById("holding-sort");
+const signedWon = new Intl.NumberFormat("ko-KR", {style:"currency", currency:"KRW", signDisplay:"exceptZero"});
+
+function showPerformance(node, value, format) {
+  node.textContent = numeric(value) ? format(Number(value)) : "—";
+  if (numeric(value) && Number(value) !== 0) node.dataset.direction = Number(value) > 0 ? "up" : "down";
+  else delete node.dataset.direction;
+}
+
+function sortHoldings() {
+  const key = holdingSort.value === "value" ? "valuation" : "rate";
+  const direction = holdingSort.value === "low" ? 1 : -1;
+  const items = [...holdingsList.children];
+  items.sort((a,b) => {
+    const x = a.dataset[key], y = b.dataset[key];
+    if (x == null || y == null) return Number(x == null) - Number(y == null);
+    return direction * (Number(x) - Number(y));
+  });
+  holdingsList.append(...items);
+}
+holdingSort.onchange = sortHoldings;
+
 function showHoldings(balance) {
   holdingsList.replaceChildren();
   const holdings = balance?.holdings;
-  document.getElementById("holding-count").textContent = Array.isArray(holdings) ? holdings.length + "종목" : "";
-  if (!holdings?.length) {
+  const hasRows = Array.isArray(holdings) && holdings.length > 0;
+  document.getElementById("holding-count").textContent = Array.isArray(holdings) ? holdings.length : "";
+  document.getElementById("holding-columns").hidden = !hasRows;
+  holdingSort.hidden = !hasRows || holdings.length < 2;
+  if (!hasRows) {
     const item = document.createElement("li");
     item.textContent = Array.isArray(holdings) ? "보유 중인 미국주식이 없습니다." : "잔고 동기화 대기";
     holdingsList.append(item);
     return;
   }
-  for (const holding of [...holdings].sort((a,b) => Number(b.value_krw) - Number(a.value_krw))) {
-    const item = document.createElement("li"), head = document.createElement("header");
-    item.className = "position-card";
-    head.className = "position-head";
-    const name = document.createElement("strong"), ticker = document.createElement("span");
-    name.textContent = holding.symbol || holding.name;
-    ticker.textContent = holding.name !== holding.symbol ? holding.name : "";
-    head.append(name, ticker);
+  for (const holding of holdings) {
+    const item = document.createElement("li"), details = document.createElement("details");
+    const head = document.createElement("summary");
+    head.className = "position-line";
+    if (numeric(holding.value_krw)) item.dataset.valuation = holding.value_krw;
+    if (numeric(holding.return_pct)) item.dataset.rate = holding.return_pct;
+    const identity = document.createElement("span"), symbol = document.createElement("strong"), company = document.createElement("small");
+    identity.className = "position-identity";
+    symbol.textContent = holding.symbol || holding.name || "—";
+    company.textContent = holding.name !== symbol.textContent ? holding.name || "" : "";
+    identity.append(symbol,company);
+    const profit = document.createElement("span"), rate = document.createElement("strong");
+    rate.className = "position-rate";
+    showPerformance(profit,holding.profit_krw,signedWon.format);
+    showPerformance(rate,holding.return_pct,signedWatchPercent);
+    head.append(identity,profit,rate);
+    head.setAttribute("aria-label", [symbol.textContent, company.textContent, "평가손익 " + profit.textContent, "수익률 " + rate.textContent].filter(Boolean).join(", "));
+
     const metrics = document.createElement("dl");
     metrics.className = "holding-values";
     const weight = numeric(holding.value_krw) && Number(balance.value_krw) > 0
       ? (100 * Number(holding.value_krw) / Number(balance.value_krw)).toFixed(2) + "%" : "—";
-    for (const [label, value, role, signedValue] of [
-      ["평가금액", formatHolding(holding.value_krw, holdingKRW), "valuation"],
-      ["평가손익", formatHolding(holding.profit_krw, holdingKRW), "profit", holding.profit_krw],
-      ["수익률", numeric(holding.return_pct) ? signedWatchPercent(Number(holding.return_pct)) : "—", "return", holding.return_pct],
+    for (const [label,value] of [
       ["보유수량", numeric(holding.quantity) ? Number(holding.quantity).toLocaleString("ko-KR", {maximumFractionDigits:8}) + "주" : "—"],
-      ["매입금액", formatHolding(holding.cost_krw, holdingKRW)],
-      ["매입가", formatHolding(holding.cost_price, holdingUSD)], ["현재가", formatHolding(holding.current_price, holdingUSD)],
-      ["전일 거래수량", tradedQuantity(holding.previous_buy_qty, holding.previous_sell_qty)],
-      ["금일 거래수량", tradedQuantity(holding.today_buy_qty, holding.today_sell_qty)], ["주식 내 비중", weight, "weight"]
+      ["주식 내 비중",weight], ["매입가",formatHolding(holding.cost_price,holdingUSD)],
+      ["현재가",formatHolding(holding.current_price,holdingUSD)], ["매입금액",formatHolding(holding.cost_krw,holdingKRW)],
+      ["평가금액",formatHolding(holding.value_krw,holdingKRW)], ["전일 거래수량",tradedQuantity(holding.previous_buy_qty,holding.previous_sell_qty)],
+      ["금일 거래수량",tradedQuantity(holding.today_buy_qty,holding.today_sell_qty)]
     ]) {
       const cell = document.createElement("div"), term = document.createElement("dt"), data = document.createElement("dd");
       term.textContent = label;
       data.textContent = value;
-      if (role) cell.className = "position-" + role;
-      if (role === "weight" && weight !== "—") cell.style.setProperty("--weight", weight);
-      if (numeric(signedValue) && Number(signedValue) !== 0) data.dataset.direction = Number(signedValue) < 0 ? "down" : "up";
-      cell.append(term, data);
+      cell.append(term,data);
       metrics.append(cell);
     }
-    item.append(head, metrics);
+    details.append(head,metrics);
+    item.append(details);
     holdingsList.append(item);
   }
+  sortHoldings();
 }
 
 function showProfit(data) {
@@ -727,8 +758,9 @@ fetch("./assets/symbols.json").then((response) => {
 
 async function loadValuation(accessToken) {
   const value = document.querySelector("#portfolio-value");
-  const performance = document.querySelector("#kiwoom-return"), accountValue = document.querySelector("#kiwoom-value");
-  accountValue.hidden = true;
+  const performance = document.querySelector("#kiwoom-return");
+  const performanceRow = document.querySelector("#account-performance");
+  performanceRow.hidden = true;
   value.textContent = "조회 중…";
   performance.textContent = "";
   showHoldings(null);
@@ -755,10 +787,9 @@ async function loadValuation(accessToken) {
     const candidate = estimate == null || !hasCash ? null : Number(estimate) - stocks - cash;
     const rp = candidate != null && Number.isFinite(candidate) && candidate >= 0 ? candidate : null;
     const total = rp == null ? stocks + cash : Number(estimate);
-    value.textContent = accountValue.textContent = won.format(total);
-    accountValue.hidden = false;
-    performance.dataset.direction = Number(balance.return_pct) < 0 ? "down" : "up";
-    performance.textContent = numeric(balance.return_pct) ? "수익률 " + signedWatchPercent(Number(balance.return_pct)) : "";
+    value.textContent = won.format(total);
+    performanceRow.hidden = !numeric(balance.return_pct);
+    showPerformance(performance,balance.return_pct,signedWatchPercent);
     showHoldings(balance);
 
     showProfit(balance.realized_profit);

@@ -396,7 +396,8 @@ body.instrument-open { overflow:hidden; }
 .instrument-tabs [aria-current] { font-weight:700; }
 .instrument-tabs [aria-current]::after { content:""; position:absolute; height:3px; width:16px; background:#3789ef; bottom:2px; border-radius:3px; }
 #chart-area { width:100%; background:#10172a; }
-#market-chart,#daily-reference { width:100%; display:block; aspect-ratio:1206/1068; }
+#market-chart { width:100%; display:block; aspect-ratio:1206/1068; }
+#market-chart.with-rsi { aspect-ratio:1/1.06; }
 #external-chart iframe { width:100%; border:0; height:min(90vw,520px); display:block; }
 .frame-bar { padding:4px 12px; gap:3px; }
 #stock-frames { flex:1; display:flex; overflow-x:auto; scrollbar-width:none; min-width:0; }
@@ -406,7 +407,6 @@ body.instrument-open { overflow:hidden; }
 #stock-detail.expanded :is(.instrument-quote,.quote-time,.instrument-tabs) { display:none; }
 #stock-detail.expanded #chart-area { max-width:900px; margin:auto; }
 #stock-detail.expanded canvas { height:calc(100dvh - 120px); aspect-ratio:auto; }
-#stock-detail.expanded #daily-reference { max-height:calc(100dvh - 120px); object-fit:contain; }
 
 /* Shared mobile surfaces for the owner workspace. */
 .trade-page:not([data-view="home"]) {
@@ -563,6 +563,11 @@ body.instrument-open { overflow:hidden; }
 .chart-tool-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
 #chart-tool-body .chart-tool-grid button { min-height:44px; }
 .chart-signal { display:flex; justify-content:space-between; gap:8px; padding:9px 0; border-top:1px solid #354768; }
+.rsi-settings fieldset { display:grid; grid-template-columns:1fr 1fr auto; align-items:end; gap:8px; margin:10px 0 2px; padding:8px 0 0; border:0; }
+.rsi-settings legend { padding:0; font-size:14px; font-weight:650; }
+.rsi-settings label { color:var(--sub); min-width:0; }
+#chart-tool-body .rsi-settings input { min-width:0; font-size:16px; }
+#chart-tool-body .rsi-settings button { background:#304a69; }
 
 .sigma-calculator { margin-top:18px; color:var(--sub); font-size:13px; }
 .sigma-calculator summary { color:#c5dbff; cursor:pointer; padding-block:7px; }
@@ -817,30 +822,53 @@ body.instrument-open { overflow:hidden; }
 #pending-action .pending-buttons { margin-top:auto; padding-top:10px; }
 #pending-orders #pending-next { background:#c8d7ec; color:#172435; flex:1.7; }
 #pending-orders [data-action="cancel"] #pending-next { background:#e6b6b3; color:#342222; }
-.holdings-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.holdings-heading h3 { margin:0; font-size:18px; }
-#account-holdings { padding:12px 0; }
+#account-home .total-row {
+  display:block; margin:0 0 7px; padding:22px 20px; border:1px solid #2d3b51;
+  border-radius:18px; background:linear-gradient(115deg,#1d2c42,#172236);
+}
+#account-home .balance-summary h2 { margin:0 0 6px; color:#b6c2d3; font-size:14px; font-weight:550; }
+#account-home .portfolio-value { display:block; font-size:clamp(28px,7vw,40px); letter-spacing:-.045em; line-height:1.16; }
+#account-performance { display:flex; align-items:baseline; gap:9px; margin:12px 0 0; color:#b1bece; font-size:13px; }
+#account-performance strong { color:var(--text); font-variant-numeric:tabular-nums; }
+#account-home [data-direction="up"] { color:#ff9fae; }
+#account-home [data-direction="down"] { color:#75d8bb; }
+#account-home .broker-row { min-height:60px; grid-template-columns:32px 1fr auto; }
+#account-home .broker-logo { width:32px; height:32px; }
+#account-home .broker-name strong { font-size:15px; }
 #open-kiwoom .account-chevron { transform:rotate(90deg); }
 #open-kiwoom[aria-expanded="true"] .account-chevron { transform:rotate(-90deg); }
-#holding-count { color:#aebdd1; font-size:13px; font-variant-numeric:tabular-nums; }
-#holdings-list .position-card { display:block; margin:10px 0 14px; padding:16px; border:1px solid #2a384f; border-radius:16px; background:#141f32; }
-.position-head { display:grid; gap:2px; padding:0 0 13px; border:0; background:transparent; }
-.position-head strong { font-size:20px; line-height:1.2; letter-spacing:-.025em; }
-.position-head span { font-size:12px; color:#b0bfd4; }
-#holdings-list .holding-values { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:16px; row-gap:12px; padding:0; margin:0; border:0; }
+#account-holdings { padding:12px 0 8px; }
+.holdings-heading { display:flex; justify-content:space-between; align-items:center; min-height:44px; gap:8px; }
+.holdings-heading h3 { margin:0; font-size:19px; letter-spacing:-.035em; }
+#holding-count { color:#9eafc6; font-size:14px; font-variant-numeric:tabular-nums; }
+#holding-sort { min-height:44px; max-width:55%; padding-inline:4px; background:transparent; border:0; color:#bdc8d9; font:inherit; font-size:13px; }
+.position-line {
+  display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(74px,.7fr) 9px;
+  align-items:center; column-gap:clamp(4px,1.3vw,10px); text-align:right; font-variant-numeric:tabular-nums;
+}
+.position-line > :first-child { text-align:left; }
+#holding-columns { padding:6px 6px 10px; color:#aebbd0; font-size:12px; }
+#holdings-list { margin:0; border-top:1px solid var(--line); }
+#holdings-list > li { margin:0; padding:0; border-bottom:1px solid var(--line); white-space:normal; }
+#holdings-list > li:not(:has(details)) { padding:18px 6px; color:var(--muted); font-size:14px; }
+#holdings-list summary { list-style:none; min-height:62px; padding:9px 6px; cursor:pointer; font-size:clamp(12px,3.45vw,15px); }
+#holdings-list summary::-webkit-details-marker { display:none; }
+#holdings-list summary::after { content:""; width:6px; height:6px; border-right:1.5px solid #9aa8bb; border-bottom:1.5px solid #9aa8bb; transform:rotate(45deg); justify-self:center; }
+#holdings-list details[open] summary::after { transform:rotate(225deg); }
+.position-identity { display:grid; min-width:0; gap:3px; }
+.position-identity strong { font-size:clamp(15px,4.1vw,18px); letter-spacing:-.025em; }
+.position-identity small { color:var(--muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.position-rate { justify-self:end; padding:4px 6px; background:#1c2739; border-radius:7px; line-height:1.3; white-space:nowrap; }
+.position-rate[data-direction="up"] { background:#322735; }
+.position-rate[data-direction="down"] { background:#192f34; }
+#holdings-list .holding-values { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:0 0 10px; padding:14px; border:0; border-radius:12px; background:#182337; }
 #holdings-list dl.holding-values > div { display:grid; gap:3px; min-width:0; text-align:left; }
-.holding-values dt { color:#b0bed2; font-size:12px; }
-.holding-values dd { margin:0; font-size:14px; line-height:1.3; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
-.holding-values .position-valuation { grid-column:1/-1; border-top:1px solid #2b374a; padding-top:12px; }
-.holding-values .position-valuation dd { font-size:clamp(22px,5vw,28px); letter-spacing:-.04em; }
-.holding-values :is(.position-profit,.position-return) { border-bottom:1px solid #2b374a; padding-bottom:12px; }
-#holdings-list dl.holding-values > .position-weight { grid-column:1/-1; display:grid; grid-template-columns:1fr auto; gap:7px; }
-.position-weight::after { content:""; grid-column:1/-1; height:4px; border-radius:3px; background:linear-gradient(to right,#8daff2 var(--weight,0%),#2a3850 var(--weight,0%)); }
+.holding-values dt { color:#adbbcf; font-size:12px; }
+.holding-values dd { margin:0; color:var(--text); font-size:14px; font-variant-numeric:tabular-nums; }
 #chart-all,#chart-history-retry { min-height:32px; padding:3px 7px; font-size:12px; color:#9bc7ff; }
 #chart-all[aria-pressed="true"] { color:white; background:#2d4871; }
 #chart-session-picker { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:6px 16px; color:var(--sub); font-size:12px; }
 #chart-session-date { width:auto; min-height:38px; padding:4px 8px; color:var(--txt); background:#19263c; color-scheme:dark; }
-#account-holdings .position-head { background:transparent; }
 @media (max-width:540px) {
   .order-sheet { inset:auto 0 0; margin:0; border:0; border-top:1px solid var(--separator); border-radius:22px 22px 0 0; padding-bottom:env(safe-area-inset-bottom); }
   #trade-preview,#pending-orders { width:100%; max-height:calc(100dvh - max(12px,env(safe-area-inset-top))); }

@@ -1,4 +1,4 @@
-import {study} from "./technical-indicators.js";
+import {study} from "./technical-indicators.js?v=76";
 import {renderAnnotations} from "./chart-annotations.js?v=58";
 
 // Bars are ordered [timestamp, open, high, low, close, volume].
@@ -100,7 +100,8 @@ export function drawChart(canvas, chart, frame, start, options) {
   }
 
   const pad = 8, top = 35, width = w - 43;
-  const axis = lower ? h * .73 : h - 19;
+  const isRsi = options.lower === "RSI";
+  const axis = lower ? h * (isRsi ? .61 : .73) : h - 19;
   const bottom = options.layers.volume ? axis - 29 : axis - 4;
   const comparison = matchingCloses(shown, options.compare, frame);
   const firstMatch = comparison.findIndex(Number.isFinite);
@@ -265,10 +266,17 @@ export function drawChart(canvas, chart, frame, start, options) {
   if (lower) {
     const lines = (lower.lines || []).map(series => ({...series,values:series.values.slice(start,end)}));
     const histogram = lower.histogram?.slice(start,end) || [];
-    const values = [...lines.flatMap(series=>series.values), ...histogram, ...(lower.levels || [])].filter(Number.isFinite);
+    const levels = (isRsi ? options.rsiLevels ?? lower.levels : lower.levels) || [];
+    const values = [...lines.flatMap(series=>series.values), ...histogram, ...levels].filter(Number.isFinite);
     const [min,max] = lower.domain || [Math.min(...values),Math.max(...values)];
     const ly = value => h - 7 - (h - axis - 36) * (value - min)/(max-min || 1);
-    for (const level of lower.levels || []) line([[pad,ly(level)],[width,ly(level)]],"#465168");
+    for (const level of levels) line([[pad,ly(level)],[width,ly(level)]],isRsi ? "#65758f" : "#465168");
+    if (isRsi) {
+      const upperY = ly(levels[1]) + 3;
+      const lowerY = Math.min(h - 3, Math.max(ly(levels[0]) + 3, upperY + 12));
+      label(String(levels[1]),width + 4,Math.min(upperY, lowerY - 12),"#b9c5da");
+      label(String(levels[0]),width + 4,lowerY,"#b9c5da");
+    }
     histogram.forEach((value,i) => {
       if (value == null) return;
       ctx.fillStyle = value >= 0 ? "#5ebaac" : "#db6f94";

@@ -1,4 +1,4 @@
-import {indicatorNames, signalsAt} from "./technical-indicators.js";
+import {defaultRsiLevels, indicatorNames, signalsAt} from "./technical-indicators.js?v=76";
 
 const get = id => document.getElementById(id);
 const types = {
@@ -28,7 +28,7 @@ const drawGroups = [
 ];
 const layers = { volume:"Volume bars", grid:"Price grid", price:"Last price line", drawings:"Drawings" };
 const initialOptions = () => ({
-  type:"candle", lower:"RSI", overlays:["EMA"],
+  type:"candle", lower:"RSI", rsiLevels:defaultRsiLevels, overlays:["EMA"],
   layers:{ volume:true, grid:true, price:true, drawings:true }, log:false, greenUp:false
 });
 const element = (tag, text) => {
@@ -62,6 +62,11 @@ function grid() {
 }
 
 const drawingKey = "tradeinsight:drawings:v2:";
+const rsiKey = "tradeinsight:rsi-levels:v1";
+function validRsiLevels(pair) {
+  return Array.isArray(pair) && pair.length === 2 && pair.every(Number.isFinite)
+    && pair[0] >= 0 && pair[0] < pair[1] && pair[1] <= 100;
+}
 function removeTestDrawings() {
   try {
     for (let i=localStorage.length-1; i>=0; i-=1) {
@@ -76,6 +81,15 @@ export function setupChartTools({redraw,moveTo,getView,alternatives,loadComparis
   const noteStatus = get("chart-tool-status"), canvas = get("market-chart"), secondCanvas = get("secondary-market-chart");
   removeTestDrawings();
   const options = initialOptions();
+  try {
+    const levels = JSON.parse(localStorage.getItem(rsiKey));
+    if (validRsiLevels(levels)) options.rsiLevels = levels;
+  } catch { /* Use the default levels if no saved preference is available. */ }
+  function setRsiLevels(levels) {
+    options.rsiLevels = levels;
+    try { localStorage.setItem(rsiKey, JSON.stringify(levels)); }
+    catch { /* Keep the preference for this session. */ }
+  }
   let selectedDrawing, moving = false;
   let series, symbol, frame, saved = [], pending, replay, timer, comparison, compareRequest = 0, section;
   function store() {
@@ -225,6 +239,23 @@ export function setupChartTools({redraw,moveTo,getView,alternatives,loadComparis
     },
     indicators() {
       const onPrice = grid(), below = grid();
+      const form = get("rsi-settings-template").content.firstElementChild.cloneNode(true);
+      const low = form.elements.low, high = form.elements.high;
+      [low.value, high.value] = options.rsiLevels;
+      form.hidden = options.lower !== "RSI";
+      form.oninput = () => high.setCustomValidity("");
+      form.onsubmit = event => {
+        event.preventDefault();
+        const levels = [low.valueAsNumber, high.valueAsNumber];
+        if (!validRsiLevels(levels)) {
+          high.setCustomValidity("Upper must be greater than lower.");
+          high.reportValidity();
+          return;
+        }
+        setRsiLevels(levels);
+        dialog.close();
+        update();
+      };
       for (const name of overlays) onPrice.append(button(indicatorNames[name], event => {
         const selected = !options.overlays.includes(name);
         options.overlays = selected ? [...options.overlays,name] : options.overlays.filter(value=>value!==name);
@@ -233,10 +264,11 @@ export function setupChartTools({redraw,moveTo,getView,alternatives,loadComparis
       },options.overlays.includes(name)));
       for (const name of lower) below.append(button(indicatorNames[name] || "None",()=>{
         options.lower = options.lower === name ? "none" : name;
+        form.hidden = options.lower !== "RSI";
         [...below.children].forEach((control,index) => control.setAttribute("aria-pressed",String(lower[index]===options.lower)));
         update();
       },options.lower===name));
-      body.append(element("h4","On the price chart"),onPrice,element("h4","Below the chart"),below);
+      body.append(form,element("h4","On the price chart"),onPrice,element("h4","Below the chart"),below);
     },
     draw() {
       const note = document.createElement("input");
@@ -287,7 +319,7 @@ export function setupChartTools({redraw,moveTo,getView,alternatives,loadComparis
       const index = Math.min(start + windowSize, replay?.end ?? series.bars.length) - 1;
       const date = new Date(series.bars[index][0]*1000);
       body.append(element("p", date.toLocaleString("en-US",{timeZone:"America/New_York"})+" ET"));
-      for (const [label,value] of signalsAt(series,index)) {
+      for (const [label,value] of signalsAt(series,index,options.rsiLevels)) {
         const row = element("p","");
         row.className = "chart-signal";
         row.append(element("strong",label),element("span",value));
@@ -305,7 +337,7 @@ export function setupChartTools({redraw,moveTo,getView,alternatives,loadComparis
       body.append(button("Log price scale",()=>{options.log=!options.log;render("settings");update();},options.log));
       body.append(button("Green up candles",()=>{options.greenUp=!options.greenUp;render("settings");update();},options.greenUp));
       body.append(button("Reset chart appearance",()=>{
-        Object.assign(options,initialOptions());render("settings");update();
+        Object.assign(options,initialOptions());setRsiLevels(defaultRsiLevels);render("settings");update();
       }));
     }
   };
@@ -376,11 +408,6 @@ export function setupChartTools({redraw,moveTo,getView,alternatives,loadComparis
       stopMode();
     },
     pause:stopTimer,
-    canUseSnapshot() {
-      return options.type==="candle" && options.lower==="RSI" && options.overlays.length===1 && options.overlays[0]==="EMA"
-        && Object.values(options.layers).every(Boolean) && !options.log && !options.greenUp
-        && !saved.length && !pending && !comparison && !replay;
-    },
     chartOptions() {
       const marks = replay
         ? saved.filter(mark => mark.points.every(point => point.time <= series.bars[replay.end-1][0]))

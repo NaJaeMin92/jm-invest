@@ -23,6 +23,7 @@ const midpoint = (bars, index, period) => {
   return (Math.max(...span.map(bar => bar[2])) + Math.min(...span.map(bar => bar[3]))) / 2;
 };
 const overlay = (label, color, values) => ({ label, color, values });
+export const defaultRsiLevels = Object.freeze([30, 70]);
 export const indicatorNames = {
   EMA: "EMA · 5, 10, 20, 200", MA: "SMA · 20", BOLL: "Bollinger Bands · 20, 2",
   IC: "Ichimoku · 9, 26, 52", VWAP: "VWAP · visible window", VP: "Volume profile · by close",
@@ -52,7 +53,7 @@ export function study(chart, name) {
       overlay("Span A", "#56c6ab", bars.map((_, i) => delayed(i, j => kijun[j] == null ? null : (tenkan[j] + kijun[j]) / 2))),
       overlay("Span B", "#dd7f98", bars.map((_, i) => midpoint(bars, i - 26, 52)))];
   }
-  if (name === "RSI") result = { lines: [overlay("RSI14", "#5eacff", chart.strength)], domain: [0, 100], levels: [30, 70] };
+  if (name === "RSI") result = { lines: [overlay("RSI14", "#5eacff", chart.strength)], domain: [0, 100], levels: defaultRsiLevels };
   if (name === "VOL") result = { histogram: bars.map(bar => bar[5]), levels: [0] };
   if (name === "ROC") result = { lines: [overlay("ROC12", "#85c3ff",
     closes.map((close, i) => i >= 12 && closes[i - 12] !== 0 ? (close / closes[i - 12] - 1) * 100 : null))], levels: [0] };
@@ -80,13 +81,13 @@ export function study(chart, name) {
   return result;
 }
 
-export function signalsAt(chart, index) {
+export function signalsAt(chart, index, [lower, upper] = defaultRsiLevels) {
   const [macd, signal] = study(chart, "MACD").lines.map(line => line.values);
   const macdChange = index > 0 && signal[index - 1] != null && signal[index] != null
     ? [macd[index - 1] - signal[index - 1], macd[index] - signal[index]] : null;
   const rsi = chart.strength[index];
   return [
-    ["RSI", rsi == null ? "Insufficient history" : rsi.toFixed(1) + (rsi >= 70 ? " · Overbought" : rsi <= 30 ? " · Oversold" : " · Neutral")],
+    ["RSI", rsi == null ? "Insufficient history" : rsi.toFixed(1) + (rsi >= upper ? " · Overbought" : rsi <= lower ? " · Oversold" : " · Neutral")],
     ["MACD", !macdChange ? "Insufficient history" : macdChange[1] > 0 && macdChange[0] <= 0 ? "Bullish crossover"
       : macdChange[1] < 0 && macdChange[0] >= 0 ? "Bearish crossover" : "No crossover on this candle"],
   ];

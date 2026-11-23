@@ -1,7 +1,7 @@
-import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=73";
+import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=76";
 import {showMarketPanel} from "./market-panels.js?v=68";
 
-import {setupChartTools} from "./chart-tools.js?v=73";
+import {setupChartTools} from "./chart-tools.js?v=76";
 import {orderKinds, needsPrice, populateKinds} from "./orders.js?v=74";
 
 const get = id => document.getElementById(id);
@@ -52,7 +52,7 @@ function mergeDaily(oldBars, newBars) {
 }
 
 export function setupInstrument({search,nameFor,readList,saveList,orders,subscribeOrderBook,canLoadChart,loadChart,signIn}) {
-  const dialog=get("stock-detail"), canvas=get("market-chart"), reference=get("daily-reference");
+  const dialog=get("stock-detail"), canvas=get("market-chart");
   let current="", quote=null, frame="day", afterClose=null, quoteRequest=0;
   const fullHistory = new Map();
   let historyAbort, historyState = "", rangeMode = "";
@@ -464,12 +464,10 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
   function draw() {
     area.classList.toggle("moving-drawing",tools.drawingOptions());
     if (!chart || !chart.bars.length || !dialog.open) return;
-    const snapshot = current === "SKHY" && !quote?.fromKiwoom && frame === "day" && start === lastStart
-      && windowSize === visibleBars && tools.canUseSnapshot();
-    reference.hidden = !snapshot;
-    canvas.hidden = snapshot;
     const options = {...tools.chartOptions(), windowSize};
-    geometry = snapshot ? null : drawChart(canvas, chart, frame, start, options);
+    canvas.hidden = false;
+    canvas.classList.toggle("with-rsi", options.lower === "RSI");
+    geometry = drawChart(canvas, chart, frame, start, options);
     const end = Math.min(options.end ?? chart.bars.length, start + windowSize) - 1;
     drawSecondary(start,end,options);
     const dates = [start, end].map(i => dateFormat.format(chart.bars[i][0] * 1000));
@@ -637,7 +635,6 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
       get("chart-history-retry").hidden = isIntraday(frame) || historyState !== "Partial history";
       draw();
     } else {
-      reference.hidden = true;
       canvas.hidden = true;
       get("dual-market-chart").hidden = true;
     }
@@ -776,7 +773,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     get("stock-quote-source").hidden = true;
     get("stock-chart-sign-in").hidden = true;
     get("external-chart").replaceChildren();get("external-chart").hidden=true;
-    canvas.hidden=true;reference.hidden=true;get("stock-frames").hidden=true;
+    canvas.hidden=true;get("stock-frames").hidden=true;
     setFavorite();setFrame("day");
     await loadInstrumentQuote(symbol);
   }

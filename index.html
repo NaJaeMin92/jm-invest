@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=75">
-<script type="module" src="./journal.js?v=75"></script>
+<link rel="stylesheet" href="./style.css?v=76">
+<script type="module" src="./journal.js?v=76"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header><div class="head"><a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -56,19 +56,21 @@
 <div id="tab-account" hidden>
 <section id="account-home" aria-label="투자 계좌" lang="ko">
 <div class="total-row">
-<span class="ledger-icon" aria-hidden="true"><i></i><i></i><i></i></span>
 <div class="balance-summary">
 <h2>총 투자 자산</h2>
 <strong id="portfolio-value" class="portfolio-value">조회 중…</strong>
+<p id="account-performance" hidden>보유주식 수익률 <strong id="kiwoom-return"></strong></p>
 </div>
 </div>
 <button class="broker-row" id="open-kiwoom" type="button" aria-expanded="false" aria-controls="account-holdings">
 <img class="broker-logo" src="./assets/kiwoom-global.jpg" width="44" height="44" alt="">
-<span class="broker-name"><strong id="kiwoom-value" hidden></strong><span class="broker-caption">키움증권 <small id="kiwoom-return"></small></span></span>
+<span class="broker-name"><strong>키움증권</strong></span>
 <span class="account-chevron" aria-hidden="true">›</span>
 </button>
 <section id="account-holdings" aria-label="미국주식 보유종목" hidden>
-<div class="holdings-heading"><h3>보유종목</h3><span id="holding-count"></span></div>
+<div class="holdings-heading"><h3>보유종목 <span id="holding-count"></span></h3>
+<select id="holding-sort" aria-label="보유종목 정렬" hidden><option value="value">평가금액순</option><option value="high">수익률 높은 순</option><option value="low">수익률 낮은 순</option></select></div>
+<div id="holding-columns" class="position-line" aria-hidden="true" hidden><span>종목</span><span>평가손익</span><span>수익률</span></div>
 <ul id="holdings-list"></ul>
 </section>
 <div class="broker-row">
@@ -174,7 +176,6 @@
 </div>
 <p id="drawing-move-hint" hidden>Drag to move the drawing</p>
 </div>
-<img draggable="false" id="daily-reference" src="./assets/quotes/skhy-daily.webp" alt="SKHY daily candlesticks, exponential moving averages, volume and RSI from the November 20 reference chart" hidden>
 <canvas id="market-chart" role="img" aria-label="Candlesticks, volume and RSI"></canvas><div id="external-chart" hidden></div><p id="chart-status" role="status" hidden></p></div>
 <figure id="dual-market-chart" hidden><figcaption id="dual-market-caption"></figcaption><canvas id="secondary-market-chart" role="img" aria-label="Second symbol chart"></canvas></figure>
 <div id="chart-history" hidden>
@@ -318,6 +319,12 @@
 <div class="chart-tool-head"><h3 id="chart-tool-title"></h3><button type="button" id="chart-tool-close" aria-label="Close chart tools">×</button></div>
 <div id="chart-tool-body"></div>
 </dialog>
+<template id="rsi-settings-template">
+<form class="rsi-settings"><fieldset><legend>RSI levels</legend>
+<label>Lower<input name="low" type="number" min="0" max="100" step="0.1" inputmode="decimal" required></label>
+<label>Upper<input name="high" type="number" min="0" max="100" step="0.1" inputmode="decimal" required></label>
+<button type="submit">Apply</button></fieldset></form>
+</template>
 </div></dialog>
 <nav id="bottom-nav" lang="en" aria-label="Main navigation">
 <button type="button" data-view="home" aria-current="page"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path fill="currentColor" stroke="none" d="M12 21 2.7 12A5.8 5.8 0 0 1 12 5 5.8 5.8 0 0 1 21.3 12Z"/></svg><span>Watchlists</span></button>
