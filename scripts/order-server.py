@@ -15,7 +15,7 @@ import stat
 from threading import Event, Lock, Thread
 import time
 from urllib.error import HTTPError
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -144,6 +144,32 @@ class Kiwoom:
                 daily.append({"date": row["dt"], "change": change, "price": price})
         return {"symbol": item["symbol"], "daily": daily} if daily else None
 
+    def order_context(self, symbol):
+        token = self.access_token()
+        directory = self.symbol_directory(token)
+        ticker = next((candidate for candidate in (symbol, symbol.replace("-", "."), symbol.replace(".", "-"))
+                       if candidate in directory), None)
+        if ticker is None:
+            raise Problem(404, "키움 미국주식 주문을 지원하지 않는 종목입니다.")
+        item = {"jmcode": ticker, "stex_tp": directory[ticker]}
+        context = {"symbol": ticker, "exchange": item["stex_tp"]}
+        for transaction in ("usa20101", "usa20100"):
+            try:
+                result = self.market_quote(token, item, transaction)
+            except (OSError, ValueError):
+                continue
+            if str(result.get("return_code")) != "0":
+                continue
+            if transaction == "usa20101":
+                context.update(price=positive_quote(result.get("cur_prc")),
+                               date=str(result.get("dt") or ""), time=str(result.get("bid_tm") or ""),
+                               asks=order_book_levels(result, "sel"), bids=order_book_levels(result, "buy"))
+            else:
+                context["fx"] = positive_quote(result.get("base_exrt"))
+                if not context.get("price"):
+                    context["price"] = positive_quote(result.get("cur_prc"))
+        return context
+
     def submit(self, token, order):
         tr = "ust20000" if order["side"] == "buy" else "ust20001"
         return read_json(KIWOOM + "/api/us/ordr", {"api-id": tr, "Authorization": "Bearer " + token}, {
@@ -261,6 +287,24 @@ def kiwoom_ticks(socket, items, timeout_error):
                        "date": values.get("22"), "session": values.get("290")}
 
 
+def positive_quote(raw):
+    try:
+        value = abs(float(raw))
+    except (ValueError, TypeError):
+        return None
+    return value if math.isfinite(value) and value > 0 else None
+
+
+def order_book_levels(result, side):
+    levels = []
+    for index in range(1, 11):
+        field = f"{side}_{index}bid"
+        price = positive_quote(result.get(field))
+        if price is not None:
+            levels.append({"price": price, "quantity": positive_quote(result.get(field + "_req"))})
+    return levels
+
+
 def seed_kiwoom_quotes(broker, token, items, snapshots, stopped):
     for read_quote in (broker.current_quote, broker.daily_quote):
         for item in items:
@@ -343,8 +387,11 @@ class App(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self.allowed_host():
             return
-        if not self.quotes_only and urlsplit(self.path).path == "/api/orders/status":
+        path = urlsplit(self.path)
+        if not self.quotes_only and path.path == "/api/orders/status":
             self.handle_order("status")
+        elif not self.quotes_only and path.path == "/api/orders/context":
+            self.handle_order_context(parse_qs(path.query).get("symbol", [""])[0])
         else:
             self.serve_static(True)
 
@@ -499,6 +546,19 @@ class App(BaseHTTPRequestHandler):
             self.write_json(400, {"message": "주문 데이터를 확인하세요."})
         except (OSError, sqlite3.Error):
             self.write_json(503, {"message": "요청 상태를 확인하지 못했습니다. 전송한 경우 키움 주문 내역을 확인하세요."})
+
+    def handle_order_context(self, symbol):
+        try:
+            owner_session(self.headers.get("Authorization"))
+            if self.quote_broker is None:
+                raise Problem(503, "키움 시세 서버가 연결되어 있지 않습니다.")
+            if not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,11}", symbol):
+                raise Problem(400, "종목 코드를 확인하세요.")
+            self.write_json(200, {**self.quote_broker.order_context(symbol), "enabled": self.orders is not None})
+        except Problem as error:
+            self.write_json(error.status, {"message": str(error)})
+        except (OSError, ValueError):
+            self.write_json(503, {"message": "키움 주문 정보를 불러오지 못했습니다."})
 
     def write_json(self, status, result):
         content = json.dumps(result, ensure_ascii=False).encode()

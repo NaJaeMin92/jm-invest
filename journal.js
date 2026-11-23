@@ -1,6 +1,7 @@
 import {setupWatchEditor} from "./watch-editor.js?v=49";
-import {setupOrders} from "./orders.js?v=55";
-import { setupInstrument, sparkline } from "./instrument.js?v=64";
+import {setupOrders} from "./orders.js?v=67";
+import { setupInstrument, sparkline } from "./instrument.js?v=67";
+import {loadWatchSentiment} from "./market-panels.js?v=67";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
 const service = "https://mfycpprqyaidoixytdim.supabase.co";
@@ -320,6 +321,11 @@ function showProfit(data) {
 
 const watchKey = "jm-invest:watchlist:v1";
 const watchList = document.querySelector("#home-holdings");
+const watchSentiment = document.querySelector("#watch-sentiment");
+const watchSentimentScore = document.querySelector("#watch-sentiment-score");
+const watchSentimentRating = document.querySelector("#watch-sentiment-rating");
+const watchSentimentSource = document.querySelector("#watch-sentiment-source");
+const watchSentimentMarker = document.querySelector("#watch-sentiment-marker");
 const watchStatus = document.querySelector("#home-value");
 const watchForm = document.querySelector("#watch-form");
 // Preserve the existing logos and default watchlist.
@@ -490,6 +496,16 @@ async function syncKiwoomQuotes() {
 let lastWatchSession;
 function refreshWatchlistQuotes() {
   if (!document.hidden && document.body.dataset.view === "home") {
+    loadWatchSentiment(({score, rating, angle, saved}) => {
+      watchSentimentScore.textContent = score;
+      watchSentimentRating.textContent = rating || "Rating unavailable";
+      watchSentimentRating.dataset.rating = rating.toLowerCase();
+      watchSentimentSource.textContent = saved ? "CNN · Saved" : "CNN";
+      watchSentimentMarker.style.setProperty("--angle", `${angle}deg`);
+      watchSentimentMarker.hidden = false;
+    }).catch(() => {
+      watchSentimentRating.textContent = "Unavailable";
+    });
     const session = usMarketSession();
     const sessionKey = session.date + session.phase;
     if (lastWatchSession !== sessionKey) {
@@ -503,7 +519,9 @@ setInterval(refreshWatchlistQuotes, 30_000);
 document.addEventListener("visibilitychange", refreshWatchlistQuotes);
 window.addEventListener("online", refreshWatchlistQuotes);
 
+const orders = setupOrders(() => token);
 const openInstrument = setupInstrument({
+  orders,
   search() {
     selectView("home");
     watchEditor.open();
@@ -543,6 +561,8 @@ function renderWatchlist() {
     kiwoomQuoteStatus.textContent = "";
   }
   symbols.sort((a, b) => {
+    const vixFirst = Number(b === "VIX") - Number(a === "VIX");
+    if (vixFirst) return vixFirst;
     const heldFirst = Number(heldWatchSymbols.has(watchSymbolKey(b))) - Number(heldWatchSymbols.has(watchSymbolKey(a)));
     if (heldFirst || !sortDirection) return heldFirst;
     const left = quotes.get(a)?.change, right = quotes.get(b)?.change;
@@ -648,6 +668,7 @@ function renderWatchlist() {
     row.append(badge, identity, chart, quote);
     watchList.append(row);
   }
+  watchList.insertBefore(watchSentiment, watchList.children[1] ?? null);
   if (focusedQuote) [...watchList.querySelectorAll(".symbol-link")].find(link => link.href === focusedQuote)
     ?.focus({preventScroll: true});
 }
@@ -838,6 +859,5 @@ async function restoreSession() {
   }
 }
 
-const orders = setupOrders(() => token);
 selectView("home");
 restoreSession();

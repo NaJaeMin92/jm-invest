@@ -19,7 +19,13 @@ The GitHub Pages build serves the public analysis site. Run the owner-only order
 python3 scripts/order-server.py --live
 ```
 
-Open `http://127.0.0.1:8765/`, sign in to **Account** and select **미국주식 주문**. The service reads the Kiwoom key and secret from the existing mode-600 `~/.jm-invest-credentials.json`. The order form accepts US whole-share limit orders. It sends a single request when you confirm the preview and displays the broker's order number. Check any uncertain submission in Kiwoom before sending a new order. The server binds to the Mac's loopback interface.
+Open `http://127.0.0.1:8765/`, sign in to **Account**, and use **매수** or **매도**
+from a stock's detail view. The ticket can load Kiwoom bid and ask levels and
+estimate the KRW amount at Kiwoom's reference exchange rate. It accepts US
+whole-share limit orders. It sends a single request when you confirm the preview
+and displays the broker's order number. Check any uncertain submission in
+Kiwoom before sending a new order. The server reads the existing mode-600
+`~/.jm-invest-credentials.json` file and binds to the Mac's loopback interface.
 
 ## Private Kiwoom quotes
 

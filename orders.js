@@ -89,6 +89,12 @@ export function setupOrders(readToken) {
       }
       catch { launch.hidden=true; }
     },
+    stockContext(symbol) {
+      if (publicSite || !readToken()) return Promise.resolve(null);
+      return call("context?symbol=" + encodeURIComponent(symbol));
+    },
+    preview: data => call("preview", data),
+    submit: id => call("submit", {id}),
     open,
     signOut() { if (dialog.open) dialog.close(); launch.hidden=true; reset(); }
   };

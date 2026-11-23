@@ -1,5 +1,5 @@
 import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=58";
-import {showMarketPanel} from "./market-panels.js?v=50";
+import {showMarketPanel} from "./market-panels.js?v=67";
 
 import {setupChartTools} from "./chart-tools.js?v=58";
 
@@ -31,56 +31,192 @@ const signed = n => (n>=0?"+":"")+n.toFixed(2);
 const displaySymbol = s => ({BZMAIN:"BZmain",CLMAIN:"CLmain"}[s] || s);
 const validSymbol = /^[A-Z][A-Z0-9.\-]{0,11}$/;
 
-export function setupInstrument({search,nameFor,readList,saveList}) {
+export function setupInstrument({search,nameFor,readList,saveList,orders}) {
   const dialog=get("stock-detail"), canvas=get("market-chart"), reference=get("daily-reference");
   let current="", quote=null, frame="day", afterClose=null;
   const trade = get("trade-preview");
   const tradeForm = get("trade-preview-form"), tradeReview = get("trade-preview-review");
+  const tradeStatus = get("trade-preview-status"), tradeNext = get("trade-preview-next");
+  const tradeConfirm = get("trade-preview-confirm"), tradeEdit = get("trade-preview-edit");
+  const book = get("trade-book"), bookRefresh = get("trade-book-refresh");
+  const quantity = tradeForm.querySelector('[name="quantity"]');
+  const price = tradeForm.querySelector('[name="price"]');
   const dollars = new Intl.NumberFormat("en-US", {
-    style:"currency", currency:"USD", maximumFractionDigits:4
+    style: "currency", currency: "USD", maximumFractionDigits: 4
   });
-  function readTrade() {
-    return {
-      side:tradeForm.elements.side.value,
-      quantity:tradeForm.elements.quantity.valueAsNumber,
-      price:tradeForm.elements.price.valueAsNumber
-    };
-  }
+  const won = new Intl.NumberFormat("ko-KR", {style: "currency", currency: "KRW"});
+  const sideName = {buy: "매수", sell: "매도"};
+  const previewOnly = "미리보기 모드입니다. 실계좌 주문은 이 Mac의 비공개 서버에서 할 수 있습니다.";
+  let tradeSide, orderContext, reviewId, tradeBusy = false, tradeVersion = 0;
+
   function updateTradeTotal() {
-    const {quantity,price} = readTrade();
-    const validNumbers = tradeForm.elements.quantity.validity.valid && tradeForm.elements.price.validity.valid;
-    get("trade-preview-total").textContent = validNumbers ? dollars.format(quantity * price) : "—";
+    const amount = quantity.valueAsNumber * price.valueAsNumber;
+    const valid = quantity.validity.valid && price.validity.valid && Number.isFinite(amount);
+    get("trade-preview-total").textContent = valid ? dollars.format(amount) : "—";
+    const converted = get("trade-preview-krw");
+    converted.hidden = !valid || !Number.isFinite(orderContext?.fx);
+    converted.textContent = converted.hidden ? "" : "약 " + won.format(amount * orderContext.fx);
   }
-  function openTrade() {
+
+  function setTradePrice(value) {
+    if (!Number.isFinite(value)) return;
+    price.value = value.toFixed(4);
+    updateTradeTotal();
+  }
+
+  function renderBookSide(container, levels) {
+    container.replaceChildren(...(levels ?? []).map(level => {
+      const button = document.createElement("button");
+      button.type = "button";
+      const value = document.createElement("span");
+      value.textContent = dollars.format(level.price);
+      const volume = document.createElement("small");
+      volume.textContent = level.quantity?.toLocaleString("ko-KR") ?? "—";
+      button.append(value, volume);
+      button.onclick = () => setTradePrice(level.price);
+      return button;
+    }));
+  }
+
+  async function loadTradeContext() {
+    const version = tradeVersion;
+    bookRefresh.disabled = true;
+    try {
+      const context = await orders.stockContext(current);
+      if (version !== tradeVersion || !trade.open) return;
+      orderContext = context;
+      tradeStatus.textContent = context?.enabled ? "" : previewOnly;
+      const currentPrice = get("trade-preview-quote");
+      if (Number.isFinite(context?.price)) {
+        currentPrice.hidden = false;
+        currentPrice.textContent = "키움 현재가 · " + dollars.format(context.price);
+        get("trade-use-quote").hidden = false;
+      }
+      book.hidden = !(context?.asks?.length || context?.bids?.length);
+      get("trade-book-time").textContent = [context?.date, context?.time].filter(Boolean).join(" ");
+      renderBookSide(get("trade-book-asks"), context?.asks);
+      renderBookSide(get("trade-book-bids"), context?.bids);
+      updateTradeTotal();
+    } catch (error) {
+      if (version === tradeVersion && trade.open) tradeStatus.textContent = error.message;
+    } finally {
+      if (version === tradeVersion) {
+        bookRefresh.disabled = false;
+        tradeNext.disabled = false;
+      }
+    }
+  }
+
+  function openTrade(side) {
+    if (tradeBusy || trade.open) return;
+    tradeVersion += 1;
+    tradeSide = side;
+    orderContext = null;
+    reviewId = null;
     tradeForm.reset();
     tradeForm.hidden = false;
     tradeReview.hidden = true;
-    updateTradeTotal();
+    tradeNext.disabled = true;
+    tradeConfirm.disabled = true;
+    tradeEdit.disabled = false;
+    book.hidden = true;
+    book.open = false;
+    get("trade-use-quote").hidden = true;
     get("trade-preview-symbol").textContent = displaySymbol(current);
+    get("trade-preview-title").textContent = sideName[side] + " 주문";
+    trade.dataset.side = side;
+    tradeStatus.textContent = "키움 주문 정보를 확인 중입니다.";
     const referencePrice = get("trade-preview-quote");
     referencePrice.hidden = !Number.isFinite(quote?.price);
-    referencePrice.textContent = referencePrice.hidden ? "" : "Last close · " + dollars.format(quote.price);
+    referencePrice.textContent = referencePrice.hidden ? "" : "저장된 종가 · " + dollars.format(quote.price);
+    updateTradeTotal();
     trade.showModal();
+    loadTradeContext();
   }
-  get("trade-preview-close").onclick = () => trade.close();
-  trade.addEventListener("cancel", event => event.stopPropagation());
+
+  get("trade-preview-close").onclick = () => { if (!tradeBusy) trade.close(); };
+  trade.addEventListener("cancel", event => {
+    if (tradeBusy) event.preventDefault();
+    event.stopPropagation();
+  });
+  trade.addEventListener("close", () => {
+    tradeVersion += 1;
+    reviewId = null;
+  });
+  bookRefresh.onclick = loadTradeContext;
+  get("trade-use-quote").onclick = () => setTradePrice(orderContext?.price);
+  for (const button of tradeForm.querySelectorAll("[data-trade-step]")) {
+    button.onclick = () => {
+      const field = button.dataset.tradeStep === "price" ? price : quantity;
+      if (button.value === "1") field.stepUp();
+      else field.stepDown();
+      updateTradeTotal();
+    };
+  }
   tradeForm.addEventListener("input", updateTradeTotal);
-  tradeForm.addEventListener("submit", event => {
+  tradeForm.addEventListener("submit", async event => {
     event.preventDefault();
-    const {side,quantity,price} = readTrade();
-    get("trade-review-side").textContent = side;
-    get("trade-review-quantity").textContent = quantity.toLocaleString("en-US");
-    get("trade-review-price").textContent = dollars.format(price);
-    get("trade-review-total").textContent = dollars.format(quantity * price);
+    if (tradeBusy || tradeNext.disabled || !tradeForm.reportValidity()) return;
+    const version = tradeVersion;
+    let order = {side: tradeSide, quantity: quantity.value, price: price.value,
+                 amount: quantity.valueAsNumber * price.valueAsNumber};
+    if (orderContext?.enabled) {
+      tradeBusy = true;
+      tradeNext.disabled = true;
+      tradeStatus.textContent = "주문 내용을 확인 중입니다.";
+      try {
+        order = await orders.preview({...order, symbol: orderContext.symbol, exchange: orderContext.exchange});
+      } catch (error) {
+        if (version === tradeVersion) tradeStatus.textContent = error.message;
+        return;
+      } finally {
+        tradeBusy = false;
+        if (version === tradeVersion) tradeNext.disabled = false;
+      }
+    }
+    if (version !== tradeVersion || !trade.open) return;
+    reviewId = order.id ?? null;
+    get("trade-review-side").textContent = sideName[order.side];
+    get("trade-review-quantity").textContent = Number(order.quantity).toLocaleString("ko-KR") + "주";
+    get("trade-review-price").textContent = dollars.format(order.price);
+    get("trade-review-total").textContent = dollars.format(order.amount);
     tradeForm.hidden = true;
     tradeReview.hidden = false;
+    tradeConfirm.disabled = !reviewId;
+    tradeStatus.textContent = reviewId ? "지정가와 수량을 확인한 뒤 실계좌 주문을 전송하세요." : previewOnly;
     get("trade-review-title").focus();
   });
-  get("trade-preview-edit").onclick = () => {
+
+  tradeEdit.onclick = () => {
+    if (tradeBusy) return;
+    reviewId = null;
+    tradeConfirm.disabled = true;
     tradeReview.hidden = true;
     tradeForm.hidden = false;
-    tradeForm.elements.quantity.focus();
+    tradeStatus.textContent = orderContext?.enabled ? "" : previewOnly;
+    quantity.focus();
   };
+
+  tradeConfirm.onclick = async () => {
+    if (tradeBusy || !reviewId) return;
+    const id = reviewId;
+    reviewId = null;
+    tradeBusy = true;
+    tradeConfirm.disabled = true;
+    tradeEdit.disabled = true;
+    tradeStatus.textContent = "키움에 주문을 전송 중입니다.";
+    try {
+      const order = await orders.submit(id);
+      tradeStatus.textContent = "키움 주문 접수 · 주문번호 " + order.number;
+    } catch (error) {
+      tradeStatus.textContent = error instanceof TypeError || error instanceof SyntaxError
+        ? "전송 결과를 확인하지 못했습니다. 새 주문 전에 키움 주문 내역을 확인하세요."
+        : error.message;
+    } finally {
+      tradeBusy = false;
+    }
+  };
+
   function setFavorite() {
     const saved=readList().includes(current);
     get("stock-star").setAttribute("aria-pressed",String(saved));
@@ -335,7 +471,8 @@ export function setupInstrument({search,nameFor,readList,saveList}) {
   get("stock-back").onclick=()=>back();
   dialog.addEventListener("cancel",e=>{e.preventDefault();back();});
   get("stock-search").onclick=()=>back(search);
-  get("stock-order").onclick=openTrade;
+  get("stock-buy").onclick = () => openTrade("buy");
+  get("stock-sell").onclick = () => openTrade("sell");
   get("stock-star").onclick=()=>{
     const items=readList();
     if(saveList(items.includes(current)?items.filter(v=>v!==current):[...items,current]))setFavorite();

@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=60">
-<script type="module" src="./journal.js?v=66"></script>
+<link rel="stylesheet" href="./style.css?v=67">
+<script type="module" src="./journal.js?v=67"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header><div class="head"><a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -35,7 +35,14 @@
 <button id="watch-sort" type="button" aria-label="Sort by percentage change">%Change <svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="m5 10 7-7 7 7zm0 4h14l-7 7z" fill="currentColor" stroke="none"/></svg></button>
 </div>
 <p id="watch-empty" hidden>No symbols in this watchlist.</p>
-<ul id="home-holdings" class="watch-list"></ul>
+<ul id="home-holdings" class="watch-list">
+<li id="watch-sentiment">
+<span class="watch-ticker-icon" aria-hidden="true">FG</span>
+<div class="watch-identity"><strong>Fear &amp; Greed</strong><div class="watch-caption"><small id="watch-sentiment-source">CNN</small></div></div>
+<div class="sentiment-gauge" id="watch-sentiment-gauge" aria-hidden="true"><div class="sentiment-arc"><span class="sentiment-marker" id="watch-sentiment-marker" hidden></span></div></div>
+<div class="watch-quote"><strong id="watch-sentiment-score">—</strong><small id="watch-sentiment-rating">Loading…</small></div>
+</li>
+</ul>
 </section>
 <section id="tab-profit" class="tab-panel" hidden>
 <h2>US equity realized P&L</h2>
@@ -211,43 +218,48 @@
 <a class="market-source" href="https://edition.cnn.com/markets/fear-and-greed" target="_blank" rel="noopener noreferrer">CNN Fear &amp; Greed ↗</a>
 </section>
 <div id="stock-order-bar">
-<button id="stock-order" type="button" aria-haspopup="dialog" aria-controls="trade-preview">
-<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14m-4-4 4 4-4 4M19 17H5m4-4-4 4 4 4"/></svg>
-<span>Trade</span></button>
+<button id="stock-buy" type="button" lang="ko" aria-haspopup="dialog" aria-controls="trade-preview">매수</button>
+<button id="stock-sell" type="button" lang="ko" aria-haspopup="dialog" aria-controls="trade-preview">매도</button>
 </div>
-<dialog id="trade-preview" aria-labelledby="trade-preview-title">
+<dialog id="trade-preview" lang="ko" aria-labelledby="trade-preview-title">
 <header class="trade-preview-head">
-<div><p id="trade-preview-symbol"></p><h3 id="trade-preview-title">Trade ticket</h3></div>
-<button type="button" id="trade-preview-close" aria-label="Close trade ticket">×</button>
+<div><p id="trade-preview-symbol"></p><h3 id="trade-preview-title" lang="ko">주문 미리보기</h3></div>
+<button type="button" id="trade-preview-close" aria-label="주문 화면 닫기">×</button>
 </header>
 <p id="trade-preview-quote" class="trade-preview-quote" hidden></p>
 <form id="trade-preview-form" method="dialog">
-<fieldset class="trade-side">
-<legend>Side</legend>
-<label><input type="radio" name="side" value="Buy" checked><span>Buy</span></label>
-<label><input type="radio" name="side" value="Sell"><span>Sell</span></label>
-</fieldset>
-<div class="trade-fields">
-<label>Shares<input type="number" name="quantity" inputmode="numeric" min="1" max="999999" step="1" placeholder="0" required></label>
-<label>Limit price (USD)<input type="number" name="price" inputmode="decimal" min="0.0001" max="9999999" step="0.0001" placeholder="0.00" required></label>
+<details id="trade-book" hidden>
+<summary>키움 10호가 <time id="trade-book-time"></time></summary>
+<div class="trade-book-grid">
+<div><strong>매도 호가</strong><div id="trade-book-asks"></div></div>
+<div><strong>매수 호가</strong><div id="trade-book-bids"></div></div>
 </div>
-<div class="trade-ticket-total"><span>Order value</span><output id="trade-preview-total">—</output></div>
-<button type="submit" class="trade-ticket-primary">Review order</button>
+<button id="trade-book-refresh" type="button">호가 새로고침</button>
+</details>
+<div class="trade-fields">
+<div><label for="trade-quantity">수량 (주)</label>
+<div class="trade-stepper"><button type="button" data-trade-step="quantity" value="-1" aria-label="수량 한 주 줄이기">−</button><input id="trade-quantity" type="number" name="quantity" inputmode="numeric" min="1" max="999999" step="1" value="1" required><button type="button" data-trade-step="quantity" value="1" aria-label="수량 한 주 늘리기">+</button></div></div>
+<div><label for="trade-limit">지정가 (USD)</label>
+<div class="trade-stepper"><button type="button" data-trade-step="price" value="-1" aria-label="지정가 한 단위 내리기">−</button><input id="trade-limit" type="number" name="price" inputmode="decimal" min="0.0001" max="9999999" step="0.0001" placeholder="0.00" required><button type="button" data-trade-step="price" value="1" aria-label="지정가 한 단위 올리기">+</button></div></div>
+</div>
+<button id="trade-use-quote" type="button" hidden>키움 현재가 사용</button>
+<div class="trade-ticket-total"><span>주문 금액</span><div><output id="trade-preview-total">—</output><small id="trade-preview-krw" hidden></small></div></div>
+<button id="trade-preview-next" type="submit" class="trade-ticket-primary">주문 내용 확인</button>
 </form>
 <section id="trade-preview-review" hidden aria-labelledby="trade-review-title">
-<h4 id="trade-review-title" tabindex="-1">Review limit order</h4>
+<h4 id="trade-review-title" tabindex="-1">지정가 주문 확인</h4>
 <dl class="trade-review-details">
-<dt>Side</dt><dd id="trade-review-side"></dd>
-<dt>Shares</dt><dd id="trade-review-quantity"></dd>
-<dt>Limit price</dt><dd id="trade-review-price"></dd>
-<dt>Order value</dt><dd id="trade-review-total"></dd>
+<dt>매매 구분</dt><dd id="trade-review-side"></dd>
+<dt>수량</dt><dd id="trade-review-quantity"></dd>
+<dt>지정가</dt><dd id="trade-review-price"></dd>
+<dt>주문 금액</dt><dd id="trade-review-total"></dd>
 </dl>
 <div class="trade-review-actions">
-<button type="button" id="trade-preview-edit">Edit order</button>
-<button type="button" disabled>Place order</button>
+<button type="button" id="trade-preview-edit">수정</button>
+<button type="button" id="trade-preview-confirm" disabled>실계좌 주문 전송</button>
 </div>
 </section>
-<p class="trade-preview-note">Preview only · trading is offline</p>
+<p class="trade-preview-note" id="trade-preview-status" role="status"></p>
 </dialog>
 <dialog id="chart-tool-dialog" aria-labelledby="chart-tool-title">
 <div class="chart-tool-head"><h3 id="chart-tool-title"></h3><button type="button" id="chart-tool-close" aria-label="Close chart tools">×</button></div>

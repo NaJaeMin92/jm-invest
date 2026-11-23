@@ -186,6 +186,18 @@ const loadSentiment = cachedFeed(
   data => Date.parse(data.fear_and_greed.timestamp), 60_000
 );
 
+export function loadWatchSentiment(render) {
+  return loadSentiment((data, saved) => {
+    const {score, rating} = data.fear_and_greed;
+    render({
+      score: Math.round(score),
+      rating: titleCase(rating),
+      angle: 1.8 * Math.min(100, Math.max(0, score)) - 90,
+      saved
+    });
+  });
+}
+
 export function showMarketPanel(panel, symbol, name) {
   const target = document.querySelector("#" + panel + "-content");
   if (panel === "sigma") showSigmaCalculator(symbol, name);
