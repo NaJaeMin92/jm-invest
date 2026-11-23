@@ -1,6 +1,7 @@
 """Serve TradeInSight and its owner-only Kiwoom order endpoint."""
 import argparse
 from decimal import Decimal
+from fcntl import LOCK_EX, flock
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import math
@@ -46,6 +47,27 @@ def read_json(url, headers, body=None):
         return json.load(response)
 
 
+def wait_for_kiwoom_read(schedule):
+    # The local app and phone gateway share one Kiwoom API budget on this Mac.
+    descriptor = os.open(schedule, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, "r+") as state:
+        flock(state, LOCK_EX)
+        try:
+            last = float(state.read())
+        except ValueError:
+            last = 0
+        now = time.time()
+        korea_hour = (time.gmtime(now).tm_hour + 9) % 24
+        interval = 0.4 if korea_hour == 9 else 0.25
+        elapsed = now - last
+        if 0 <= elapsed < interval:
+            time.sleep(interval - elapsed)
+        state.seek(0)
+        state.write(str(time.time()))
+        state.truncate()
+        state.flush()
+
+
 def owner_session(authorization):
     if not authorization or not authorization.startswith("Bearer ") or len(authorization) > 8192:
         raise Problem(401, "로그인이 필요합니다.")
@@ -83,6 +105,7 @@ class Kiwoom:
         self.directory_lock = Lock()
         self.directory = {}
         self.directory_until = 0
+        self.read_schedule = Path.home() / ".jm-invest-kiwoom-reads"
 
     def access_token(self):
         with self.lock:
@@ -103,6 +126,7 @@ class Kiwoom:
         with self.directory_lock:
             if time.monotonic() < self.directory_until:
                 return self.directory
+            wait_for_kiwoom_read(self.read_schedule)
             result = read_json(KIWOOM + "/api/us/stkinfo", {
                 "api-id": "usa10099", "Authorization": "Bearer " + token,
             }, {"stex_tp": "%"})
@@ -114,6 +138,7 @@ class Kiwoom:
             return self.directory
 
     def market_quote(self, token, item, transaction):
+        wait_for_kiwoom_read(self.read_schedule)
         return read_json(KIWOOM + "/api/us/mrkcond", {
             "api-id": transaction, "Authorization": "Bearer " + token,
         }, {"stex_tp": item["stex_tp"], "stk_cd": item["jmcode"]})
@@ -316,8 +341,6 @@ def seed_kiwoom_quotes(broker, token, items, snapshots, stopped):
                 quote = None
             if quote:
                 snapshots.put(quote)
-            if stopped.wait(0.75):
-                return
 
 
 def refresh_external_quotes(symbols, snapshots, stopped):
