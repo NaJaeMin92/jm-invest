@@ -25,6 +25,8 @@ ROOT = Path(__file__).resolve().parent.parent
 KIWOOM = "https://api.kiwoom.com"
 EASTERN = ZoneInfo("America/New_York")
 CHART_INTERVALS = {"minute": "1", "five": "5", "hour": "60"}
+LIMIT_TYPES = {"00", "26", "27", "30"}
+MARKET_TYPES = {"03", "36", "37"}
 SUPABASE = "https://mfycpprqyaidoixytdim.supabase.co"
 PUBLIC_KEY = "sb_publishable_KIxbzozNkk50oEZ9GehtZA_E484E5Lr"
 PAGES_ORIGIN = "https://najaemin92.github.io"
@@ -35,7 +37,7 @@ YAHOO_SYMBOLS = {
 STATIC = {
     "index.html", "journal.html", "style.css", "journal.js", "instrument.js", "instrument-chart.js",
     "market-panels.js", "chart-tools.js", "chart-annotations.js", "technical-indicators.js", "orders.js", "watch-editor.js",
-    "watch-quotes.js",
+    "watch-quotes.js", "pending-orders.js",
 }
 
 
@@ -45,10 +47,14 @@ class Problem(Exception):
         self.status = status
 
 
-def read_json(url, headers, body=None):
+def read_page(url, headers, body=None):
     data = json.dumps(body).encode() if body is not None else None
     with urlopen(Request(url, data=data, headers={"Content-Type": "application/json", **headers}), timeout=15) as response:
-        return json.load(response)
+        return json.load(response), response.headers
+
+
+def read_json(url, headers, body=None):
+    return read_page(url, headers, body)[0]
 
 
 def wait_for_kiwoom_read(schedule):
@@ -85,6 +91,17 @@ def owner_session(authorization):
         raise Problem(403, "본인 계정만 주문할 수 있습니다.")
 
 
+def limit_price(value):
+    price = str(value)
+    if not re.fullmatch(r"\d{1,7}(?:\.\d{1,4})?", price) or not Decimal(price) > 0:
+        raise Problem(400, "유효한 USD 지정가를 입력하세요.")
+    limit = Decimal(price)
+    formatted = limit.quantize(Decimal("0.01") if limit >= 1 else Decimal("0.0001"))
+    if formatted != limit:
+        raise Problem(400, "미국주식 지정가는 $1 이상 소수점 2자리, $1 미만 소수점 4자리까지 입력할 수 있습니다.")
+    return format(formatted, "f")
+
+
 def order_fields(data):
     symbol = str(data.get("symbol", "")).strip().upper()
     quantity, price = str(data.get("quantity", "")), str(data.get("price", ""))
@@ -93,14 +110,33 @@ def order_fields(data):
         raise Problem(400, "종목코드와 거래소를 확인하세요.")
     if side not in ("buy", "sell") or not re.fullmatch(r"[1-9]\d{0,8}", quantity):
         raise Problem(400, "매매 구분과 주 단위 수량을 확인하세요.")
-    if not re.fullmatch(r"\d{1,7}(?:\.\d{1,4})?", price) or not Decimal(price) > 0:
-        raise Problem(400, "유효한 USD 지정가를 입력하세요.")
-    limit = Decimal(price)
-    formatted = limit.quantize(Decimal("0.01") if limit >= 1 else Decimal("0.0001"))
-    if formatted != limit:
-        raise Problem(400, "미국주식 지정가는 $1 이상 소수점 2자리, $1 미만 소수점 4자리까지 입력할 수 있습니다.")
-    return dict(symbol=symbol, quantity=quantity, price=format(formatted, "f"), exchange=exchange, side=side,
-                amount=format(formatted * int(quantity), "f"))
+    kind = data.get("kind", "00")  # Existing previews are limit orders.
+    if kind in {"26", "27", "36", "37"} and int(quantity) < 5:
+        raise Problem(400, "VWAP·TWAP 주문은 5주 이상 입력하세요.")
+    if kind in LIMIT_TYPES:
+        price = limit_price(price)
+    elif kind in MARKET_TYPES and not price:
+        price = ""
+    else:
+        raise Problem(400, "주문 종류와 지정가 입력을 확인하세요.")
+    return dict(symbol=symbol, quantity=quantity, price=price, exchange=exchange, side=side, kind=kind,
+                amount=format(Decimal(price) * int(quantity), "f") if price else None)
+
+
+def pending_row(row):
+    remaining = int(row.get("ord_remnq") or 0)
+    if remaining <= 0 or row.get("ord_cntr_tp") == "12":
+        return None
+    number, symbol = row["ord_no"].strip(), row["stk_cd"].strip()
+    side = {"1": "sell", "2": "buy"}.get(row.get("slby_tp"))
+    kind = row.get("frgn_trde_tp", "").strip()
+    amend_price = row.get("mdfy_uv") if row.get("ord_cntr_tp") == "11" else None
+    price = Decimal(amend_price or 0) or Decimal(row.get("ord_uv") or 0)
+    regular = (side is not None and row.get("rsrv_tp", "0").strip() in ("", "0")
+               and row.get("ord_cntr_tp") in ("10", "11") and re.fullmatch(r"\d{1,9}", number) is not None)
+    return dict(number=number, symbol=symbol, side=side, kind=kind, kindName=row.get("frgn_trde_nm", ""),
+                remaining=remaining, price=format(price, "f") if price else "", time=row.get("ord_time", ""),
+                canCancel=regular, canAmend=regular and kind in LIMIT_TYPES)
 
 
 class Kiwoom:
@@ -177,6 +213,18 @@ class Kiwoom:
                 daily.append({"date": row["dt"], "change": change, "price": price})
         return {"symbol": item["symbol"], "daily": daily} if daily else None
 
+    def minute_quote(self, token, item):
+        now = datetime.now(EASTERN)
+        wait_for_kiwoom_read(self.read_schedule)
+        result = read_json(KIWOOM + "/api/us/chart", {"api-id": "usa06011", "Authorization": "Bearer " + token},
+                           {"stex_tp": item["stex_tp"], "stk_cd": item["jmcode"], "strt_dt": now.strftime("%Y%m%d"),
+                            "tic_scope": "1", "upd_stkpc_tp": "1", "exrt_appl_tp": "0"})
+        if str(result.get("return_code")) != "0":
+            return None
+        bars = chart_bars(result.get("result_list", []), True, now)
+        if bars:
+            return {"symbol": item["symbol"], "series": watch_series([(bar[0], bar[4]) for bar in bars])}
+
     def resolve_us_stock(self, token, symbol):
         directory = self.symbol_directory(token)
         ticker = next((candidate for candidate in (symbol, symbol.replace("-", "."), symbol.replace(".", "-"))
@@ -242,15 +290,43 @@ class Kiwoom:
                                asks=order_book_levels(result, "sel"), bids=order_book_levels(result, "buy"))
             else:
                 context["fx"] = positive_quote(result.get("base_exrt"))
+                context["previousClose"] = positive_quote(result.get("base_close_pric"))
                 if not context.get("price"):
                     context["price"] = positive_quote(result.get("cur_prc"))
         return context
 
+    def pending(self, token):
+        headers = {"api-id": "ust21050", "Authorization": "Bearer " + token}
+        rows, seen = [], set()
+        while True:
+            wait_for_kiwoom_read(self.read_schedule)
+            result, page = read_page(KIWOOM + "/api/us/acnt", headers, {"slby_tp": "0"})
+            if "571758:" in str(result.get("return_msg")) and not rows:
+                return []
+            if str(result.get("return_code")) != "0" or not isinstance(result.get("result_list"), list):
+                raise Problem(502, "키움 미체결 내역을 조회하지 못했습니다. " + str(result.get("return_msg") or "")[:160])
+            rows.extend(item for row in result["result_list"] if (item := pending_row(row)))
+            if page.get("cont-yn") != "Y":
+                return rows
+            key = page.get("next-key")
+            if not key or key in seen:
+                raise Problem(502, "키움 미체결 내역의 다음 페이지를 확인하지 못했습니다.")
+            seen.add(key)
+            headers.update({"cont-yn": "Y", "next-key": key})
+
     def submit(self, token, order):
+        if order.get("action") in ("amend", "cancel"):
+            amend = order["action"] == "amend"
+            payload = {"orig_ord_no": order["number"], "stex_tp": order["exchange"], "stk_cd": order["symbol"]}
+            if amend:
+                payload["mdfy_uv"] = order["price"]
+            return read_json(KIWOOM + "/api/us/ordr", {
+                "api-id": "ust20002" if amend else "ust20003", "Authorization": "Bearer " + token,
+            }, payload)
         tr = "ust20000" if order["side"] == "buy" else "ust20001"
         return read_json(KIWOOM + "/api/us/ordr", {"api-id": tr, "Authorization": "Bearer " + token}, {
             "stex_tp": order["exchange"], "stk_cd": order["symbol"], "ord_qty": order["quantity"],
-            "ord_uv": order["price"], "trde_tp": "00",
+            "ord_uv": order["price"], "trde_tp": order["kind"],
         })
 
 
@@ -263,9 +339,35 @@ class Orders:
                 id TEXT PRIMARY KEY, expires INTEGER NOT NULL, payload TEXT NOT NULL,
                 state TEXT NOT NULL, number TEXT
             )""")
+            db.execute("CREATE TABLE IF NOT EXISTS pending_claims (target TEXT PRIMARY KEY, intent TEXT UNIQUE NOT NULL)")
+
+    def pending(self):
+        return self.broker.pending(self.broker.access_token())
+
+    def current_original(self, original):
+        if not isinstance(original, dict):
+            raise Problem(400, "미체결 목록에서 주문을 선택하세요.")
+        for row in self.pending():
+            if row == original:
+                return row
+        raise Problem(409, "체결 또는 주문 상태가 바뀌었습니다. 미체결 목록을 새로고침하세요.")
 
     def preview(self, data):
-        order = order_fields(data)
+        action = data.get("action", "new")
+        if action == "new":
+            order = order_fields(data)
+        elif action in ("amend", "cancel"):
+            row = self.current_original(data.get("original"))
+            if not row["canAmend" if action == "amend" else "canCancel"]:
+                raise Problem(422, "이 주문은 선택한 정정 또는 취소를 지원하지 않습니다.")
+            item = self.broker.resolve_us_stock(self.broker.access_token(), row["symbol"])
+            price = limit_price(data.get("price")) if action == "amend" else ""
+            if action == "amend" and row["price"] and Decimal(price) == Decimal(row["price"]):
+                raise Problem(400, "기존 지정가와 다른 가격을 입력하세요.")
+            order = dict(action=action, original=row, number=row["number"], symbol=item["jmcode"],
+                         exchange=item["stex_tp"], price=price)
+        else:
+            raise Problem(400, "주문 요청 종류를 확인하세요.")
         intent = secrets.token_urlsafe(24)
         with sqlite3.connect(self.filename) as db:
             db.execute("DELETE FROM orders WHERE state='preview' AND expires<?", (int(time.time()),))
@@ -286,7 +388,21 @@ class Orders:
                 if existing and existing[0] == "accepted":
                     return {"number": existing[1]}
                 raise Problem(409, "주문 확인이 만료되었거나 이미 처리되었습니다. 키움에서 확인하세요.")
-            order = order_fields(json.loads(db.execute("SELECT payload FROM orders WHERE id=?", (intent,)).fetchone()[0]))
+            stored = json.loads(db.execute("SELECT payload FROM orders WHERE id=?", (intent,)).fetchone()[0])
+            management = stored.get("action") in ("amend", "cancel")
+            order = stored if management else order_fields(stored)
+            if management:
+                row = stored["original"]
+                target = "|".join((datetime.now(EASTERN).date().isoformat(), row["number"], row["symbol"], row["time"]))
+                if not db.execute("INSERT OR IGNORE INTO pending_claims VALUES (?,?)", (target, intent)).rowcount:
+                    raise Problem(409, "이미 정정 또는 취소를 요청한 주문입니다. 키움 접수 상태를 확인하세요.")
+
+        if management:
+            try:
+                self.current_original(order["original"])
+            except Exception:
+                self.update(intent, "rejected")
+                raise
 
         try:
             result = self.broker.submit(token, order)
@@ -309,6 +425,8 @@ class Orders:
     def update(self, intent, state, number=None):
         with sqlite3.connect(self.filename) as db:
             db.execute("UPDATE orders SET state=?,number=? WHERE id=?", (state,number,intent))
+            if state == "rejected":
+                db.execute("DELETE FROM pending_claims WHERE intent=?", (intent,))
 
 
 def kiwoom_ticks(socket, items, timeout_error):
@@ -367,7 +485,12 @@ def kiwoom_ticks(socket, items, timeout_error):
                     continue
                 if not math.isfinite(price) or not price:
                     continue
-                yield {"symbol": symbol, "price": price,
+                date, clock = values.get("22"), values.get("51020")
+                try:
+                    traded_at = int(datetime.strptime(date + clock, "%Y%m%d%H%M%S").replace(tzinfo=EASTERN).timestamp())
+                except (TypeError, ValueError):
+                    traded_at = None
+                yield {"symbol": symbol, "price": price, "tradedAt": traded_at,
                        "change": change if change is not None and math.isfinite(change) else None,
                        "date": values.get("22"), "session": values.get("290")}
 
@@ -455,8 +578,17 @@ def order_book_levels(result, side):
     return levels
 
 
+def watch_series(points):
+    if not points:
+        return []
+    last = points[-1][0]
+    start = datetime.fromtimestamp(last, EASTERN).replace(hour=0, minute=0, second=0, microsecond=0)
+    cutoff = max(start.timestamp(), last - 179 * 60)
+    return [[stamp, price] for stamp, price in points if stamp >= cutoff]
+
+
 def seed_kiwoom_quotes(broker, token, items, snapshots, stopped):
-    for read_quote in (broker.current_quote, broker.daily_quote):
+    for read_quote in (broker.current_quote, broker.minute_quote, broker.daily_quote):
         for item in items:
             if stopped.is_set():
                 return
@@ -477,13 +609,18 @@ def refresh_external_quotes(symbols, snapshots, stopped):
                 ticker, market_type = YAHOO_SYMBOLS[symbol]
                 result = read_json(
                     "https://query1.finance.yahoo.com/v8/finance/chart/" + ticker
-                    + "?range=1d&interval=5m", {"User-Agent": "Mozilla/5.0"})
-                meta = result["chart"]["result"][0]["meta"]
+                    + "?range=1d&interval=1m", {"User-Agent": "Mozilla/5.0"})
+                chart = result["chart"]["result"][0]
+                meta = chart["meta"]
                 price = float(meta["regularMarketPrice"])
                 previous = float(meta["chartPreviousClose"])
                 if not all(math.isfinite(value) and value > 0 for value in (price, previous)):
                     continue
-                snapshots.put({"symbol": symbol, "price": price, "change": (price / previous - 1) * 100,
+                closes = chart.get("indicators", {}).get("quote") or [{}]
+                points = [(stamp, value) for stamp, value in zip(chart.get("timestamp", []), closes[0].get("close", []))
+                          if isinstance(stamp, int) and positive_quote(value)]
+                snapshots.put({"symbol": symbol, "price": price, "series": watch_series(points),
+                               "change": (price / previous - 1) * 100,
                                "quoteTime": meta.get("regularMarketTime"), "marketType": market_type})
             except (OSError, KeyError, ValueError, IndexError, TypeError):
                 continue
@@ -538,6 +675,8 @@ class App(BaseHTTPRequestHandler):
         path = urlsplit(self.path)
         if not self.quotes_only and path.path == "/api/orders/status":
             self.handle_order("status")
+        elif not self.quotes_only and path.path == "/api/orders/pending":
+            self.handle_order("pending")
         elif not self.quotes_only and path.path == "/api/orders/context":
             self.handle_order_context(parse_qs(path.query).get("symbol", [""])[0])
         elif self.quotes_only and path.path == "/api/quotes/book":
@@ -672,6 +811,10 @@ class App(BaseHTTPRequestHandler):
             owner_session(self.headers.get("Authorization"))
             if action == "status":
                 result = {"enabled": self.orders is not None}
+            elif action == "pending":
+                if self.orders is None:
+                    raise Problem(403, "비공개 주문 서버에서 조회할 수 있습니다.")
+                result = {"orders": self.orders.pending()}
             else:
                 if self.orders is None or self.headers.get("Origin") != self.origin:
                     raise Problem(403, "주문 서버에서 요청을 허용하지 않습니다.")

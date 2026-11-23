@@ -1,6 +1,6 @@
 import {setupWatchEditor} from "./watch-editor.js?v=49";
-import {setupOrders} from "./orders.js?v=70";
-import { setupInstrument, sparkline } from "./instrument.js?v=71";
+import {setupOrders} from "./orders.js?v=72";
+import { setupInstrument, sparkline } from "./instrument.js?v=72";
 import {loadWatchSentiment} from "./market-panels.js?v=68";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -45,8 +45,8 @@ async function request(path, { method = "GET", body, accessToken = token } = {})
   return payload;
 }
 
-const home = document.querySelector("#account-home");
-const detail = document.querySelector("#trade-detail");
+const holdingsPanel = document.querySelector("#account-holdings");
+const holdingsToggle = document.querySelector("#open-kiwoom");
 const logout = document.querySelector("#logout");
 const navigation = document.querySelector("#bottom-nav");
 const navButtons = [...navigation.querySelectorAll("button")];
@@ -92,22 +92,10 @@ for (const button of document.querySelectorAll("[data-shortcut]")) {
 }
 
 function setDetail(open) {
-  home.hidden = open;
-  detail.hidden = !open;
-  document.querySelector("#back-accounts").hidden = !open;
-  document.querySelector("#section-icon").hidden = open;
-  document.querySelector("#page-heading").textContent = open ? "키움증권" : "계좌";
+  holdingsPanel.hidden = !open;
+  holdingsToggle.setAttribute("aria-expanded", String(open));
 }
-
-document.querySelector("#open-kiwoom").addEventListener("click", () => {
-  setDetail(true);
-  document.querySelector("#back-accounts").focus();
-});
-document.querySelector("#back-accounts").addEventListener("click", () => {
-  setDetail(false);
-  document.querySelector("#open-kiwoom").focus();
-});
-
+holdingsToggle.addEventListener("click", () => setDetail(holdingsPanel.hidden));
 
 login.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -144,21 +132,14 @@ document.querySelector("#logout").addEventListener("click", () => {
   heldWatchSymbols.clear();
   orders.signOut();
   saveSession(null);
-  if (holdingsDialog.open) holdingsDialog.close();
   holdingsList.replaceChildren();
-  document.querySelector("#holdings-summary").textContent = "";
   document.querySelector("#profit-list").replaceChildren();
   document.querySelector("#profit-period").textContent = "";
   document.querySelector("#profit-updated").textContent = "";
   document.querySelector("#profit-total").textContent = "Awaiting sync";
   workspace.hidden = true;
   document.querySelector("#kiwoom-value").textContent = "";
-  document.querySelector("#allocation-total").textContent = "";
-  document.querySelector("#allocation-value").textContent = "";
-  document.querySelector("#allocation-return").textContent = "";
-  document.querySelector("#allocation-breakdown").hidden = true;
   document.querySelector("#portfolio-value").textContent = "";
-  document.querySelector("#valuation-note").textContent = "";
   document.querySelector("#kiwoom-return").textContent = "";
   renderWatchlist();
   setDetail(false);
@@ -167,116 +148,54 @@ document.querySelector("#logout").addEventListener("click", () => {
   request("/auth/v1/logout?scope=local", { method: "POST", accessToken }).catch(() => {});
 });
 
-const holdingsDialog = document.querySelector("#holdings-dialog");
 const holdingsList = document.querySelector("#holdings-list");
-document.querySelector("#open-holdings").addEventListener("click", () => holdingsDialog.showModal());
-document.querySelector("#close-holdings").addEventListener("click", () => holdingsDialog.close());
-holdingsDialog.addEventListener("click", (event) => {
-  if (event.target === holdingsDialog) holdingsDialog.close();
-});
+const numeric = value => value != null && value !== "" && Number.isFinite(Number(value));
+const holdingUSD = new Intl.NumberFormat("ko-KR", {style:"currency", currency:"USD", currencyDisplay:"narrowSymbol", maximumFractionDigits:4});
+const holdingKRW = new Intl.NumberFormat("ko-KR", {style:"currency", currency:"KRW"});
+const formatHolding = (value, formatter) => numeric(value) ? formatter.format(Number(value)) : "—";
 
-function formatStockProfit(balance, won) {
-  const holdings = balance.holdings;
-  if (!Array.isArray(holdings) || balance.return_pct == null) return "평가손익 동기화 대기";
-  const profits = holdings.map((holding) => holding.profit_krw);
-  if (profits.some((amount) => amount == null || amount === "" || !Number.isFinite(Number(amount)))) {
-    return "평가손익 동기화 대기";
-  }
-  const total = profits.reduce((sum, amount) => sum + Number(amount), 0);
-  return `${total > 0 ? "+" : ""}${won.format(total)} (${Math.abs(Number(balance.return_pct)).toFixed(2)}%)`;
+function tradedQuantity(bought, sold) {
+  if (!numeric(bought) || !numeric(sold)) return "—";
+  return (Number(bought) + Number(sold)).toLocaleString("ko-KR") + "주";
 }
 
 function showHoldings(balance) {
-  const won = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" });
-  document.querySelector("#holdings-summary").textContent = formatStockProfit(balance, won);
   holdingsList.replaceChildren();
-  const holdings = balance.holdings;
-  if (!Array.isArray(holdings)) {
+  const holdings = balance?.holdings;
+  if (!holdings?.length) {
     const item = document.createElement("li");
-    item.textContent = "동기화 후 보유종목을 표시합니다.";
+    item.textContent = Array.isArray(holdings) ? "보유 중인 미국주식이 없습니다." : "잔고 동기화 대기";
     holdingsList.append(item);
     return;
   }
-  if (!holdings.length) {
-    const item = document.createElement("li");
-    item.textContent = "보유 중인 미국주식이 없습니다.";
-    holdingsList.append(item);
-    return;
-  }
-  for (const holding of [...holdings].sort((a, b) => Number(b.value_krw) - Number(a.value_krw))) {
-    const item = document.createElement("li");
-    const left = document.createElement("div");
-    left.className = "holding-main";
-    const logo = document.createElement("span");
-    logo.className = "holding-logo";
-    const ticker = String(holding.symbol || "").toUpperCase();
-    const logoFiles = { NVDA: "nvda", GOOGL: "goog", GOOG: "goog", AMZN: "amzn", AVGO: "avgo", NBIS: "nbis", AMZU: "amzu", SOXX: "soxx", SOXL: "soxl" };
-    if (logoFiles[ticker]) {
-      const image = document.createElement("img");
-      image.src = `./assets/companies/${logoFiles[ticker]}.png?v=29`;
-      image.alt = "";
-      image.addEventListener("error", () => {
-        image.remove();
-        logo.textContent = ticker.slice(0, 2);
-        logo.classList.remove("has-logo");
-      });
-      logo.classList.add("has-logo");
-      logo.append(image);
-    } else {
-      logo.textContent = ticker.slice(0, 2);
-    }
-    const labels = document.createElement("div");
-    const name = document.createElement("strong");
-    const quantity = document.createElement("small");
-    const right = document.createElement("div");
-    const value = document.createElement("strong");
-    const profit = document.createElement("small");
-    name.textContent = holding.name === ticker ? ticker : `${holding.name} (${ticker})`;
-    quantity.textContent = `${Number(holding.quantity).toLocaleString("en-US")}주`;
-    value.textContent = won.format(Number(holding.value_krw));
-    const amount = Number(holding.profit_krw);
-    profit.textContent = `${amount > 0 ? "+" : ""}${won.format(amount)} (${Math.abs(Number(holding.return_pct)).toFixed(2)}%)`;
-    profit.dataset.direction = amount < 0 ? "down" : "up";
-    labels.append(name, quantity);
-    left.append(logo, labels);
-    right.append(value, profit);
-    const content = document.createElement("div");
-    content.className = "holding-top";
-    content.append(left, right);
-    const metrics = document.createElement("div");
-    metrics.className = "holding-metrics";
-    const money = (amount, currency) => {
-      if (amount == null || amount === "" || !Number.isFinite(Number(amount))) return "동기화 대기";
-      return new Intl.NumberFormat("ko-KR", {
-        style: "currency", currency, maximumFractionDigits: currency === "KRW" ? 0 : 4,
-      }).format(Number(amount));
-    };
-    const currency = /^[A-Z]{3}$/.test(holding.currency || "") ? holding.currency : null;
-    const priceDigits = Math.max(2, ...[holding.cost_price, holding.current_price].map((price) => {
-      const fraction = String(price ?? "").split(".")[1] || "";
-      return fraction.replace(/0+$/, "").length;
-    }));
-    const formatPrice = (price) => {
-      if (!currency || price == null || price === "" || !Number.isFinite(Number(price))) return "동기화 대기";
-      return new Intl.NumberFormat("ko-KR", {
-        style: "currency", currency, currencyDisplay: "narrowSymbol", minimumFractionDigits: priceDigits, maximumFractionDigits: priceDigits,
-      }).format(Number(price));
-    };
-    for (const [label, metric] of [
-      ["매입가", formatPrice(holding.cost_price)],
-      ["매입금액", money(holding.cost_krw, "KRW")],
-      ["현재가", formatPrice(holding.current_price)],
-      ["평가금액", money(holding.value_krw, "KRW")],
+  for (const holding of [...holdings].sort((a,b) => Number(b.value_krw) - Number(a.value_krw))) {
+    const item = document.createElement("li"), head = document.createElement("div");
+    head.className = "holding-title";
+    const name = document.createElement("strong"), ticker = document.createElement("span");
+    name.textContent = holding.name || holding.symbol;
+    ticker.textContent = holding.name !== holding.symbol ? holding.symbol : "";
+    head.append(name, ticker);
+    const metrics = document.createElement("dl");
+    metrics.className = "holding-values";
+    const weight = numeric(holding.value_krw) && Number(balance.value_krw) > 0
+      ? (100 * Number(holding.value_krw) / Number(balance.value_krw)).toFixed(2) + "%" : "—";
+    for (const [label, value, signedValue] of [
+      ["보유수량", numeric(holding.quantity) ? Number(holding.quantity).toLocaleString("ko-KR", {maximumFractionDigits:8}) + "주" : "—"],
+      ["매입가", formatHolding(holding.cost_price, holdingUSD)], ["현재가", formatHolding(holding.current_price, holdingUSD)],
+      ["평가손익", formatHolding(holding.profit_krw, holdingKRW), holding.profit_krw],
+      ["수익률", numeric(holding.return_pct) ? signedWatchPercent(Number(holding.return_pct)) : "—", holding.return_pct],
+      ["매입금액", formatHolding(holding.cost_krw, holdingKRW)], ["평가금액", formatHolding(holding.value_krw, holdingKRW)],
+      ["전일 거래수량", tradedQuantity(holding.previous_buy_qty, holding.previous_sell_qty)],
+      ["금일 거래수량", tradedQuantity(holding.today_buy_qty, holding.today_sell_qty)], ["주식 내 비중", weight]
     ]) {
-      const cell = document.createElement("div");
-      const title = document.createElement("small");
-      const text = document.createElement("span");
-      title.textContent = label;
-      text.textContent = metric;
-      cell.append(title, text);
+      const cell = document.createElement("div"), term = document.createElement("dt"), data = document.createElement("dd");
+      term.textContent = label;
+      data.textContent = value;
+      if (numeric(signedValue) && Number(signedValue) !== 0) data.dataset.direction = Number(signedValue) < 0 ? "down" : "up";
+      cell.append(term, data);
       metrics.append(cell);
     }
-    item.append(content, metrics);
+    item.append(head, metrics);
     holdingsList.append(item);
   }
 }
@@ -382,13 +301,14 @@ const lastKiwoomPrices = new Map();
 const kiwoomDaily = new Map();
 const kiwoomRegular = new Map();
 const externalPrices = new Map();
+const minuteHistory = new Map(), liveMinutes = new Map(), changedSymbols = new Set();
 const unavailableSymbols = new Set();
 const kiwoomQuoteStatus = document.querySelector("#kiwoom-quote-status");
 // Set the HTTPS URL of the authenticated, quote-only gateway when provisioned.
 const kiwoomGateway = document.querySelector('meta[name="kiwoom-quote-gateway"]')?.content;
 const kiwoomEndpoint = location.hostname === "127.0.0.1" ? "./api/quotes/stream"
   : location.origin === "https://najaemin92.github.io" ? kiwoomGateway : null;
-const kiwoomPhases = {"0": "Regular", "1": "Pre", "2": "After"};
+const kiwoomPhases = {"0": "Regular", "1": "Pre", "2": "After", "4": "Overnight"};
 let kiwoomStream;
 let redrawQuotes;
 let kiwoomRetry;
@@ -411,6 +331,8 @@ function stopKiwoomQuotes() {
   kiwoomStream?.controller.abort();
   kiwoomStream = null;
   if (token) return;
+  minuteHistory.clear();
+  liveMinutes.clear();
   kiwoomTicks.clear();
   lastKiwoomPrices.clear();
   kiwoomDaily.clear();
@@ -473,8 +395,10 @@ async function syncKiwoomQuotes() {
             activeOrderBook.onUpdate(update);
           }
           if (update.book || update.bookStatus) continue;
+          if (update.symbol) changedSymbols.add(update.symbol);
+          if (Array.isArray(update.series)) minuteHistory.set(update.symbol, update.series);
           if (Array.isArray(update.unsupported)) {
-            for (const symbol of update.unsupported) unavailableSymbols.add(symbol);
+            for (const symbol of update.unsupported) { unavailableSymbols.add(symbol); changedSymbols.add(symbol); }
           } else if (Array.isArray(update.daily)) {
             kiwoomDaily.set(update.symbol, update.daily);
           } else if (Number.isFinite(update.price)) {
@@ -483,14 +407,25 @@ async function syncKiwoomQuotes() {
             } else if (update.snapshot) {
               lastKiwoomPrices.set(update.symbol, {...update, received: usMarketSession()});
             } else {
+              const prior = kiwoomTicks.get(update.symbol);
+              if (prior?.tradedAt && update.tradedAt && prior.tradedAt > update.tradedAt) continue;
+              if (!update.date) update.date = usMarketSession().date.replaceAll("-", "");
               kiwoomTicks.set(update.symbol, update);
+              if (update.tradedAt) {
+                const minute = Math.floor(update.tradedAt / 60) * 60;
+                let points = liveMinutes.get(update.symbol);
+                if (prior?.date !== update.date || !points) liveMinutes.set(update.symbol, points = new Map());
+                points.set(minute, update.price);
+                while (points.keys().next().value < minute - 179 * 60) points.delete(points.keys().next().value);
+              }
               if (update.session === "0") kiwoomRegular.set(update.symbol, update);
             }
           }
-          redrawQuotes ??= setTimeout(() => {
+          redrawQuotes ??= requestAnimationFrame(() => {
             redrawQuotes = undefined;
-            renderWatchlist();
-          }, 250);
+            renderWatchlist(changedSymbols);
+            changedSymbols.clear();
+          });
         }
       }
     } finally {
@@ -501,7 +436,10 @@ async function syncKiwoomQuotes() {
       kiwoomRetry = setTimeout(syncKiwoomQuotes, 2_000);
     }
   } catch (error) {
-    if (kiwoomStream === stream) kiwoomQuoteStatus.textContent = error.message;
+    if (kiwoomStream === stream) {
+      kiwoomQuoteStatus.textContent = error.message;
+      kiwoomRetry = setTimeout(syncKiwoomQuotes, 2_000);
+    }
   } finally {
     if (kiwoomStream === stream) {
       kiwoomStream = null;
@@ -556,7 +494,7 @@ const instrument = setupInstrument({
   readList: readWatchlist,
   saveList: watchEditor.saveList,
 });
-function renderWatchlist() {
+function renderWatchlist(changed) {
   watchEditor.renameHeading();
   const symbols = readWatchlist();
   const session = usMarketSession();
@@ -567,17 +505,19 @@ function renderWatchlist() {
     if (external) return [symbol, {...external, label: external.marketType}];
     const tick = kiwoomTicks.get(symbol);
     const snapshot = lastKiwoomPrices.get(symbol);
-    const daily = kiwoomDaily.get(symbol)?.find(row => row.date < date);
+    const daily = kiwoomDaily.get(symbol)?.find(row => row.date < date
+      || row.date === date && ["After","Close"].includes(session.phase));
     const regular = kiwoomRegular.get(symbol);
-    const live = tick?.date === date && kiwoomPhases[tick.session] === session.phase ? tick : null;
+    const freshOvernight = tick?.session === "4" && tick.tradedAt >= Date.now() / 1000 - 120;
+    const live = tick?.date === date || freshOvernight ? tick : null;
     const change = regular?.date === date ? regular.change
       : snapshot?.received.date === session.date && snapshot.received.phase === "Regular" && session.phase === "Regular"
         ? snapshot.change : daily?.change;
     const price = live?.price ?? snapshot?.price ?? daily?.price;
-    const label = live ? kiwoomPhases[live.session] : snapshot ? "Last" : "Close";
+    const label = live ? (kiwoomPhases[live.session] || "Last") : snapshot ? "Last" : "Close";
     return [symbol, price != null || Number.isFinite(change)
       ? {price, change, label,
-        extendedChange: label === "Pre" || label === "After" ? live.change : null,
+        extendedChange: ["Pre", "After", "Overnight"].includes(label) ? live.change : null,
         changeDate: regular?.date === date ? date : daily?.date}
       : null];
   }));
@@ -596,104 +536,104 @@ function renderWatchlist() {
     }
     return sortDirection * (left - right);
   });
-  const focusedQuote = watchList.contains(document.activeElement) ? document.activeElement.href : null;
-  watchList.replaceChildren();
+  const existing = new Map([...watchList.children].map(row => [row.dataset.symbol, row]));
   document.querySelector("#watch-empty").hidden = Boolean(symbols.length);
-  for (const symbol of symbols) {
-    const row = document.createElement("li");
-    const badge = document.createElement("span");
-    badge.className = "watch-ticker-icon";
-    const logoFiles = { NVDA:"nvda", GOOGL:"goog", GOOG:"goog", AMZN:"amzn", AVGO:"avgo", NBIS:"nbis", AMZU:"amzu", SOXX:"soxx", SOXL:"soxl" };
+  symbols.forEach((symbol, index) => {
+    let row = existing.get(symbol);
+    const fresh = !row;
+    if (fresh) row = makeWatchRow(symbol);
+    existing.delete(symbol);
+    if (watchList.children[index] !== row) watchList.insertBefore(row, watchList.children[index] || null);
+    if (fresh || !changed || changed.has(symbol)) paintWatchRow(row, symbol, quotes.get(symbol), session);
+  });
+  for (const row of existing.values()) row.remove();
+}
+
+function makeWatchRow(symbol) {
+  const row = document.createElement("li");
+  row.dataset.symbol = symbol;
+  const badge = document.createElement("span");
+  badge.className = "watch-ticker-icon";
+  const logoFiles = {NVDA:"nvda", GOOGL:"goog", GOOG:"goog", AMZN:"amzn", AVGO:"avgo", NBIS:"nbis", AMZU:"amzu", SOXX:"soxx", SOXL:"soxl"};
+  const snapshot = snapshots.get(symbol);
+  if (snapshot) {
+    row.style.setProperty("--sprite-position", (snapshot.index * 12.5) + "%");
+    badge.classList.add("reference-logo");
+  } else {
     badge.textContent = symbol.slice(0, 2);
-    const snapshot = snapshots.get(symbol);
-    if (snapshot) {
-      row.style.setProperty("--sprite-position", `${snapshot.index * 12.5}%`);
-      badge.classList.add("reference-logo");
-      badge.textContent = "";
-    } else if (logoFiles[symbol]) {
+    if (logoFiles[symbol]) {
       const image = document.createElement("img");
-      image.src = `./assets/companies/${logoFiles[symbol]}.png?v=29`;
+      image.src = "./assets/companies/" + logoFiles[symbol] + ".png?v=29";
       image.alt = "";
-      image.addEventListener("load", () => { badge.firstChild?.remove(); });
       image.addEventListener("error", () => image.remove());
       badge.append(image);
     }
-    const identity = document.createElement("div");
-    identity.className = "watch-identity";
-    const name = document.createElement("strong");
-    const subtitle = document.createElement("small");
-    const market = quotes.get(symbol);
-    subtitle.textContent = nameFor(symbol);
-    const caption = document.createElement("div");
-    caption.className = "watch-caption";
-    caption.append(subtitle);
-    if (market) {
-      const tag = document.createElement("span");
-      tag.textContent = market.label;
-      tag.className = market.marketType ? "session-tag futures" : "session-tag";
-      if (!market.marketType && ["Pre", "After"].includes(session.phase) && market.label !== session.phase) {
-        tag.title = session.phase + " quote pending";
-      }
-      caption.append(tag);
-    }
-    identity.append(name, caption);
-    const chart = document.createElement("span");
-    chart.className = "mini-chart";
-    chart.setAttribute("aria-hidden", "true");
-    const daily = token && kiwoomDaily.get(symbol)?.filter(row => row.date < date);
-    if (daily?.length > 1) {
-      chart.style.color = market?.change < 0 ? "var(--down)" : "var(--up)";
-      chart.append(sparkline(daily.map(row => row.price).reverse()));
-    }
-    const quote = document.createElement("div");
-    quote.className = "watch-quote";
-    const priceLabel = document.createElement("strong");
-    const priceNote = document.createElement("small");
-    if (market) {
-      const {change} = market;
-      const hasChange = Number.isFinite(change);
-      const price = !Number.isFinite(market.price) ? ""
-        : market.marketType === "Index" ? market.price.toFixed(2) : watchDollars.format(market.price);
-      priceLabel.textContent = hasChange ? signedWatchPercent(change) : "—";
-      if (hasChange && !market.marketType) {
-        priceLabel.title = "Regular-session change from the prior close"
-          + (market.changeDate ? ` (${market.changeDate})` : "");
-      }
-      if (Number.isFinite(market.extendedChange)) {
-        priceNote.textContent = `${market.label}: ${signedWatchPercent(market.extendedChange)}`;
-        priceNote.title = price;
-        priceNote.dataset.direction = market.extendedChange < 0 ? "down" : "up";
-      } else {
-        priceNote.textContent = market.marketType === "Futures" && price ? price + " · Delayed" : price;
-        if (market.quoteTime) priceNote.title = new Date(market.quoteTime * 1000).toLocaleString();
-      }
-      if (hasChange) quote.dataset.direction = change < 0 ? "down" : "up";
-    } else {
-      priceLabel.textContent = "—";
-      priceNote.textContent = !token ? "Sign in for quotes"
-        : unavailableSymbols.has(symbol) ? "Unavailable on Kiwoom" : "Waiting for quote";
-    }
-    quote.append(priceLabel, priceNote);
-    const referenceSymbols = { BZMAIN: "BZmain", CLMAIN: "CLmain" };
-    name.textContent = referenceSymbols[symbol] || symbol;
-    {
-      const link = document.createElement("a");
-      link.href = "#stock=" + encodeURIComponent(symbol);
-      link.className = "symbol-link";
-      link.textContent = name.textContent;
-      link.setAttribute("aria-label", "Open " + symbol + " chart");
-      link.addEventListener("click", event => {
-        if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-        event.preventDefault();
-        instrument.open(symbol);
-      });
-      name.replaceChildren(link);
-    }
-    row.append(badge, identity, chart, quote);
-    watchList.append(row);
   }
-  if (focusedQuote) [...watchList.querySelectorAll(".symbol-link")].find(link => link.href === focusedQuote)
-    ?.focus({preventScroll: true});
+  const identity = document.createElement("div"), name = document.createElement("strong");
+  identity.className = "watch-identity";
+  const link = document.createElement("a");
+  link.href = "#stock=" + encodeURIComponent(symbol);
+  link.className = "symbol-link";
+  link.textContent = ({BZMAIN:"BZmain", CLMAIN:"CLmain"}[symbol] || symbol);
+  link.setAttribute("aria-label", "Open " + symbol + " chart");
+  link.addEventListener("click", event => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    instrument.open(symbol);
+  });
+  name.append(link);
+  const caption = document.createElement("div");
+  caption.className = "watch-caption";
+  caption.append(document.createElement("small"), document.createElement("span"));
+  identity.append(name, caption);
+  const chart = document.createElement("span"), quote = document.createElement("div");
+  chart.className = "mini-chart";
+  chart.setAttribute("aria-hidden", "true");
+  quote.className = "watch-quote";
+  quote.append(document.createElement("strong"), document.createElement("small"), document.createElement("small"));
+  row.append(badge, identity, chart, quote);
+  return row;
+}
+
+function paintWatchRow(row, symbol, market, session) {
+  const caption = row.querySelector(".watch-caption"), tag = caption.lastElementChild;
+  caption.firstElementChild.textContent = nameFor(symbol);
+  tag.hidden = !market;
+  tag.textContent = market?.label || "";
+  tag.className = market?.marketType ? "session-tag futures" : "session-tag";
+  tag.title = market && !market.marketType && ["Pre", "After"].includes(session.phase) && market.label !== session.phase
+    ? session.phase + " quote pending" : "";
+
+  const chart = row.querySelector(".mini-chart");
+  const points = new Map(token ? minuteHistory.get(symbol) : []);
+  if (token) for (const [stamp, price] of liveMinutes.get(symbol) ?? []) points.set(stamp, price);
+  const samples = [...points].sort((a, b) => a[0] - b[0]);
+  if (samples.length > 1) {
+    const end = samples.at(-1)[0];
+    let visible = samples.filter(([stamp]) => stamp >= end - 179 * 60);
+    const tradingDate = stamp => usMarketSession(new Date(stamp * 1000)).date;
+    const date = tradingDate(end);
+    if (tradingDate(visible[0][0]) !== date) visible = visible.filter(([stamp]) => tradingDate(stamp) === date);
+    if (visible.length > 1) {
+      chart.style.color = visible.at(-1)[1] < visible[0][1] ? "var(--down)" : "var(--up)";
+      sparkline(visible, chart);
+    } else chart.replaceChildren();
+  } else chart.replaceChildren();
+
+  const quote = row.querySelector(".watch-quote"), [main, price, extra] = quote.children;
+  const change = market?.change;
+  main.textContent = Number.isFinite(change) ? signedWatchPercent(change) : "—";
+  main.title = Number.isFinite(change) && !market.marketType ? "Regular-session change from the prior close" : "";
+  quote.dataset.direction = Number.isFinite(change) ? (change < 0 ? "down" : "up") : "";
+  if (market) {
+    price.textContent = !Number.isFinite(market.price) ? "" : market.marketType === "Index" ? market.price.toFixed(2)
+      : watchDollars.format(market.price) + (market.marketType === "Futures" ? " · Delayed" : "");
+  } else {
+    price.textContent = !token ? "Sign in for quotes" : unavailableSymbols.has(symbol) ? "Unavailable on Kiwoom" : "Waiting for quote";
+  }
+  extra.hidden = !Number.isFinite(market?.extendedChange);
+  extra.textContent = extra.hidden ? "" : market.label + ": " + signedWatchPercent(market.extendedChange);
+  extra.dataset.direction = market?.extendedChange < 0 ? "down" : "up";
 }
 var stockDirectory;
 watchForm.addEventListener("submit", async (event) => {
@@ -758,22 +698,11 @@ fetch("./assets/symbols.json").then((response) => {
 
 async function loadValuation(accessToken) {
   const value = document.querySelector("#portfolio-value");
-  const note = document.querySelector("#valuation-note");
-  const performance = document.querySelector("#kiwoom-return");
-  const accountValue = document.querySelector("#kiwoom-value");
-
-  const allocationTotal = document.querySelector("#allocation-total");
-  const allocation = document.querySelector("#allocation-breakdown");
-  allocationTotal.textContent = "조회 중…";
-  allocation.hidden = true;
+  const performance = document.querySelector("#kiwoom-return"), accountValue = document.querySelector("#kiwoom-value");
   accountValue.hidden = true;
-  accountValue.textContent = "";
   value.textContent = "조회 중…";
-  document.querySelector("#cash-value").textContent = "동기화 대기";
-  document.querySelector("#cash-breakdown").textContent = "";
-  document.querySelector("#cash-share").textContent = "";
-  note.textContent = "";
   performance.textContent = "";
+  showHoldings(null);
   try {
     const [balance] = await request("/rest/v1/kiwoom_valuation?select=*&limit=1", { accessToken });
     if (token !== accessToken) return;
@@ -786,7 +715,7 @@ async function loadValuation(accessToken) {
     }
     renderWatchlist();
     if (!balance) {
-      value.textContent = allocationTotal.textContent = "잔고 동기화 대기";
+      value.textContent = "잔고 동기화 대기";
       return;
     }
     const won = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" });
@@ -797,44 +726,15 @@ async function loadValuation(accessToken) {
     const candidate = estimate == null || !hasCash ? null : Number(estimate) - stocks - cash;
     const rp = candidate != null && Number.isFinite(candidate) && candidate >= 0 ? candidate : null;
     const total = rp == null ? stocks + cash : Number(estimate);
-    document.querySelector("#rp-value").textContent = rp == null ? "확인 필요" : won.format(rp);
-    document.querySelector("#rp-note").textContent = rp == null ? "총자산·예수금 확인 필요" : "총자산에서 주식과 예수금을 뺀 추정액";
-    document.querySelector("#rp-share").textContent = rp != null && total > 0 ? new Intl.NumberFormat("ko-KR", { style: "percent", maximumFractionDigits: 1 }).format(rp / total) : "";
-    const canCompare = stocks >= 0 && cash >= 0 && total > 0;
-    const stockWeight = canCompare ? stocks / total : 0;
     value.textContent = accountValue.textContent = won.format(total);
-    allocationTotal.textContent = value.textContent;
     accountValue.hidden = false;
-    const bar = document.querySelector("#allocation-bar");
-    bar.hidden = !canCompare;
-    bar.style.setProperty("--stock-share", `${stockWeight * 100}%`);
-    bar.style.setProperty("--cash-end", `${(stockWeight + cash / total) * 100}%`);
-    bar.setAttribute("aria-label", rp == null ? "주식 및 예수금 비중" : "주식, 예수금, 차액 비중");
-    const percent = new Intl.NumberFormat("ko-KR", { style: "percent", maximumFractionDigits: 1 });
-    document.querySelector("#stock-share").textContent = hasCash && canCompare ? percent.format(stockWeight) : "미국주식";
-    if (hasCash) {
-      document.querySelector("#cash-value").textContent = won.format(cash);
-      const usd = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "USD", currencyDisplay: "code" });
-      const foreignLabel = balance.cash_usd == null
-        ? `외화 환산 ${won.format(balance.cash_foreign_krw)}`
-        : usd.format(balance.cash_usd);
-      document.querySelector("#cash-breakdown").textContent =
-        `${won.format(balance.cash_domestic_krw)} KRW\n${foreignLabel}`;
-      if (canCompare) document.querySelector("#cash-share").textContent = percent.format(cash / total);
-    }
     performance.dataset.direction = Number(balance.return_pct) < 0 ? "down" : "up";
-    note.textContent = new Date(balance.observed_at).toLocaleString("en-US", { timeZone: "Asia/Seoul" }) + " KST";
-    performance.textContent = balance.return_pct == null ? "" : "수익률 " + Number(balance.return_pct).toFixed(2) + "%";
-    const allocationReturn = document.querySelector("#allocation-return");
-    document.querySelector("#allocation-value").textContent = won.format(stocks);
-    allocationReturn.textContent = formatStockProfit(balance, won);
-    allocationReturn.dataset.direction = performance.dataset.direction;
-    allocation.hidden = false;
+    performance.textContent = numeric(balance.return_pct) ? "수익률 " + signedWatchPercent(Number(balance.return_pct)) : "";
     showHoldings(balance);
 
     showProfit(balance.realized_profit);
   } catch (error) {
-    if (token === accessToken) value.textContent = allocationTotal.textContent = error.code === "PGRST205" ? "잔고 설정 대기" : "잔고를 불러오지 못했습니다";
+    if (token === accessToken) value.textContent = error.code === "PGRST205" ? "잔고 설정 대기" : "잔고를 불러오지 못했습니다";
   }
 }
 

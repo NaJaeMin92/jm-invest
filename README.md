@@ -22,8 +22,10 @@ python3 scripts/order-server.py --live
 Open `http://127.0.0.1:8765/`, sign in to **Account**, and use **매수** or **매도**
 from a stock's detail view. The ticket can load Kiwoom bid and ask levels and
 estimate the KRW amount at Kiwoom's reference exchange rate. It accepts US
-whole-share limit orders. It sends a single request when you confirm the preview
-and displays the broker's order number. Check any uncertain submission in
+whole-share limit, market, LOC, and VWAP/TWAP limit or market orders. The
+미체결 view shows the broker's open orders and lets you review a price amendment
+or cancellation of the remaining shares. It sends a single request when you
+confirm the preview and displays the broker's order number. Check any uncertain submission in
 Kiwoom before sending a new order. The server reads the existing mode-600
 `~/.jm-invest-credentials.json` file and binds to the Mac's loopback interface.
 
@@ -32,8 +34,9 @@ Kiwoom before sending a new order. The server reads the existing mode-600
 Install `websocket-client` in the Python environment that runs the server, then
 run `python3 scripts/order-server.py --quotes` from the repository root. Open
 `http://127.0.0.1:8765/` and sign in through Account. My Watchlist uses the
-Kiwoom current-quote and daily APIs to fill US equity rows, and the FE WebSocket
-to update traded prices. Brent and WTI crude oil futures and the VIX index use
+Kiwoom current-quote and daily APIs to fill US equity rows, minute bars for the
+sparklines, and the FE WebSocket to update traded prices and the latest minute.
+Brent and WTI crude oil futures and the VIX index use
 Yahoo Finance delayed quotes. This mode enables quotes only. The existing `--live` mode enables
 quotes and orders. The local server uses the same mode-600 credentials file
 and registered IP as the order service.

@@ -2,6 +2,7 @@ import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-cha
 import {showMarketPanel} from "./market-panels.js?v=68";
 
 import {setupChartTools} from "./chart-tools.js?v=58";
+import {orderKinds, needsPrice, populateKinds} from "./orders.js?v=72";
 
 const get = id => document.getElementById(id);
 const savedQuotes = new Set("ANT SKHY SPCX MRVL BZMAIN CLMAIN AAL UAL DAL NVDA AMZN".split(" "));
@@ -16,16 +17,28 @@ export function publicQuote(symbol) {
   }
   return cache.get(symbol);
 }
-export function sparkline(values) {
+export function sparkline(points, container) {
   const ns = "http://www.w3.org/2000/svg";
-  const svg=document.createElementNS(ns,"svg"), path=document.createElementNS(ns,"polyline");
-  const min=Math.min(...values), max=Math.max(...values);
-  svg.setAttribute("viewBox","0 0 100 44");
-  svg.setAttribute("preserveAspectRatio","none");
-  path.setAttribute("points",values.map((v,i)=>[(i*99/(values.length-1 || 1)).toFixed(2),(41-38*(v-min)/(max-min||1)).toFixed(2)].join(",")).join(" "));
-  path.setAttribute("fill","none");path.setAttribute("stroke","currentColor");path.setAttribute("stroke-width","1.6");
-  svg.append(path);
-  return svg;
+  let path = container.querySelector("polyline");
+  if (!path) {
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox","0 0 100 44");
+    svg.setAttribute("preserveAspectRatio","none");
+    path = document.createElementNS(ns,"polyline");
+    path.setAttribute("fill","none");
+    path.setAttribute("stroke","currentColor");
+    path.setAttribute("stroke-width","1.6");
+    svg.append(path);
+    container.append(svg);
+  }
+  const prices = points.map(point => point[1]);
+  const min = Math.min(...prices), max = Math.max(...prices), start = points[0][0];
+  const span = points.at(-1)[0] - start;
+  path.setAttribute("points",points.map(([stamp, value]) => {
+    const x = 1 + 98 * (stamp - start) / span;
+    const y = min === max ? 22 : 40 - 36 * (value - min) / (max - min);
+    return x.toFixed(2) + "," + y.toFixed(2);
+  }).join(" "));
 }
 const signed = n => (n>=0?"+":"")+n.toFixed(2);
 const displaySymbol = s => ({BZMAIN:"BZmain",CLMAIN:"CLmain"}[s] || s);
@@ -40,7 +53,8 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
   const tradeConfirm = get("trade-preview-confirm"), tradeEdit = get("trade-preview-edit");
   const bookLevels = get("trade-book-levels"), bookRefresh = get("trade-book-refresh");
   const bookStatus = get("trade-book-status"), bookMarket = get("trade-book-market");
-  const bookMode = get("trade-book-mode"), bestPrice = get("trade-use-best");
+  const bookMode = get("trade-book-mode"), kind = get("trade-kind");
+  populateKinds(kind);
   const ticketSides = [...tradeForm.querySelectorAll("[data-ticket-side]")];
   const quantity = tradeForm.querySelector('[name="quantity"]');
   const price = tradeForm.querySelector('[name="price"]');
@@ -62,27 +76,29 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     for (const button of ticketSides) {
       button.setAttribute("aria-pressed", String(button.dataset.ticketSide === side));
     }
-    refreshBestPrice();
   }
 
-  function oppositePrice() {
-    return (tradeSide === "buy" ? displayedBook?.asks : displayedBook?.bids)?.[0]?.price;
+  function updateOrderKind() {
+    const algo = ["26","27","36","37"].includes(kind.value);
+    quantity.min = algo ? "5" : "1";
+    get("trade-quantity-label").textContent = algo ? "수량 (최소 5주)" : "수량 (주)";
+    price.disabled = !needsPrice(kind.value);
+    get("trade-limit-field").hidden = price.disabled;
+    get("trade-use-quote").parentElement.hidden = price.disabled;
+    for (const button of bookLevels.querySelectorAll("button")) button.disabled = price.disabled;
+    updateTradeTotal();
   }
-
-  function refreshBestPrice() {
-    bestPrice.hidden = !Number.isFinite(oppositePrice());
-    bestPrice.textContent = tradeSide === "buy" ? "최우선 매도호가" : "최우선 매수호가";
-  }
+  kind.onchange = updateOrderKind;
 
   function updateTradeTotal() {
     const amount = quantity.valueAsNumber * price.valueAsNumber;
     const valid = quantity.validity.valid && price.validity.valid && Number.isFinite(amount);
-    get("trade-preview-total").textContent = valid ? dollars.format(amount) : "—";
+    get("trade-preview-total").textContent = price.disabled ? "체결 시 결정" : valid ? dollars.format(amount) : "—";
     const converted = get("trade-preview-krw");
-    converted.hidden = !valid || !Number.isFinite(orderContext?.fx);
+    converted.hidden = price.disabled || !valid || !Number.isFinite(orderContext?.fx);
     converted.textContent = converted.hidden ? "" : "약 " + won.format(amount * orderContext.fx);
     for (const button of bookLevels.querySelectorAll("button")) {
-      button.setAttribute("aria-pressed", String(Number(button.dataset.price) === price.valueAsNumber));
+      button.setAttribute("aria-pressed", String(!price.disabled && Number(button.dataset.price) === price.valueAsNumber));
     }
   }
 
@@ -106,14 +122,21 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
       if (!button) {
         button = document.createElement("button");
         button.type = "button";
-        button.append(document.createElement("span"), document.createElement("small"));
+        const prices = document.createElement("span");
+        prices.append(document.createElement("b"), document.createElement("small"));
+        button.append(prices, document.createElement("span"));
         button.onclick = () => setTradePrice(Number(button.dataset.price));
         container.append(button);
       }
       button.dataset.price = level.price;
       button.style.setProperty("--depth", (100 * (level.quantity ?? 0) / largest) + "%");
-      button.firstElementChild.textContent = dollars.format(level.price);
-      button.lastElementChild.textContent = level.quantity?.toLocaleString("ko-KR") ?? "—";
+      button.disabled = price.disabled;
+      const prices = button.firstElementChild, change = button.lastElementChild;
+      prices.firstElementChild.textContent = dollars.format(level.price);
+      prices.lastElementChild.textContent = orderContext?.fx > 0 ? won.format(level.price * orderContext.fx) : "₩—";
+      const percent = orderContext?.previousClose > 0 ? (level.price / orderContext.previousClose - 1) * 100 : null;
+      change.textContent = percent == null ? "—" : (percent > 0 ? "+" : "") + percent.toFixed(2) + "%";
+      change.dataset.direction = percent > 0 ? "up" : percent < 0 ? "down" : "";
     });
   }
 
@@ -140,7 +163,6 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     if (centerBook && !bookLevels.hidden) {
       bookLevels.scrollTop = bookMarket.offsetTop + (bookMarket.offsetHeight - bookLevels.clientHeight) / 2;
     }
-    refreshBestPrice();
     updateTradeTotal();
   }
 
@@ -177,6 +199,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
       tradeStatus.textContent = context?.enabled ? "" : previewOnly;
       showTradeQuote(liveTradePrice ?? context?.price);
       if (context && revision === bookRevision) showOrderBook(context);
+      else if (displayedBook) showOrderBook(displayedBook);
       if (!context && bookLevels.hidden) bookStatus.textContent = "로그인 후 호가를 볼 수 있습니다.";
       updateTradeTotal();
     } catch (error) {
@@ -199,12 +222,13 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     orderContext = null;
     reviewId = null;
     displayedBook = undefined;
-    refreshBestPrice();
     bookMode.textContent = "";
     bookMode.dataset.live = "false";
     bookRevision = 0;
     liveTradePrice = undefined;
     tradeForm.reset();
+    kind.value = "00";
+    updateOrderKind();
     price.setCustomValidity("");
     priceHint.textContent = "";
     tradeForm.hidden = false;
@@ -212,6 +236,8 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     tradeNext.disabled = true;
     tradeConfirm.disabled = true;
     tradeEdit.disabled = false;
+    tradeEdit.hidden = false;
+    get("trade-review-pending").hidden = true;
     bookLevels.hidden = true;
     bookStatus.hidden = false;
     bookStatus.textContent = "호가 조회 중…";
@@ -249,7 +275,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     };
   }
   get("trade-use-quote").onclick = () => setTradePrice(liveTradePrice ?? orderContext?.price);
-  bestPrice.onclick = () => setTradePrice(oppositePrice());
+  get("trade-pending").onclick = get("trade-review-pending").onclick = orders.openPending;
   for (const button of tradeForm.querySelectorAll("[data-trade-step]")) {
     button.onclick = () => {
       if (button.dataset.tradeStep === "price") {
@@ -278,8 +304,8 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     event.preventDefault();
     if (tradeBusy || tradeNext.disabled || !tradeForm.reportValidity()) return;
     const version = tradeVersion;
-    let order = {side: tradeSide, quantity: quantity.value, price: price.value,
-                 amount: quantity.valueAsNumber * price.valueAsNumber};
+    let order = {side: tradeSide, kind:kind.value, quantity: quantity.value, price: price.disabled ? "" : price.value,
+                 amount: price.disabled ? null : quantity.valueAsNumber * price.valueAsNumber};
     if (orderContext?.enabled) {
       tradeBusy = true;
       tradeNext.disabled = true;
@@ -297,13 +323,14 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     if (version !== tradeVersion || !trade.open) return;
     reviewId = order.id ?? null;
     get("trade-review-side").textContent = sideName[order.side];
+    get("trade-review-kind").textContent = orderKinds.get(order.kind);
     get("trade-review-quantity").textContent = Number(order.quantity).toLocaleString("ko-KR") + "주";
-    get("trade-review-price").textContent = dollars.format(order.price);
-    get("trade-review-total").textContent = dollars.format(order.amount);
+    get("trade-review-price").textContent = order.price ? dollars.format(order.price) : "시장가";
+    get("trade-review-total").textContent = order.amount == null ? "체결 시 결정" : dollars.format(order.amount);
     tradeForm.hidden = true;
     tradeReview.hidden = false;
     tradeConfirm.disabled = !reviewId;
-    tradeStatus.textContent = reviewId ? "지정가와 수량을 확인한 뒤 실계좌 주문을 전송하세요." : previewOnly;
+    tradeStatus.textContent = reviewId ? "주문 종류와 수량을 확인한 뒤 전송하세요." : previewOnly;
     get("trade-review-title").focus();
   });
 
@@ -334,6 +361,8 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
         : error.message;
     } finally {
       tradeBusy = false;
+      tradeEdit.hidden = true;
+      get("trade-review-pending").hidden = false;
     }
   };
 
