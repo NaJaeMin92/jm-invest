@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=70">
-<script type="module" src="./journal.js?v=70"></script>
+<link rel="stylesheet" href="./style.css?v=71">
+<script type="module" src="./journal.js?v=71"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header><div class="head"><a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -228,7 +228,7 @@
 </div>
 <div class="trade-workspace">
 <section id="trade-book" aria-label="키움 호가">
-<div class="trade-book-head"><div><strong>10호가</strong><time id="trade-book-time"></time></div>
+<div class="trade-book-head"><div><strong>10호가</strong><span id="trade-book-mode"></span><time id="trade-book-time"></time></div>
 <button id="trade-book-refresh" type="button" aria-label="호가 새로고침" title="호가 새로고침">↻</button></div>
 <div class="trade-book-columns" aria-hidden="true"><span>가격 (USD)</span><span>잔량</span></div>
 <p id="trade-book-status" role="status"></p>
@@ -241,15 +241,19 @@
 <div class="trade-entry">
 <div class="trade-fields">
 <div><label for="trade-limit">지정가 (USD)</label>
-<div class="trade-stepper"><button type="button" data-trade-step="price" value="-1" aria-label="지정가 1센트 내리기">−</button><input id="trade-limit" type="number" name="price" inputmode="decimal" min="0.0001" max="9999999" step="0.0001" placeholder="0.00" required><button type="button" data-trade-step="price" value="1" aria-label="지정가 1센트 올리기">+</button></div></div>
-<button id="trade-use-quote" type="button" hidden>현재가 사용</button>
+<div class="trade-stepper"><button type="button" data-trade-step="price" value="-1" aria-label="지정가 한 단위 내리기">−</button><input id="trade-limit" type="number" name="price" inputmode="decimal" min="0.0001" max="9999999" step="0.0001" placeholder="0.00" aria-describedby="trade-price-hint" required><button type="button" data-trade-step="price" value="1" aria-label="지정가 한 단위 올리기">+</button></div>
+<small id="trade-price-hint" role="status"></small></div>
+<div class="trade-price-shortcuts">
+<button id="trade-use-best" type="button" hidden></button>
+<button id="trade-use-quote" type="button" hidden>현재가</button>
+</div>
 <div><label for="trade-quantity">수량 (주)</label>
 <div class="trade-stepper"><button type="button" data-trade-step="quantity" value="-1" aria-label="수량 한 주 줄이기">−</button><input id="trade-quantity" type="number" name="quantity" inputmode="numeric" min="1" max="999999" step="1" value="1" required><button type="button" data-trade-step="quantity" value="1" aria-label="수량 한 주 늘리기">+</button></div></div>
 </div>
 </div>
 </div>
 <div class="trade-ticket-footer">
-<div class="trade-ticket-total"><span>주문 금액</span><div><output id="trade-preview-total">—</output><small id="trade-preview-krw" hidden></small></div></div>
+<div class="trade-ticket-total"><span>예상 주문 금액</span><div><output id="trade-preview-total">—</output><small id="trade-preview-krw" hidden></small></div></div>
 <button id="trade-preview-next" type="submit" class="trade-ticket-primary">주문 내용 확인</button>
 </div>
 </form>

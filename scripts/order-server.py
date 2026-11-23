@@ -95,8 +95,12 @@ def order_fields(data):
         raise Problem(400, "매매 구분과 주 단위 수량을 확인하세요.")
     if not re.fullmatch(r"\d{1,7}(?:\.\d{1,4})?", price) or not Decimal(price) > 0:
         raise Problem(400, "유효한 USD 지정가를 입력하세요.")
-    return dict(symbol=symbol, quantity=quantity, price=price, exchange=exchange, side=side,
-                amount=format(Decimal(price)*int(quantity), "f"))
+    limit = Decimal(price)
+    formatted = limit.quantize(Decimal("0.01") if limit >= 1 else Decimal("0.0001"))
+    if formatted != limit:
+        raise Problem(400, "미국주식 지정가는 $1 이상 소수점 2자리, $1 미만 소수점 4자리까지 입력할 수 있습니다.")
+    return dict(symbol=symbol, quantity=quantity, price=format(formatted, "f"), exchange=exchange, side=side,
+                amount=format(formatted * int(quantity), "f"))
 
 
 class Kiwoom:
@@ -282,7 +286,7 @@ class Orders:
                 if existing and existing[0] == "accepted":
                     return {"number": existing[1]}
                 raise Problem(409, "주문 확인이 만료되었거나 이미 처리되었습니다. 키움에서 확인하세요.")
-            order = json.loads(db.execute("SELECT payload FROM orders WHERE id=?", (intent,)).fetchone()[0])
+            order = order_fields(json.loads(db.execute("SELECT payload FROM orders WHERE id=?", (intent,)).fetchone()[0]))
 
         try:
             result = self.broker.submit(token, order)
@@ -311,9 +315,12 @@ def kiwoom_ticks(socket, items, timeout_error):
     socket.send(json.dumps({"trnm": "LOGIN", "token": items["token"]}))
     subscriptions = {(item["jmcode"], item["stex_tp"]): item.get("symbol", item["jmcode"])
                      for item in items["symbols"]}
-    request = {"trnm": "REG", "grp_no": "1", "refresh": "0",
-               "data": [{"item": [{"jmcode": ticker, "stex_tp": exchange}
-                                  for ticker, exchange in subscriptions], "type": ["FE"]}]}
+    data = [{"item": [{"jmcode": ticker, "stex_tp": exchange}
+                      for ticker, exchange in subscriptions], "type": ["FE"]}]
+    book = items.get("book")
+    if book:
+        data.append({"item": [{"jmcode": book["jmcode"], "stex_tp": book["stex_tp"]}], "type": ["FT"]})
+    request = {"trnm": "REG", "grp_no": "1", "refresh": "0", "data": data}
     registered = False
     while True:
         try:
@@ -341,18 +348,24 @@ def kiwoom_ticks(socket, items, timeout_error):
                 yield None
         elif action == "REAL":
             for tick in message.get("data", []):
-                if tick.get("type") != "FE":
+                symbol = subscriptions.get((tick.get("item"), tick.get("stexTp")))
+                if not symbol:
                     continue
                 values = tick.get("values", {})
+                if tick.get("type") == "FT" and book and symbol == book["symbol"]:
+                    yield {"symbol": symbol, "book": {
+                        "asks": ft_levels(values, 41, 61), "bids": ft_levels(values, 51, 71),
+                        "time": str(values.get("21") or ""),
+                    }}
+                    continue
+                if tick.get("type") != "FE":
+                    continue
                 try:
                     price = abs(float(values["10"]))
                     change = float(values["12"]) if values.get("12") else None
                 except (KeyError, ValueError, TypeError):
                     continue
                 if not math.isfinite(price) or not price:
-                    continue
-                symbol = subscriptions.get((tick.get("item"), tick.get("stexTp")))
-                if not symbol:
                     continue
                 yield {"symbol": symbol, "price": price,
                        "change": change if change is not None and math.isfinite(change) else None,
@@ -371,6 +384,42 @@ def finite_quote(raw):
         return None
     return value if math.isfinite(value) else None
 
+
+def ft_levels(values, price_start, size_start):
+    levels = []
+    for index in range(10):
+        price = positive_quote(values.get(str(price_start + index)))
+        if price is not None:
+            levels.append({"price": price, "quantity": finite_quote(values.get(str(size_start + index)))})
+    return levels
+
+
+def publish_kiwoom_stream(token, items, book, updates, stopped):
+    import websocket
+    while not stopped.is_set():
+        socket = None
+        try:
+            socket = websocket.create_connection("wss://api.kiwoom.com:10000/api/websocket",
+                                                 timeout=5, suppress_origin=True)
+            ticks = kiwoom_ticks(socket, {"token": token, "symbols": items, "book": book},
+                                  websocket.WebSocketTimeoutException)
+            first = next(ticks, None)
+            if first is not None:
+                updates.put(first)
+            socket.settimeout(1)
+            for tick in ticks:
+                if stopped.is_set():
+                    return
+                if tick is not None:
+                    updates.put(tick)
+        except (OSError, ValueError, Problem, websocket.WebSocketException):
+            if book:
+                updates.put({"symbol": book["symbol"], "bookStatus": "reconnecting"})
+        finally:
+            if socket is not None:
+                socket.close(timeout=0)
+        if stopped.wait(2):
+            return
 
 def chart_bars(rows, intraday, now):
     bars = {}
@@ -534,7 +583,7 @@ class App(BaseHTTPRequestHandler):
         self.close_connection = True
         opened = False
         acquired = False
-        socket = None
+        worker = None
         stopped = Event()
         try:
             if self.quote_broker is None:
@@ -544,6 +593,9 @@ class App(BaseHTTPRequestHandler):
             owner_session(self.headers.get("Authorization"))
             length = int(self.headers.get("Content-Length", "0"))
             requested = json.loads(self.rfile.read(length)) if 0 < length <= 16000 else None
+            book_symbol = requested.get("book") if isinstance(requested, dict) else None
+            if isinstance(requested, dict):
+                requested = requested.get("symbols")
             if isinstance(requested, list):
                 requested = [item.get("jmcode") if isinstance(item, dict) else item for item in requested]
             if not isinstance(requested, list) or not 1 <= len(requested) <= 200 or any(
@@ -551,6 +603,8 @@ class App(BaseHTTPRequestHandler):
                 for symbol in requested
             ):
                 raise Problem(400, "종목 코드를 확인하세요.")
+            if book_symbol is not None and book_symbol not in requested:
+                raise Problem(400, "호가 조회 종목을 확인하세요.")
             acquired = self.quote_lock.acquire(timeout=3)
             if not acquired:
                 raise Problem(409, "키움 시세 세션을 다른 탭에서 사용 중입니다.")
@@ -566,14 +620,7 @@ class App(BaseHTTPRequestHandler):
                     items.append({"symbol": symbol, "jmcode": ticker, "stex_tp": directory[ticker]})
                 else:
                     unsupported.append(symbol)
-            ticks = iter(())
-            if items:
-                import websocket
-                socket = websocket.create_connection(
-                    "wss://api.kiwoom.com:10000/api/websocket", timeout=8, suppress_origin=True)
-                ticks = kiwoom_ticks(socket, {"token": token, "symbols": items}, websocket.WebSocketTimeoutException)
-                next(ticks, None)
-                socket.settimeout(2)
+            book = next((item for item in items if item["symbol"] == book_symbol), None)
             self.send_response(200)
             self.send_header("Content-Type", "application/x-ndjson")
             self.send_header("Transfer-Encoding", "chunked")
@@ -582,32 +629,27 @@ class App(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             opened = True
-            snapshots = SimpleQueue()
+            self.connection.settimeout(10)
+            updates = SimpleQueue()
+            updates.put({"unsupported": unsupported})
             if items:
-                Thread(target=seed_kiwoom_quotes, args=(self.quote_broker, token, items, snapshots, stopped),
+                Thread(target=seed_kiwoom_quotes, args=(self.quote_broker, token, items, updates, stopped),
                        daemon=True).start()
+                worker = Thread(target=publish_kiwoom_stream, args=(token, items, book, updates, stopped),
+                                daemon=True)
+                worker.start()
             if external:
-                Thread(target=refresh_external_quotes, args=(external, snapshots, stopped), daemon=True).start()
+                Thread(target=refresh_external_quotes, args=(external, updates, stopped), daemon=True).start()
             deadline = time.monotonic() + 300
-            tick = {"unsupported": unsupported}
-            while True:
-                if time.monotonic() >= deadline:
-                    break
-                frames = [tick]
-                while True:
-                    try:
-                        frames.append(snapshots.get_nowait())
-                    except Empty:
-                        break
-                payload = b"".join((json.dumps(frame) + "\n").encode() for frame in frames)
-                self.wfile.write(f"{len(payload):X}\r\n".encode() + payload + b"\r\n")
+            while time.monotonic() < deadline:
                 try:
-                    tick = next(ticks)
-                except StopIteration:
-                    if items or not external:
-                        break
-                    stopped.wait(2)
-                    tick = None
+                    frame = updates.get(timeout=1)
+                except Empty:
+                    frame = None
+                payload = (json.dumps(frame) + "\n").encode()
+                self.wfile.write(f"{len(payload):X}\r\n".encode() + payload + b"\r\n")
+                if not items and not external:
+                    break
             self.wfile.write(b"0\r\n\r\n")
         except Problem as error:
             if not opened:
@@ -620,12 +662,10 @@ class App(BaseHTTPRequestHandler):
                 self.write_json(502, {"message": "키움 실시간 시세를 받지 못했습니다."})
         finally:
             stopped.set()
-            try:
-                if socket is not None:
-                    socket.close(timeout=0)
-            finally:
-                if acquired:
-                    self.quote_lock.release()
+            if worker is not None:
+                worker.join(timeout=2)
+            if acquired:
+                self.quote_lock.release()
 
     def handle_order(self, action):
         try:

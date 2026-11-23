@@ -1,4 +1,4 @@
-import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=58";
+import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=71";
 import {showMarketPanel} from "./market-panels.js?v=68";
 
 import {setupChartTools} from "./chart-tools.js?v=58";
@@ -31,7 +31,7 @@ const signed = n => (n>=0?"+":"")+n.toFixed(2);
 const displaySymbol = s => ({BZMAIN:"BZmain",CLMAIN:"CLmain"}[s] || s);
 const validSymbol = /^[A-Z][A-Z0-9.\-]{0,11}$/;
 
-export function setupInstrument({search,nameFor,readList,saveList,orders,canLoadChart,loadChart,signIn}) {
+export function setupInstrument({search,nameFor,readList,saveList,orders,subscribeOrderBook,canLoadChart,loadChart,signIn}) {
   const dialog=get("stock-detail"), canvas=get("market-chart"), reference=get("daily-reference");
   let current="", quote=null, frame="day", afterClose=null, quoteRequest=0;
   const trade = get("trade-preview");
@@ -40,9 +40,11 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
   const tradeConfirm = get("trade-preview-confirm"), tradeEdit = get("trade-preview-edit");
   const bookLevels = get("trade-book-levels"), bookRefresh = get("trade-book-refresh");
   const bookStatus = get("trade-book-status"), bookMarket = get("trade-book-market");
+  const bookMode = get("trade-book-mode"), bestPrice = get("trade-use-best");
   const ticketSides = [...tradeForm.querySelectorAll("[data-ticket-side]")];
   const quantity = tradeForm.querySelector('[name="quantity"]');
   const price = tradeForm.querySelector('[name="price"]');
+  const priceHint = get("trade-price-hint");
   const dollars = new Intl.NumberFormat("en-US", {
     style: "currency", currency: "USD", maximumFractionDigits: 4
   });
@@ -50,6 +52,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
   const sideName = {buy: "매수", sell: "매도"};
   const previewOnly = "미리보기 모드입니다. 실계좌 주문은 이 Mac의 비공개 서버에서 할 수 있습니다.";
   let tradeSide, orderContext, reviewId, tradeBusy = false, tradeVersion = 0;
+  let unsubscribeBook, pendingBook, bookPaint, bookRevision = 0, liveTradePrice, displayedBook;
 
   function selectTradeSide(side) {
     tradeSide = side;
@@ -59,6 +62,16 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
     for (const button of ticketSides) {
       button.setAttribute("aria-pressed", String(button.dataset.ticketSide === side));
     }
+    refreshBestPrice();
+  }
+
+  function oppositePrice() {
+    return (tradeSide === "buy" ? displayedBook?.asks : displayedBook?.bids)?.[0]?.price;
+  }
+
+  function refreshBestPrice() {
+    bestPrice.hidden = !Number.isFinite(oppositePrice());
+    bestPrice.textContent = tradeSide === "buy" ? "최우선 매도호가" : "최우선 매수호가";
   }
 
   function updateTradeTotal() {
@@ -75,50 +88,96 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
 
   function setTradePrice(value) {
     if (!Number.isFinite(value)) return;
-    price.value = value.toFixed(4);
+    const scale = value >= 1 ? 100 : 10_000;
+    const scaled = Number((value * scale).toFixed(6));
+    const rounded = (tradeSide === "buy" ? Math.floor(scaled) : Math.ceil(scaled)) / scale;
+    price.value = rounded.toFixed(rounded >= 1 ? 2 : 4);
+    price.setCustomValidity("");
+    priceHint.textContent = Math.abs(rounded - value) > 1e-8
+      ? dollars.format(value) + " → 주문가 " + dollars.format(rounded) : "";
     updateTradeTotal();
   }
 
   function renderBookSide(container, levels) {
-    container.replaceChildren(...(levels ?? []).map(level => {
-      const button = document.createElement("button");
-      button.type = "button";
+    const largest = Math.max(1, ...levels.map(level => level.quantity ?? 0));
+    while (container.children.length > levels.length) container.lastElementChild.remove();
+    levels.forEach((level, index) => {
+      let button = container.children[index];
+      if (!button) {
+        button = document.createElement("button");
+        button.type = "button";
+        button.append(document.createElement("span"), document.createElement("small"));
+        button.onclick = () => setTradePrice(Number(button.dataset.price));
+        container.append(button);
+      }
       button.dataset.price = level.price;
-      const value = document.createElement("span");
-      value.textContent = dollars.format(level.price);
-      const volume = document.createElement("small");
-      volume.textContent = level.quantity?.toLocaleString("ko-KR") ?? "—";
-      button.append(value, volume);
-      button.onclick = () => setTradePrice(level.price);
-      return button;
-    }));
+      button.style.setProperty("--depth", (100 * (level.quantity ?? 0) / largest) + "%");
+      button.firstElementChild.textContent = dollars.format(level.price);
+      button.lastElementChild.textContent = level.quantity?.toLocaleString("ko-KR") ?? "—";
+    });
+  }
+
+  function showTradeQuote(value) {
+    if (!Number.isFinite(value)) return;
+    const currentPrice = get("trade-preview-quote");
+    currentPrice.hidden = false;
+    currentPrice.textContent = "키움 현재가 · " + dollars.format(value);
+    get("trade-use-quote").hidden = false;
+    get("trade-book-price").textContent = dollars.format(value);
+  }
+
+  function showOrderBook(book) {
+    displayedBook = book;
+    const centerBook = bookLevels.hidden;
+    bookLevels.hidden = !(book.asks?.length || book.bids?.length);
+    bookStatus.hidden = !bookLevels.hidden;
+    bookStatus.textContent = "표시할 호가가 없습니다.";
+    bookMode.textContent = book.live ? "실시간" : bookLevels.hidden ? "" : "최근 호가";
+    bookMode.dataset.live = String(Boolean(book.live));
+    get("trade-book-time").textContent = [book.date, book.time].filter(Boolean).join(" ");
+    renderBookSide(get("trade-book-asks"), [...(book.asks ?? [])].reverse());
+    renderBookSide(get("trade-book-bids"), book.bids ?? []);
+    if (centerBook && !bookLevels.hidden) {
+      bookLevels.scrollTop = bookMarket.offsetTop + (bookMarket.offsetHeight - bookLevels.clientHeight) / 2;
+    }
+    refreshBestPrice();
+    updateTradeTotal();
+  }
+
+  function onBookUpdate(update) {
+    if (!trade.open || tradeForm.hidden) return;
+    if (update.bookStatus === "reconnecting") {
+      bookMode.textContent = "재연결 중";
+      bookMode.dataset.live = "false";
+      return;
+    }
+    if (update.book) {
+      bookRevision += 1;
+      pendingBook = {...update.book, live: true,
+        time: update.book.time.replace(/^(\d\d)(\d\d)(\d\d)$/, "$1:$2:$3")};
+    } else if (Number.isFinite(update.price)) {
+      liveTradePrice = update.price;
+    }
+    bookPaint ??= requestAnimationFrame(() => {
+      bookPaint = undefined;
+      if (Number.isFinite(liveTradePrice)) showTradeQuote(liveTradePrice);
+      if (pendingBook) showOrderBook(pendingBook);
+      pendingBook = undefined;
+    });
   }
 
   async function loadTradeContext() {
     const version = tradeVersion;
+    const revision = bookRevision;
     bookRefresh.disabled = true;
     try {
       const context = await orders.stockContext(current);
       if (version !== tradeVersion || !trade.open) return;
       orderContext = context;
       tradeStatus.textContent = context?.enabled ? "" : previewOnly;
-      const currentPrice = get("trade-preview-quote");
-      if (Number.isFinite(context?.price)) {
-        currentPrice.hidden = false;
-        currentPrice.textContent = "키움 현재가 · " + dollars.format(context.price);
-        get("trade-use-quote").hidden = false;
-      }
-      get("trade-book-price").textContent = Number.isFinite(context?.price) ? dollars.format(context.price) : "—";
-      const centerBook = bookLevels.hidden;
-      bookLevels.hidden = !(context?.asks?.length || context?.bids?.length);
-      bookStatus.hidden = !bookLevels.hidden;
-      bookStatus.textContent = context ? "표시할 호가가 없습니다." : "로그인 후 호가를 볼 수 있습니다.";
-      get("trade-book-time").textContent = [context?.date, context?.time].filter(Boolean).join(" ");
-      renderBookSide(get("trade-book-asks"), [...(context?.asks ?? [])].reverse());
-      renderBookSide(get("trade-book-bids"), context?.bids);
-      if (centerBook && !bookLevels.hidden) {
-        bookLevels.scrollTop = bookMarket.offsetTop + (bookMarket.offsetHeight - bookLevels.clientHeight) / 2;
-      }
+      showTradeQuote(liveTradePrice ?? context?.price);
+      if (context && revision === bookRevision) showOrderBook(context);
+      if (!context && bookLevels.hidden) bookStatus.textContent = "로그인 후 호가를 볼 수 있습니다.";
       updateTradeTotal();
     } catch (error) {
       if (version === tradeVersion && trade.open) {
@@ -139,7 +198,15 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
     selectTradeSide(side);
     orderContext = null;
     reviewId = null;
+    displayedBook = undefined;
+    refreshBestPrice();
+    bookMode.textContent = "";
+    bookMode.dataset.live = "false";
+    bookRevision = 0;
+    liveTradePrice = undefined;
     tradeForm.reset();
+    price.setCustomValidity("");
+    priceHint.textContent = "";
     tradeForm.hidden = false;
     tradeReview.hidden = true;
     tradeNext.disabled = true;
@@ -158,6 +225,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
       : (quote.fromKiwoom ? "키움 조회가 · " : "저장된 종가 · ") + dollars.format(quote.price);
     updateTradeTotal();
     trade.showModal();
+    unsubscribeBook = subscribeOrderBook(current, onBookUpdate);
     loadTradeContext();
   }
 
@@ -169,6 +237,10 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
   trade.addEventListener("close", () => {
     tradeVersion += 1;
     reviewId = null;
+    unsubscribeBook?.();
+    unsubscribeBook = undefined;
+    if (bookPaint != null) cancelAnimationFrame(bookPaint);
+    bookPaint = pendingBook = undefined;
   });
   bookRefresh.onclick = loadTradeContext;
   for (const button of ticketSides) {
@@ -176,22 +248,32 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
       if (!tradeBusy && !tradeForm.hidden) selectTradeSide(button.dataset.ticketSide);
     };
   }
-  get("trade-use-quote").onclick = () => setTradePrice(orderContext?.price);
+  get("trade-use-quote").onclick = () => setTradePrice(liveTradePrice ?? orderContext?.price);
+  bestPrice.onclick = () => setTradePrice(oppositePrice());
   for (const button of tradeForm.querySelectorAll("[data-trade-step]")) {
     button.onclick = () => {
       if (button.dataset.tradeStep === "price") {
         if (!Number.isFinite(price.valueAsNumber)) {
-          setTradePrice(orderContext?.price);
+          setTradePrice(liveTradePrice ?? orderContext?.price);
           return;
         }
-        const value = price.valueAsNumber + Number(button.value) * 0.01;
+        const direction = Number(button.value);
+        const currentPrice = price.valueAsNumber;
+        const tick = currentPrice < 1 || currentPrice === 1 && direction < 0 ? 0.0001 : 0.01;
+        const value = Number((currentPrice + direction * tick).toFixed(4));
         setTradePrice(Math.min(Number(price.max), Math.max(Number(price.min), value)));
       } else if (button.value === "1") quantity.stepUp();
       else quantity.stepDown();
       updateTradeTotal();
     };
   }
-  tradeForm.addEventListener("input", updateTradeTotal);
+  tradeForm.addEventListener("input", () => {
+    const decimals = price.value.split(".")[1]?.replace(/0+$/, "").length ?? 0;
+    const invalid = decimals > (price.valueAsNumber >= 1 ? 2 : 4);
+    price.setCustomValidity(invalid ? "$1 이상은 소수점 2자리, $1 미만은 4자리까지 입력할 수 있습니다." : "");
+    priceHint.textContent = "";
+    updateTradeTotal();
+  });
   tradeForm.addEventListener("submit", async event => {
     event.preventDefault();
     if (tradeBusy || tradeNext.disabled || !tradeForm.reportValidity()) return;
@@ -268,10 +350,12 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
   const chartStatus = get("chart-status");
   const minuteCache = new Map();
   const tabs = [...dialog.querySelectorAll("[data-panel]")];
-  let chart = null, start = 0, lastStart = 0, drag = null, requestId = 0;
+  let chart = null, start = 0, lastStart = 0, windowSize = visibleBars, drag = null, requestId = 0;
+  const touchPoints = new Map();
+  let pinch;
   let geometry;
   const tools = setupChartTools({
-    redraw:draw, moveTo, getView:()=>({start,windowSize:visibleBars}), alternatives:[...savedQuotes],
+    redraw:draw, moveTo, getView:()=>({start,windowSize}), alternatives:[...savedQuotes],
     async loadComparison(symbol, interval) {
       const data = await publicQuote(symbol);
       if (!data) return null;
@@ -294,12 +378,13 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
   function draw() {
     area.classList.toggle("moving-drawing",tools.drawingOptions());
     if (!chart || !chart.bars.length || !dialog.open) return;
-    const snapshot = current === "SKHY" && frame === "day" && start === lastStart && tools.canUseSnapshot();
+    const snapshot = current === "SKHY" && frame === "day" && start === lastStart
+      && windowSize === visibleBars && tools.canUseSnapshot();
     reference.hidden = !snapshot;
     canvas.hidden = snapshot;
-    const options = tools.chartOptions();
+    const options = {...tools.chartOptions(), windowSize};
     geometry = snapshot ? null : drawChart(canvas, chart, frame, start, options);
-    const end = Math.min(options.end ?? chart.bars.length, start + visibleBars) - 1;
+    const end = Math.min(options.end ?? chart.bars.length, start + windowSize) - 1;
     drawSecondary(start,end,options);
     const dates = [start, end].map(i => dateFormat.format(chart.bars[i][0] * 1000));
     get("chart-dates").textContent = dates.join(" – ");
@@ -320,7 +405,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
     tools.secondaryCanvas.hidden = !show;
     get("dual-market-caption").textContent = show ? symbol : symbol + " · No candles in this date range";
     if (show) drawChart(tools.secondaryCanvas, other, frame, first, {
-      ...options, end:last, drawings:[], overlays:[], lower:"none", compare:null
+      ...options, end:last, windowSize:last-first, drawings:[], overlays:[], lower:"none", compare:null
     });
   }
   function moveTo(index) {
@@ -336,8 +421,30 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
     drag = null;
     area.classList.remove("dragging");
   }
+  function pinchGeometry() {
+    const [first, second] = [...touchPoints.values()];
+    const bounds = area.getBoundingClientRect();
+    return {
+      distance: Math.hypot(first.x - second.x, first.y - second.y),
+      anchor: Math.max(0, Math.min(1, ((first.x + second.x) / 2 - bounds.left - 8) / Math.max(1, bounds.width - 48)))
+    };
+  }
+
   area.addEventListener("pointerdown", event => {
-    if (!chart || !event.isPrimary || event.button !== 0 || event.target.closest("#drawing-actions")) return;
+    if (!chart || event.button !== 0 || event.target.closest("#drawing-actions")) return;
+    if (event.pointerType === "touch" && !tools.activeDrawing() && !tools.drawingOptions()) {
+      if (touchPoints.size >= 2) return;
+      touchPoints.set(event.pointerId, {x:event.clientX, y:event.clientY});
+      area.setPointerCapture(event.pointerId);
+      if (touchPoints.size === 2) {
+        const {distance, anchor} = pinchGeometry();
+        pinch = {distance:Math.max(1, distance), windowSize, index:start + anchor * Math.min(windowSize, chart.bars.length - start)};
+        drag = null;
+        area.classList.remove("dragging");
+        return;
+      }
+    }
+    if (!event.isPrimary) return;
     const points = tools.pointsToMove();
     if (points) {
       const origin = geometry?.point(event.clientX,event.clientY);
@@ -355,11 +462,26 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
       return;
     }
     drag = {id: event.pointerId, x: event.clientX, y:event.clientY, start, moved:false,
-      step: Math.max(1, (area.clientWidth - 48) / visibleBars)};
+      step: Math.max(1, (area.clientWidth - 48) / windowSize)};
     area.setPointerCapture(event.pointerId);
     area.classList.add("dragging");
   });
   area.addEventListener("pointermove", event => {
+    if (touchPoints.has(event.pointerId)) {
+      touchPoints.set(event.pointerId, {x:event.clientX, y:event.clientY});
+      if (pinch && chart && touchPoints.size === 2) {
+        const {distance, anchor} = pinchGeometry();
+        const count = tools.replayEnd() ?? chart.bars.length;
+        const max = Math.min(240, count);
+        windowSize = Math.max(Math.min(8, max), Math.min(max,
+          Math.round(pinch.windowSize * pinch.distance / Math.max(1, distance))));
+        lastStart = Math.max(0, chart.bars.length - windowSize);
+        start = Math.max(0, Math.min(count - windowSize, Math.round(pinch.index - anchor * windowSize)));
+        area.classList.toggle("pannable", lastStart > 0);
+        draw();
+        return;
+      }
+    }
     if (drag?.id !== event.pointerId) return;
     if (drag.freehand) {
       tools.addPoint(geometry?.point(event.clientX,event.clientY));
@@ -373,6 +495,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
   });
   for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
     area.addEventListener(type, event => {
+      if (touchPoints.delete(event.pointerId)) pinch = null;
       if (drag?.id !== event.pointerId) return;
       if (drag.freehand) tools.finishFreehand();
       else if (drag.points) tools.finishMove();
@@ -387,10 +510,14 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
   new ResizeObserver(draw).observe(area);
   function finishFrame(source) {
     chart = source?.length ? prepareChart(source, frame) : null;
-    lastStart = Math.max(0, (chart?.bars.length || 0) - visibleBars);
+    windowSize = visibleBars;
+    touchPoints.clear();
+    pinch = null;
+    lastStart = Math.max(0, (chart?.bars.length || 0) - windowSize);
     start = lastStart;
     get("chart-history").hidden = !chart;
     area.classList.toggle("pannable", lastStart > 0);
+    area.classList.toggle("zoomable", Boolean(chart));
     tools.updateSeries(chart,current,frame);
     if (chart) {
       const startDate = dateFormat.format(source[0][0] * 1000);

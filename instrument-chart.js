@@ -75,7 +75,7 @@ function heikinAshi(bars) {
 export function drawChart(canvas, chart, frame, start, options) {
   const {bars} = chart;
   const w = canvas.clientWidth, h = canvas.clientHeight;
-  const end = Math.min(start + visibleBars, options.end ?? bars.length);
+  const end = Math.min(start + (options.windowSize ?? visibleBars), options.end ?? bars.length);
   if (!w || !h || start >= end) return null;
   const pixel = window.devicePixelRatio || 1;
   canvas.width = Math.round(w * pixel);

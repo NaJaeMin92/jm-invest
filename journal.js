@@ -1,6 +1,6 @@
 import {setupWatchEditor} from "./watch-editor.js?v=49";
 import {setupOrders} from "./orders.js?v=70";
-import { setupInstrument, sparkline } from "./instrument.js?v=70";
+import { setupInstrument, sparkline } from "./instrument.js?v=71";
 import {loadWatchSentiment} from "./market-panels.js?v=68";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -392,12 +392,25 @@ const kiwoomPhases = {"0": "Regular", "1": "Pre", "2": "After"};
 let kiwoomStream;
 let redrawQuotes;
 let kiwoomRetry;
+let activeOrderBook;
+
+function subscribeOrderBook(symbol, onUpdate) {
+  const subscription = {symbol, onUpdate};
+  activeOrderBook = subscription;
+  syncKiwoomQuotes();
+  return () => {
+    if (activeOrderBook !== subscription) return;
+    activeOrderBook = undefined;
+    syncKiwoomQuotes();
+  };
+}
 
 function stopKiwoomQuotes() {
   clearTimeout(kiwoomRetry);
   kiwoomRetry = undefined;
   kiwoomStream?.controller.abort();
   kiwoomStream = null;
+  if (token) return;
   kiwoomTicks.clear();
   lastKiwoomPrices.clear();
   kiwoomDaily.clear();
@@ -410,9 +423,10 @@ window.addEventListener("pageshow", refreshWatchlistQuotes);
 
 async function syncKiwoomQuotes() {
   if (!kiwoomEndpoint) return;
-  const active = token && !document.hidden && document.body.dataset.view === "home";
-  const symbols = active ? [...new Set(readWatchlist())].sort().slice(0, 200) : [];
-  const key = JSON.stringify(symbols);
+  const active = token && !document.hidden && (activeOrderBook || document.body.dataset.view === "home");
+  const book = active && activeOrderBook?.symbol;
+  const symbols = active ? [...new Set(book ? [book, ...readWatchlist()] : readWatchlist())].slice(0, 200) : [];
+  const key = JSON.stringify(book ? {symbols, book} : symbols);
   if (kiwoomStream?.key === key && kiwoomStream.token === token) return;
   stopKiwoomQuotes();
   if (!symbols.length) {
@@ -455,6 +469,10 @@ async function syncKiwoomQuotes() {
         for (const line of lines) {
           const update = JSON.parse(line);
           if (!update) continue;
+          if (activeOrderBook?.symbol === update.symbol && (update.book || update.bookStatus || update.session != null)) {
+            activeOrderBook.onUpdate(update);
+          }
+          if (update.book || update.bookStatus) continue;
           if (Array.isArray(update.unsupported)) {
             for (const symbol of update.unsupported) unavailableSymbols.add(symbol);
           } else if (Array.isArray(update.daily)) {
@@ -478,7 +496,10 @@ async function syncKiwoomQuotes() {
     } finally {
       await reader.cancel().catch(() => {});
     }
-    if (kiwoomStream === stream) kiwoomQuoteStatus.textContent = "Kiwoom disconnected. Showing available quotes.";
+    if (kiwoomStream === stream) {
+      kiwoomQuoteStatus.textContent = "Kiwoom disconnected. Reconnecting…";
+      kiwoomRetry = setTimeout(syncKiwoomQuotes, 2_000);
+    }
   } catch (error) {
     if (kiwoomStream === stream) kiwoomQuoteStatus.textContent = error.message;
   } finally {
@@ -514,6 +535,7 @@ window.addEventListener("online", refreshWatchlistQuotes);
 const orders = setupOrders(() => token, kiwoomEndpoint);
 const instrument = setupInstrument({
   orders,
+  subscribeOrderBook,
   canLoadChart: () => Boolean(token && kiwoomEndpoint),
   async loadChart(symbol, frame) {
     if (!token || !kiwoomEndpoint) return null;
