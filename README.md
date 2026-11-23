@@ -20,3 +20,13 @@ python3 scripts/order-server.py --live
 ```
 
 Open `http://127.0.0.1:8765/`, sign in to **Account** and select **미국주식 주문**. The service reads the Kiwoom key and secret from the existing mode-600 `~/.jm-invest-credentials.json`. The order form accepts US whole-share limit orders. It sends a single request when you confirm the preview and displays the broker's order number. Check any uncertain submission in Kiwoom before sending a new order. The server binds to the Mac's loopback interface.
+
+## Private Kiwoom quotes
+
+Install `websocket-client` in the Python environment that runs the server, then
+run `python3 scripts/order-server.py --quotes` from the repository root. Open
+`http://127.0.0.1:8765/` and sign in through Account. My Watchlist uses the
+Kiwoom FE WebSocket for supported US equities and labels received prices
+**Kiwoom**. This mode enables quotes only. The existing `--live` mode enables
+quotes and orders. The local server uses the same mode-600 credentials file
+and registered IP as the order service.

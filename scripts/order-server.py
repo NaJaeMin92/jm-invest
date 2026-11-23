@@ -2,7 +2,9 @@
 import argparse
 from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from itertools import chain
 import json
+import math
 import mimetypes
 import os
 from pathlib import Path
@@ -155,8 +157,59 @@ class Orders:
             db.execute("UPDATE orders SET state=?,number=? WHERE id=?", (state,number,intent))
 
 
+def kiwoom_ticks(socket, items, timeout_error):
+    socket.send(json.dumps({"trnm": "LOGIN", "token": items["token"]}))
+    request = {"trnm": "REG", "grp_no": "1", "refresh": "0",
+               "data": [{"item": items["symbols"], "type": ["FE"]}]}
+    registered = False
+    while True:
+        try:
+            raw = socket.recv()
+        except timeout_error:
+            if not registered:
+                raise
+            yield None
+            continue
+        if not raw:
+            return
+        message = json.loads(raw)
+        action = message.get("trnm")
+        if action == "PING":
+            socket.send(raw)
+            if registered:
+                yield None
+        elif action in ("LOGIN", "REG"):
+            if str(message.get("return_code")) != "0":
+                raise Problem(502, "키움 실시간 시세 등록에 실패했습니다.")
+            if action == "LOGIN":
+                socket.send(json.dumps(request))
+            else:
+                registered = True
+                yield None
+        elif action == "REAL":
+            for tick in message.get("data", []):
+                if tick.get("type") != "FE":
+                    continue
+                values = tick.get("values", {})
+                try:
+                    price = abs(float(values["10"]))
+                    change = float(values["12"]) if values.get("12") else None
+                except (KeyError, ValueError, TypeError):
+                    continue
+                if not math.isfinite(price) or not price:
+                    continue
+                symbol = tick.get("item")
+                if not any(s["jmcode"] == symbol and s["stex_tp"] == tick.get("stexTp") for s in items["symbols"]):
+                    continue
+                yield {"symbol": symbol, "price": price,
+                       "change": change if change is not None and math.isfinite(change) else None,
+                       "date": values.get("22"), "session": values.get("290")}
+
+
 class App(BaseHTTPRequestHandler):
     orders = None
+    quote_broker = None
+    quote_lock = Lock()
     host = ""
     origin = ""
 
@@ -200,10 +253,70 @@ class App(BaseHTTPRequestHandler):
         if not self.allowed_host():
             return
         path = urlsplit(self.path).path
+        if path == "/api/quotes/stream":
+            self.stream_quotes()
+            return
         if path not in ("/api/orders/preview","/api/orders/submit"):
             self.send_error(404)
             return
         self.handle_order(path.rsplit("/", 1)[-1])
+
+    def stream_quotes(self):
+        opened = False
+        acquired = False
+        socket = None
+        try:
+            if self.quote_broker is None:
+                raise Problem(503, "키움 시세 서비스가 꺼져 있습니다.")
+            if self.headers.get("Origin") != self.origin or self.headers.get_content_type() != "application/json":
+                raise Problem(403, "허용되지 않은 시세 요청입니다.")
+            owner_session(self.headers.get("Authorization"))
+            length = int(self.headers.get("Content-Length", "0"))
+            items = json.loads(self.rfile.read(length)) if 0 < length <= 16000 else None
+            if not isinstance(items, list) or not 1 <= len(items) <= 200 or any(
+                not isinstance(item, dict)
+                or not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,11}", str(item.get("jmcode", "")))
+                or item.get("stex_tp") not in ("ND", "NY", "NA")
+                for item in items
+            ):
+                raise Problem(400, "종목과 거래소를 확인하세요.")
+            items = [{"jmcode": item["jmcode"], "stex_tp": item["stex_tp"]} for item in items]
+            acquired = self.quote_lock.acquire(blocking=False)
+            if not acquired:
+                raise Problem(409, "키움 시세 세션을 다른 탭에서 사용 중입니다.")
+            import websocket
+            token = self.quote_broker.access_token()
+            socket = websocket.create_connection(
+                "wss://api.kiwoom.com:10000/api/websocket", timeout=8, suppress_origin=True)
+            ticks = kiwoom_ticks(socket, {"token": token, "symbols": items}, websocket.WebSocketTimeoutException)
+            first = next(ticks, None)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-ndjson")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            opened = True
+            socket.settimeout(2)
+            deadline = time.monotonic() + 300
+            for tick in chain((first,), ticks):
+                if time.monotonic() >= deadline:
+                    break
+                self.wfile.write((json.dumps(tick) + "\n").encode())
+        except Problem as error:
+            if not opened:
+                self.write_json(error.status, {"message": str(error)})
+        except (OSError, ImportError, ValueError, TypeError):
+            if not opened:
+                self.write_json(502, {"message": "키움 실시간 시세에 연결하지 못했습니다."})
+        except Exception:
+            if not opened:
+                self.write_json(502, {"message": "키움 실시간 시세를 받지 못했습니다."})
+        finally:
+            try:
+                if socket is not None:
+                    socket.close(timeout=0)
+            finally:
+                if acquired:
+                    self.quote_lock.release()
 
     def handle_order(self, action):
         try:
@@ -244,10 +357,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--live", action="store_true", help="Enable explicit orders on the real account")
+    parser.add_argument("--quotes", action="store_true", help="Enable private read-only Kiwoom quotes")
     args = parser.parse_args()
     App.host = f"127.0.0.1:{args.port}"
     App.origin = "http://" + App.host
-    if args.live:
+    if args.live or args.quotes:
         os.umask(0o077)
         path = Path.home() / ".jm-invest-credentials.json"
         with path.open() as config:
@@ -255,8 +369,10 @@ def main():
             if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
                 parser.error("Credentials must belong to you and have mode 600")
             credentials = json.load(config)
-        App.orders = Orders(Kiwoom(credentials["KIWOOM_APP_KEY"],credentials["KIWOOM_APP_SECRET"]),
-                            Path.home() / ".jm-invest-orders.sqlite")
+        broker = Kiwoom(credentials["KIWOOM_APP_KEY"], credentials["KIWOOM_APP_SECRET"])
+        App.quote_broker = broker
+        if args.live:
+            App.orders = Orders(broker, Path.home() / ".jm-invest-orders.sqlite")
     with ThreadingHTTPServer(("127.0.0.1",args.port), App) as app:
         print(App.origin, flush=True)
         app.serve_forever()

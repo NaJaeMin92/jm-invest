@@ -18,6 +18,7 @@ const earlyCloses = new Set([
 const futuresTickers = new Map([
   ["BZMAIN", "NYMEX:BZ1!"], ["CLMAIN", "NYMEX:CL1!"]
 ]);
+const kiwoomExchanges = {NASDAQ: "ND", NYSE: "NY", AMEX: "NA"};
 const columns = [
   "name", "description", "is_primary", "close", "change", "update_mode", "time",
   "premarket_close", "premarket_change", "postmarket_close", "postmarket_change"
@@ -95,7 +96,7 @@ export async function fetchWatchQuotes(symbols, signal) {
       if (previous && (previous.primary || !primary)) continue;
       const delay = /^delayed_streaming_(\d+)$/.exec(mode);
       byTicker.set(ticker, {
-        description, primary, price, change, session, futures: group.futures, receivedAt: Date.now(),
+        description, primary, price, change, session, exchange: kiwoomExchanges[s.split(":")[0]], futures: group.futures, receivedAt: Date.now(),
         date: Number.isFinite(time) ? dateKey(easternParts(time * 1000)) : null,
         delayMinutes: delay ? Math.ceil(Number(delay[1]) / 60) : null,
         prePrice, preChange, afterPrice, afterChange
