@@ -306,6 +306,10 @@ export function drawChart(canvas, chart, frame, start, options) {
   let barIndex;
   return {
     point, step,
+    executionPoint(index, price) {
+      const py = y(price);
+      return {x:x(index - start), y:py, top, bottom, width};
+    },
     hitDrawing(clientX,clientY) {
       const bounds=canvas.getBoundingClientRect();
       return drawingAt?.(clientX-bounds.left, clientY-bounds.top);

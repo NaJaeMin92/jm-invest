@@ -25,6 +25,30 @@ class BrokerOrdersTest(unittest.TestCase):
         self.send = patcher.start()
         self.addCleanup(patcher.stop)
 
+    def test_execution_time_uses_broker_session_rollover_in_winter_and_summer(self):
+        row = dict(stk_cd="GOOG", slby_tp_nm="매수", cntr_qty="2", cntr_uv="99.5000", ord_time="13:00:00")
+        for day, clock, eastern in [("20261123","02:00:00","2026-11-23 12:00"),
+                                    ("20260710","02:00:00","2026-07-10 13:00"),
+                                    ("20261123","10:30:00","2026-11-22 20:30")]:
+            record = server.execution_record(dict(row,cntr_time=clock), "GOOG", day)
+            self.assertEqual(server.datetime.fromtimestamp(record["time"],server.EASTERN).strftime("%Y-%m-%d %H:%M"), eastern)
+            self.assertEqual((record["price"],record["quantity"],record["side"]), (99.5,2,"buy"))
+        self.assertIsNone(server.execution_record(row,"GOOG","20261123")["time"])
+        for invalid in [dict(cntr_qty="0"),dict(cntr_qty="-1"),dict(cntr_uv="0"),dict(stk_cd="AAPL")]:
+            self.assertIsNone(server.execution_record(dict(row,**invalid),"GOOG","20261123"))
+
+    def test_execution_history_uses_confirmed_days_and_independent_page_cursors(self):
+        order = dict(stk_cd="GOOG",ord_dt="20261123",cntr_qty="3")
+        filled = dict(order,slby_tp_nm="매도",cntr_uv="101.25",cntr_time="23:50:40")
+        def page(rows, key=None):
+            return {"return_code":0,"result_list":rows}, {"cont-yn":"Y","next-key":key} if key else {}
+        pages = [page([dict(order,ord_dt="20261122",cntr_qty="0")],"p1"),page([order,order]),
+                 page([filled],"d1"),page([dict(filled,cntr_qty="1",cntr_time="23:50:50")])]
+        with patch.object(server,"wait_for_kiwoom_read"), patch.object(server,"read_page",side_effect=pages) as read:
+            results = self.broker.executions("GOOG","20261101","20261123")
+        self.assertEqual([r["quantity"] for r in results], [3,1])
+        self.assertEqual([c.args[2].get("ord_dt") for c in read.call_args_list], [None,None,"20261123","20261123"])
+
     def test_pending_cancel_normalizes_broker_fields(self):
         raw = dict(ord_no="000000003", stk_cd="GOOG", ord_cntr_tp=" 원주문 ", ord_remnq="0002",
                    ord_stat="접수", rsrv_tp="일반", slby_tp_nm="매수", frgn_trde_tp="00")

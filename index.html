@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=76">
-<script type="module" src="./journal.js?v=76"></script>
+<link rel="stylesheet" href="./style.css?v=77">
+<script type="module" src="./journal.js?v=77"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header><div class="head"><a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -176,7 +176,14 @@
 </div>
 <p id="drawing-move-hint" hidden>Drag to move the drawing</p>
 </div>
-<canvas id="market-chart" role="img" aria-label="Candlesticks, volume and RSI"></canvas><div id="external-chart" hidden></div><p id="chart-status" role="status" hidden></p></div>
+<canvas id="market-chart" role="img" aria-label="Candlesticks, volume and RSI"></canvas>
+<div id="execution-flags" role="group" aria-label="내 체결 내역"></div>
+<div id="external-chart" hidden></div><p id="chart-status" role="status" hidden></p></div>
+<button type="button" id="execution-retry" hidden>체결 내역 다시 조회</button>
+<dialog id="execution-detail" class="order-sheet" aria-labelledby="execution-title" lang="ko">
+<header class="order-sheet-head"><h3 id="execution-title"></h3><button type="button" class="sheet-icon" id="execution-close" aria-label="체결 내역 닫기">×</button></header>
+<ul id="execution-list"></ul>
+</dialog>
 <figure id="dual-market-chart" hidden><figcaption id="dual-market-caption"></figcaption><canvas id="secondary-market-chart" role="img" aria-label="Second symbol chart"></canvas></figure>
 <div id="chart-history" hidden>
 <span id="chart-dates"></span><div class="chart-jumps"><button type="button" id="chart-first">First</button><button type="button" id="chart-all" aria-pressed="false">All</button><button type="button" id="chart-latest">Latest</button></div>

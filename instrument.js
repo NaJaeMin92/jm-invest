@@ -1,4 +1,5 @@
-import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=76";
+import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=77";
+import {setupExecutionFlags} from "./chart-executions.js?v=77";
 import {showMarketPanel} from "./market-panels.js?v=68";
 
 import {setupChartTools} from "./chart-tools.js?v=76";
@@ -51,8 +52,9 @@ function mergeDaily(oldBars, newBars) {
   return [...days.values()].sort((a,b) => a[0] - b[0]);
 }
 
-export function setupInstrument({search,nameFor,readList,saveList,orders,subscribeOrderBook,canLoadChart,loadChart,signIn}) {
+export function setupInstrument({search,nameFor,readList,saveList,orders,subscribeOrderBook,canLoadChart,loadChart,loadExecutions,signIn}) {
   const dialog=get("stock-detail"), canvas=get("market-chart");
+  const executions = setupExecutionFlags(loadExecutions);
   let current="", quote=null, frame="day", afterClose=null, quoteRequest=0;
   const fullHistory = new Map();
   let historyAbort, historyState = "", rangeMode = "";
@@ -469,6 +471,9 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     canvas.classList.toggle("with-rsi", options.lower === "RSI");
     geometry = drawChart(canvas, chart, frame, start, options);
     const end = Math.min(options.end ?? chart.bars.length, start + windowSize) - 1;
+    if (geometry && canLoadChart() && !["BZMAIN","CLMAIN","VIX"].includes(current)) {
+      executions.show(current,{bars:chart.bars,frame,start,end,geometry});
+    }
     drawSecondary(start,end,options);
     const dates = [start, end].map(i => dateFormat.format(chart.bars[i][0] * 1000));
     get("chart-dates").textContent = dates.join(" – ");
@@ -519,6 +524,8 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
 
   area.addEventListener("pointerdown", event => {
     if (!chart || event.button !== 0 || event.target.closest("#drawing-actions")) return;
+    const flag = event.target.closest(".execution-flag");
+    if (flag && event.pointerType !== "touch") return;
     if (event.pointerType === "touch" && !tools.activeDrawing() && !tools.drawingOptions()) {
       if (touchPoints.size >= 2) return;
       touchPoints.set(event.pointerId, {x:event.clientX, y:event.clientY});
@@ -548,7 +555,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
       }
       return;
     }
-    drag = {id: event.pointerId, x: event.clientX, y:event.clientY, start, moved:false,
+    drag = {id: event.pointerId, x: event.clientX, y:event.clientY, start, moved:false, flag,
       step: Math.max(1, (area.clientWidth - 48) / windowSize)};
     area.setPointerCapture(event.pointerId);
     area.classList.add("dragging");
@@ -587,6 +594,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
       if (drag?.id !== event.pointerId) return;
       if (drag.freehand) tools.finishFreehand();
       else if (drag.points) tools.finishMove();
+      else if (type === "pointerup" && !drag.moved && drag.flag?.isConnected) drag.flag.click();
       else if (type === "pointerup" && !drag.moved && tools.replayEnd() == null) {
         tools.selectDrawing(geometry?.hitDrawing(event.clientX,event.clientY));
       }
@@ -636,6 +644,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
       draw();
     } else {
       canvas.hidden = true;
+      executions.reset();
       get("dual-market-chart").hidden = true;
     }
   }
@@ -756,6 +765,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     get("stock-frames").hidden = true;
   }
   async function open(symbol) {
+    executions.reset();
     if (trade.open) trade.close();
     current=symbol;quote=null;historyState="";sessionDate.value="";
     selectPanel("chart");
@@ -787,6 +797,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     quoteRequest += 1;
     historyAbort?.abort();
     if (trade.open) trade.close();
+    executions.reset();
     current="";quote=null;chart=null;endDrag();
     tools.updateSeries(null,current,frame);
     if(dialog.open) dialog.close();
@@ -820,6 +831,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
   window.addEventListener("popstate",sync);
   sync();
   return {
+    clearExecutions: executions.reset,
     open(symbol) {
       history.pushState({stockEntry:true},"","#stock="+encodeURIComponent(symbol));
       sync();

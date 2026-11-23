@@ -1,6 +1,6 @@
 import {setupWatchEditor} from "./watch-editor.js?v=49";
 import {setupOrders} from "./orders.js?v=74";
-import { setupInstrument, sparkline } from "./instrument.js?v=76";
+import { setupInstrument, sparkline } from "./instrument.js?v=77";
 import {loadWatchSentiment} from "./market-panels.js?v=68";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -131,6 +131,7 @@ document.querySelector("#logout").addEventListener("click", () => {
   token = null;
   heldWatchSymbols.clear();
   orders.signOut();
+  instrument.clearExecutions();
   saveSession(null);
   holdingsList.replaceChildren();
   document.querySelector("#profit-list").replaceChildren();
@@ -518,6 +519,13 @@ const instrument = setupInstrument({
   orders,
   subscribeOrderBook,
   canLoadChart: () => Boolean(token && kiwoomEndpoint),
+  async loadExecutions(symbol, from, to, signal) {
+    const endpoint = new URL("executions", new URL(kiwoomEndpoint, location.href));
+    endpoint.search = new URLSearchParams({symbol,from:from.replaceAll("-",""),to:to.replaceAll("-","")});
+    const response = await fetch(endpoint,{headers:{Authorization:"Bearer "+token},cache:"no-store",signal});
+    if (!response.ok) throw new Error("체결 내역을 불러오지 못했습니다.");
+    return (await response.json()).executions;
+  },
   async loadChart(symbol, frame, before, signal, day) {
     if (!token || !kiwoomEndpoint) return null;
     const endpoint = new URL("instrument", new URL(kiwoomEndpoint, location.href));

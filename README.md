@@ -51,3 +51,10 @@ requests from the GitHub Pages origin and checks the signed-in owner session
 before subscribing to Kiwoom. The local app and gateway share one Kiwoom
 WebSocket slot. Additional clients refresh current quotes and open books via
 REST and resume push updates when the slot becomes available.
+
+Signed-in stock charts also read the owner's Kiwoom execution history through
+`GET /api/quotes/executions` on the local server or phone gateway. B and S
+mark reported purchases and sales. Select a flag for the order-level fill
+price, quantity and execution time in New York. Records with only a trading
+date appear on daily and longer intervals. The browser keeps execution
+records in memory while the symbol is open.

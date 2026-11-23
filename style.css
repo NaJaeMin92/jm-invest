@@ -925,6 +925,31 @@ body.instrument-open { overflow:hidden; }
   .trade-ticket-footer { margin-top:4px; padding-block:6px; }
 }
 #chart-area { position:relative; }
+#execution-flags { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+#execution-flags i { position:absolute; width:5px; height:5px; transform:translate(-50%,-50%); border-radius:50%; background:#b8efdb; box-shadow:0 0 0 1px #152139; }
+#execution-flags i[data-side="sell"] { background:#f2d1a8; }
+#execution-flags button {
+  --flag-ink:#b8efdb; --flag-bg:#203b38;
+  position:absolute; pointer-events:auto; transform:translate(-50%,-50%);
+  display:grid; place-items:center; min-height:22px; min-width:22px; padding:1px 4px;
+  border:1px solid var(--flag-ink); border-radius:6px; background:var(--flag-bg); color:var(--flag-ink);
+  font:700 11px/1 system-ui,sans-serif; box-shadow:0 1px 4px #0c131db0;
+}
+#execution-flags [data-side="sell"] { --flag-ink:#f2d1a8; --flag-bg:#3c322b; }
+#execution-flags [data-side="both"] { --flag-ink:#e5eaf4; --flag-bg:#2c3546; }
+#execution-flags button::before { content:""; position:absolute; left:50%; bottom:100%; height:5px; border-left:1px solid var(--flag-ink); }
+#execution-flags [data-below="false"]::before { bottom:auto; top:100%; }
+#execution-flags .multiple::after { content:""; position:absolute; right:2px; top:2px; width:3px; height:3px; border-radius:50%; background:currentColor; }
+#market-chart.annotating ~ #execution-flags button,#chart-area.moving-drawing #execution-flags button { pointer-events:none; }
+#execution-retry { margin:4px 12px; color:#bccde5; font-size:12px; }
+#execution-detail { width:min(380px,calc(100% - 24px)); max-height:75dvh; margin:auto; inset:0; border-radius:18px; overflow:auto; }
+#execution-detail .order-sheet-head { position:sticky; top:0; background:var(--sheet); padding:10px 14px; }
+#execution-title { font-size:18px; margin:0; }
+#execution-list { margin:0; padding:0 16px 12px; list-style:none; }
+#execution-list li { display:grid; grid-template-columns:1fr auto; gap:4px 12px; padding:10px 0; border-top:1px solid var(--separator); }
+#execution-list strong { color:var(--buy-ink); }
+#execution-list [data-side="sell"] { color:var(--sell-ink); }
+#execution-list time { grid-column:1/-1; color:var(--secondary); font-size:12px; }
 #chart-area.moving-drawing { touch-action:none; cursor:move; }
 #drawing-actions {
   display:grid; grid-template-columns:repeat(4,40px); gap:4px; padding:4px;

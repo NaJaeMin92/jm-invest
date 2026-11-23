@@ -25,6 +25,7 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parent.parent
 KIWOOM = "https://api.kiwoom.com"
 EASTERN = ZoneInfo("America/New_York")
+SEOUL = ZoneInfo("Asia/Seoul")
 CHART_INTERVALS = {"minute": "1", "five": "5", "hour": "60"}
 LIMIT_TYPES = {"00", "26", "27", "30"}
 MARKET_TYPES = {"03", "36", "37"}
@@ -38,7 +39,7 @@ YAHOO_SYMBOLS = {
 STATIC = {
     "index.html", "journal.html", "style.css", "journal.js", "instrument.js", "instrument-chart.js",
     "market-panels.js", "chart-tools.js", "chart-annotations.js", "technical-indicators.js", "orders.js", "watch-editor.js",
-    "watch-quotes.js", "pending-orders.js",
+    "watch-quotes.js", "pending-orders.js", "chart-executions.js",
 }
 
 
@@ -151,6 +152,28 @@ def pending_row(row):
     if reason:
         item["cancelReason"] = reason
     return item
+
+
+def execution_record(row, symbol, session):
+    side = {"매수": "buy", "매도": "sell"}.get(str(row.get("slby_tp_nm", "")).strip())
+    quantity = finite_quote(row.get("cntr_qty"))
+    price = finite_quote(row.get("cntr_uv"))
+    if str(row.get("stk_cd", "")).strip() != symbol or not side or (price or 0) <= 0 or (quantity or 0) <= 0:
+        return None
+    # Kiwoom's KST order date rolls after the US after-hours session, not at midnight.
+    day = datetime.strptime(session, "%Y%m%d")
+    clock = str(row.get("cntr_time") or "").strip().replace(":", "")
+    stamp = None
+    if re.fullmatch(r"\d{6}", clock):
+        try:
+            local = datetime.combine(day.date(), datetime.strptime(clock, "%H%M%S").time(), SEOUL)
+            prior_close = (day - timedelta(days=1)).replace(hour=20, tzinfo=EASTERN)
+            if local <= prior_close:
+                local += timedelta(days=1)
+            stamp = int(local.timestamp())
+        except ValueError:
+            pass
+    return dict(day=day.date().isoformat(), time=stamp, side=side, price=price, quantity=quantity)
 
 
 class Kiwoom:
@@ -379,6 +402,42 @@ class Kiwoom:
                 if not context.get("price"):
                     context["price"] = positive_quote(result.get("cur_prc"))
         return context
+
+    def executions(self, symbol, start, end):
+        if symbol in YAHOO_SYMBOLS:
+            return []
+        token = self.access_token()
+        item = self.resolve_us_stock(token, symbol)
+        criteria = {"stk_cd": item["jmcode"], "stex_tp": item["stex_tp"], "slby_tp": "0", "oppo_trde_tp": "%"}
+
+        def rows(transaction, dates):
+            headers = {"api-id": transaction, "Authorization": "Bearer " + token}
+            seen = set()
+            while True:
+                wait_for_kiwoom_read(self.read_schedule)
+                result, page = read_page(KIWOOM + "/api/us/acnt", headers, {**criteria, **dates})
+                if str(result.get("return_code")) != "0":
+                    if "조회내역이 없습니다" in str(result.get("return_msg", "")).replace("조회 내역", "조회내역"):
+                        return
+                    raise Problem(502, "키움 체결 내역을 조회하지 못했습니다.")
+                yield from result.get("result_list") or []
+                if page.get("cont-yn") != "Y":
+                    return
+                key = page.get("next-key")
+                if not key or key in seen:
+                    raise Problem(502, "키움 체결 내역의 다음 페이지를 조회하지 못했습니다.")
+                seen.add(key)
+                headers.update({"cont-yn": "Y", "next-key": key})
+
+        days = {row.get("ord_dt") for row in rows("ust21180", {"strt_dt": start, "end_dt": end})
+                if str(row.get("stk_cd", "")).strip() == item["jmcode"] and (finite_quote(row.get("cntr_qty")) or 0) > 0}
+        records = []
+        for session in sorted(day for day in days if isinstance(day, str) and start <= day <= end):
+            for row in rows("ust21150", {"ord_dt": session, "query_tp": "5"}):
+                record = execution_record(row, item["jmcode"], session)
+                if record:
+                    records.append(record)
+        return records
 
     def pending(self, token):
         headers = {"api-id": "ust21050", "Authorization": "Bearer " + token}
@@ -819,6 +878,8 @@ class App(BaseHTTPRequestHandler):
             self.handle_order_context(parse_qs(path.query).get("symbol", [""])[0])
         elif path.path == "/api/quotes/instrument":
             self.handle_instrument_chart(parse_qs(path.query))
+        elif path.path == "/api/quotes/executions":
+            self.handle_executions(parse_qs(path.query))
         else:
             self.serve_static(True)
 
@@ -838,7 +899,7 @@ class App(BaseHTTPRequestHandler):
         if not self.allowed_host():
             return
         method = {"/api/quotes/stream": "POST", "/api/quotes/instrument": "GET",
-                  "/api/quotes/book": "GET"}.get(urlsplit(self.path).path)
+                  "/api/quotes/book": "GET", "/api/quotes/executions": "GET"}.get(urlsplit(self.path).path)
         if not self.quotes_only or not method or self.headers.get("Origin") != self.origin:
             self.send_error(403)
             return
@@ -985,6 +1046,28 @@ class App(BaseHTTPRequestHandler):
             self.write_json(error.status, {"message": str(error)})
         except (OSError, ValueError):
             self.write_json(503, {"message": "키움 주문 정보를 불러오지 못했습니다."})
+
+    def handle_executions(self, query):
+        try:
+            if self.quotes_only and self.headers.get("Origin") != self.origin:
+                raise Problem(403, "허용되지 않은 요청입니다.")
+            owner_session(self.headers.get("Authorization"))
+            if self.quote_broker is None:
+                raise Problem(503, "키움 계좌가 연결되어 있지 않습니다.")
+            symbol, start, end = (query.get(key, [""])[0] for key in ("symbol", "from", "to"))
+            if not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,11}", symbol):
+                raise Problem(400, "종목 코드를 확인하세요.")
+            try:
+                span = (datetime.strptime(end, "%Y%m%d") - datetime.strptime(start, "%Y%m%d")).days
+            except ValueError:
+                span = -1
+            if not 0 <= span < 84 or len(start) != 8 or len(end) != 8:
+                raise Problem(400, "체결 조회 기간을 확인하세요.")
+            self.write_json(200, {"executions": self.quote_broker.executions(symbol, start, end)})
+        except Problem as error:
+            self.write_json(error.status, {"message": str(error)})
+        except (OSError, ValueError):
+            self.write_json(503, {"message": "키움 체결 내역을 불러오지 못했습니다."})
 
     def handle_instrument_chart(self, query):
         try:
