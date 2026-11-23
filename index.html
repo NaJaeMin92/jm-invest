@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=77">
-<script type="module" src="./journal.js?v=77"></script>
+<link rel="stylesheet" href="./style.css?v=78">
+<script type="module" src="./journal.js?v=78"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header><div class="head"><a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -251,6 +251,14 @@
   <div id="trade-preview-quote" hidden><strong id="trade-quote-value"></strong><small id="trade-quote-label"></small></div>
 </div>
 <form id="trade-preview-form" method="dialog">
+<section id="trade-position" aria-label="내 보유 현황" hidden>
+  <dl>
+    <div><dt>보유수량</dt><dd id="trade-position-shares">—</dd></div>
+    <div><dt>평균 매입가</dt><dd id="trade-position-average">—</dd></div>
+    <div><dt>평단 대비 수익률</dt><dd id="trade-position-return">—</dd></div>
+  </dl>
+  <div id="trade-position-message" hidden><span role="status"></span><button type="button" id="trade-position-retry">다시 조회</button></div>
+</section>
 <div class="trade-workspace">
 <section id="trade-book" aria-label="키움 호가">
 <div class="trade-book-head"><div><strong>10호가</strong><span id="trade-book-mode"></span><time id="trade-book-time"></time></div>

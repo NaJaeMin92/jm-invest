@@ -25,6 +25,30 @@ class BrokerOrdersTest(unittest.TestCase):
         self.send = patcher.start()
         self.addCleanup(patcher.stop)
 
+    @patch.object(server, "wait_for_kiwoom_read")
+    def test_position_uses_total_shares_and_dollar_cost(self, _wait):
+        row = dict(stk_cd=" GOOG ", crnc_code="USD", poss_qty="3.125", qty="2", sell_alowq="1",
+                   frgn_stk_book_uv="96.5234", frgn_stk_book_uv_krw="130306", now_pric="99.7000")
+        self.send.return_value = dict(return_code=0, result_list=[row])
+        self.assertEqual(self.broker.position("GOOG"), {"quantity":3.125, "averagePrice":96.5234, "markPrice":99.7})
+        url, headers, criteria = self.send.call_args.args
+        self.assertEqual((url, headers["api-id"]), (server.KIWOOM + "/api/us/acnt", "ust21070"))
+        self.assertEqual(criteria, {"stk_cd":"GOOG", "stex_tp":"ND", "crnc_code":"USD"})
+
+    @patch.object(server, "wait_for_kiwoom_read")
+    def test_position_distinguishes_empty_balance_from_unknown(self, _wait):
+        self.send.return_value = dict(return_code=0, result_list=[])
+        self.assertEqual(self.broker.position("GOOG"), {"quantity":0, "averagePrice":None, "markPrice":None})
+        row = dict(stk_cd="GOOG", crnc_code="USD", poss_qty="2", frgn_stk_book_uv="0")
+        self.send.return_value = dict(return_code=0, result_list=[row])
+        self.assertIsNone(self.broker.position("GOOG")["averagePrice"])
+        for response in [dict(return_code=2, result_list=[]), dict(return_code=0),
+                         dict(return_code=0, result_list=[dict(row, stk_cd="AAPL")]),
+                         dict(return_code=0, result_list=[dict(row, poss_qty="")])]:
+            self.send.return_value = response
+            with self.assertRaises(server.Problem):
+                self.broker.position("GOOG")
+
     def test_execution_time_uses_broker_session_rollover_in_winter_and_summer(self):
         row = dict(stk_cd="GOOG", slby_tp_nm="매수", cntr_qty="2", cntr_uv="99.5000", ord_time="13:00:00")
         for day, clock, eastern in [("20261123","02:00:00","2026-11-23 12:00"),

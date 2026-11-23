@@ -1,6 +1,6 @@
 import {setupWatchEditor} from "./watch-editor.js?v=49";
-import {setupOrders} from "./orders.js?v=74";
-import { setupInstrument, sparkline } from "./instrument.js?v=77";
+import {setupOrders} from "./orders.js?v=78";
+import { setupInstrument, sparkline } from "./instrument.js?v=78";
 import {loadWatchSentiment} from "./market-panels.js?v=68";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -131,7 +131,7 @@ document.querySelector("#logout").addEventListener("click", () => {
   token = null;
   heldWatchSymbols.clear();
   orders.signOut();
-  instrument.clearExecutions();
+  instrument.clearAccountData();
   saveSession(null);
   holdingsList.replaceChildren();
   document.querySelector("#profit-list").replaceChildren();

@@ -3,7 +3,7 @@ import {setupExecutionFlags} from "./chart-executions.js?v=77";
 import {showMarketPanel} from "./market-panels.js?v=68";
 
 import {setupChartTools} from "./chart-tools.js?v=76";
-import {orderKinds, needsPrice, populateKinds} from "./orders.js?v=74";
+import {orderKinds, needsPrice, populateKinds} from "./orders.js?v=78";
 
 const get = id => document.getElementById(id);
 const savedQuotes = new Set("ANT SKHY SPCX MRVL BZMAIN CLMAIN AAL UAL DAL NVDA AMZN".split(" "));
@@ -76,6 +76,11 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
   const quantity = tradeForm.querySelector('[name="quantity"]');
   const price = tradeForm.querySelector('[name="price"]');
   const priceHint = get("trade-price-hint");
+  const positionPanel = get("trade-position"), positionMessage = get("trade-position-message");
+  const heldShares = get("trade-position-shares"), averagePrice = get("trade-position-average");
+  const positionReturn = get("trade-position-return"), retryPosition = get("trade-position-retry");
+  const sharesFormat = new Intl.NumberFormat("ko-KR", {maximumFractionDigits:8});
+  const returnFormat = new Intl.NumberFormat("en-US", {style:"percent", minimumFractionDigits:2, signDisplay:"exceptZero"});
   const dollars = new Intl.NumberFormat("en-US", {
     style: "currency", currency: "USD", maximumFractionDigits: 4
   });
@@ -84,9 +89,57 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
   const previewOnly = "미리보기 모드입니다. 실계좌 주문은 이 Mac의 비공개 서버에서 할 수 있습니다.";
   let tradeSide, orderContext, reviewId, tradeBusy = false, tradeVersion = 0;
   let unsubscribeBook, pendingBook, bookPaint, bookRevision = 0, liveTradePrice, displayedBook;
+  let position, positionRequest;
+
+  function updatePositionReturn() {
+    const mark = liveTradePrice ?? orderContext?.price ?? position?.markPrice;
+    const text = position?.averagePrice > 0 && mark > 0 ? returnFormat.format(mark / position.averagePrice - 1) : "—";
+    positionReturn.textContent = text;
+    positionReturn.dataset.direction = text.startsWith("+") ? "up" : text.startsWith("-") ? "down" : "";
+  }
+
+  function resetPosition() {
+    positionRequest?.abort();
+    positionRequest = position = null;
+    positionPanel.querySelector("dl").hidden = false;
+    positionPanel.removeAttribute("aria-busy");
+    positionMessage.hidden = true;
+    heldShares.textContent = averagePrice.textContent = "—";
+    updatePositionReturn();
+  }
+
+  async function loadPosition() {
+    resetPosition();
+    const controller = new AbortController();
+    positionRequest = controller;
+    positionPanel.setAttribute("aria-busy", "true");
+    try {
+      const result = await orders.stockPosition(current, controller.signal);
+      if (controller.signal.aborted) return;
+      if (result) {
+        position = result;
+        heldShares.textContent = sharesFormat.format(position.quantity) + "주";
+        averagePrice.textContent = position.averagePrice > 0 ? dollars.format(position.averagePrice) : "—";
+        updatePositionReturn();
+        return;
+      }
+      positionMessage.firstElementChild.textContent = "로그인 후 보유 잔고를 볼 수 있습니다.";
+      retryPosition.hidden = true;
+    } catch {
+      if (controller.signal.aborted) return;
+      positionMessage.firstElementChild.textContent = "보유 잔고를 불러오지 못했습니다.";
+      retryPosition.hidden = false;
+    } finally {
+      if (!controller.signal.aborted) positionPanel.removeAttribute("aria-busy");
+    }
+    positionPanel.querySelector("dl").hidden = true;
+    positionMessage.hidden = false;
+  }
+  retryPosition.onclick = loadPosition;
 
   function selectTradeSide(side) {
     tradeSide = side;
+    positionPanel.hidden = side !== "sell";
     trade.dataset.side = side;
     tradeNext.textContent = sideName[side] + " 주문 확인";
     for (const button of ticketSides) {
@@ -183,6 +236,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
   function showTradeQuote(value) {
     if (!Number.isFinite(value)) return;
     setTicketQuote(value, "현재가");
+    if (position) updatePositionReturn();
     get("trade-use-quote").hidden = false;
     get("trade-book-price").textContent = dollars.format(value);
     get("trade-book-krw").textContent = orderContext?.fx > 0 ? won.format(value * orderContext.fx) : "";
@@ -262,6 +316,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
 
   function openTrade(side) {
     if (tradeBusy || trade.open) return;
+    if (unsubscribeBook) releaseTicket();
     tradeVersion += 1;
     selectTradeSide(side);
     orderContext = null;
@@ -299,6 +354,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     trade.showModal();
     unsubscribeBook = subscribeOrderBook(current, onBookUpdate);
     loadTradeContext();
+    if (side === "sell") loadPosition();
   }
 
   get("trade-preview-close").onclick = () => { if (!tradeBusy) trade.close(); };
@@ -306,18 +362,24 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     if (tradeBusy) event.preventDefault();
     event.stopPropagation();
   });
-  trade.addEventListener("close", () => {
+  function releaseTicket() {
     tradeVersion += 1;
+    resetPosition();
     reviewId = null;
     unsubscribeBook?.();
     unsubscribeBook = undefined;
     if (bookPaint != null) cancelAnimationFrame(bookPaint);
     bookPaint = pendingBook = undefined;
-  });
+  }
+  trade.addEventListener("close", () => { if (!trade.open) releaseTicket(); });
   bookRefresh.onclick = loadTradeContext;
   for (const button of ticketSides) {
     button.onclick = () => {
-      if (!tradeBusy && !tradeForm.hidden) selectTradeSide(button.dataset.ticketSide);
+      const side = button.dataset.ticketSide;
+      if (tradeBusy || tradeForm.hidden || tradeSide === side) return;
+      selectTradeSide(side);
+      if (side === "sell") loadPosition();
+      else resetPosition();
     };
   }
   get("trade-use-quote").onclick = () => setTradePrice(liveTradePrice ?? orderContext?.price);
@@ -831,7 +893,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
   window.addEventListener("popstate",sync);
   sync();
   return {
-    clearExecutions: executions.reset,
+    clearAccountData() { resetPosition(); executions.reset(); },
     open(symbol) {
       history.pushState({stockEntry:true},"","#stock="+encodeURIComponent(symbol));
       sync();

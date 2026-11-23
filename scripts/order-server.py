@@ -403,6 +403,29 @@ class Kiwoom:
                     context["price"] = positive_quote(result.get("cur_prc"))
         return context
 
+    def position(self, symbol):
+        token = self.access_token()
+        item = self.resolve_us_stock(token, symbol)
+        wait_for_kiwoom_read(self.read_schedule)
+        result = read_json(KIWOOM + "/api/us/acnt", {"api-id": "ust21070", "Authorization": "Bearer " + token},
+                           {"stk_cd": item["jmcode"], "stex_tp": item["stex_tp"], "crnc_code": "USD"})
+        rows = result.get("result_list")
+        if str(result.get("return_code")) != "0" or not isinstance(rows, list):
+            raise Problem(502, "키움 보유 잔고를 조회하지 못했습니다.")
+        if not rows:
+            return {"quantity": 0, "averagePrice": None, "markPrice": None}
+        if len(rows) != 1 or not isinstance(rows[0], dict):
+            raise Problem(502, "종목별 잔고를 확인하지 못했습니다.")
+        row = rows[0]
+        if str(row.get("stk_cd", "")).strip() != item["jmcode"] or str(row.get("crnc_code", "")).strip() != "USD":
+            raise Problem(502, "종목별 잔고를 확인하지 못했습니다.")
+        quantity = finite_quote(row.get("poss_qty"))
+        if quantity is None:
+            raise Problem(502, "보유수량을 확인하지 못했습니다.")
+        average = finite_quote(row.get("frgn_stk_book_uv"))
+        return {"quantity": quantity, "averagePrice": average if quantity and average and average > 0 else None,
+                "markPrice": positive_quote(row.get("now_pric"))}
+
     def executions(self, symbol, start, end):
         if symbol in YAHOO_SYMBOLS:
             return []
@@ -873,9 +896,11 @@ class App(BaseHTTPRequestHandler):
         elif not self.quotes_only and path.path == "/api/orders/pending":
             self.handle_order("pending")
         elif not self.quotes_only and path.path == "/api/orders/context":
-            self.handle_order_context(parse_qs(path.query).get("symbol", [""])[0])
+            self.handle_ticket_data(parse_qs(path.query).get("symbol", [""])[0])
         elif self.quotes_only and path.path == "/api/quotes/book":
-            self.handle_order_context(parse_qs(path.query).get("symbol", [""])[0])
+            self.handle_ticket_data(parse_qs(path.query).get("symbol", [""])[0])
+        elif path.path == "/api/quotes/position":
+            self.handle_ticket_data(parse_qs(path.query).get("symbol", [""])[0], position=True)
         elif path.path == "/api/quotes/instrument":
             self.handle_instrument_chart(parse_qs(path.query))
         elif path.path == "/api/quotes/executions":
@@ -899,7 +924,8 @@ class App(BaseHTTPRequestHandler):
         if not self.allowed_host():
             return
         method = {"/api/quotes/stream": "POST", "/api/quotes/instrument": "GET",
-                  "/api/quotes/book": "GET", "/api/quotes/executions": "GET"}.get(urlsplit(self.path).path)
+                  "/api/quotes/book": "GET", "/api/quotes/position": "GET",
+                  "/api/quotes/executions": "GET"}.get(urlsplit(self.path).path)
         if not self.quotes_only or not method or self.headers.get("Origin") != self.origin:
             self.send_error(403)
             return
@@ -1032,7 +1058,7 @@ class App(BaseHTTPRequestHandler):
         except (OSError, sqlite3.Error):
             self.write_json(503, {"message": "요청 상태를 확인하지 못했습니다. 전송한 경우 키움 주문 내역을 확인하세요."})
 
-    def handle_order_context(self, symbol):
+    def handle_ticket_data(self, symbol, position=False):
         try:
             if self.quotes_only and self.headers.get("Origin") != self.origin:
                 raise Problem(403, "허용되지 않은 시세 요청입니다.")
@@ -1041,7 +1067,10 @@ class App(BaseHTTPRequestHandler):
                 raise Problem(503, "키움 시세 서버가 연결되어 있지 않습니다.")
             if not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,11}", symbol):
                 raise Problem(400, "종목 코드를 확인하세요.")
-            self.write_json(200, {**self.quote_broker.order_context(symbol), "enabled": self.orders is not None})
+            if position:
+                self.write_json(200, self.quote_broker.position(symbol))
+            else:
+                self.write_json(200, {**self.quote_broker.order_context(symbol), "enabled": self.orders is not None})
         except Problem as error:
             self.write_json(error.status, {"message": str(error)})
         except (OSError, ValueError):
