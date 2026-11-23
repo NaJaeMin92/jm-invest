@@ -61,7 +61,13 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
   const tradeStatus = get("trade-preview-status"), tradeNext = get("trade-preview-next");
   const tradeConfirm = get("trade-preview-confirm"), tradeEdit = get("trade-preview-edit");
   const bookLevels = get("trade-book-levels"), bookRefresh = get("trade-book-refresh");
-  const bookStatus = get("trade-book-status"), bookMarket = get("trade-book-market");
+  const bookStatus = get("trade-book-status");
+  const bookAsks = get("trade-book-asks"), bookBids = get("trade-book-bids");
+  new ResizeObserver(([entry]) => {
+    if (!entry.contentRect.height) return;
+    const visibleRows = Math.max(1, Math.min(10, Math.floor(entry.contentRect.height / 44)));
+    bookLevels.style.setProperty("--visible-rows", visibleRows);
+  }).observe(bookBids);
   const bookMode = get("trade-book-mode"), kind = get("trade-kind");
   populateKinds(kind);
   const ticketSides = [...tradeForm.querySelectorAll("[data-ticket-side]")];
@@ -72,7 +78,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     style: "currency", currency: "USD", maximumFractionDigits: 4
   });
   const won = new Intl.NumberFormat("ko-KR", {style: "currency", currency: "KRW"});
-  const sideName = {buy: "Buy", sell: "Sell"};
+  const sideName = {buy: "매수", sell: "매도"};
   const previewOnly = "미리보기 모드입니다. 실계좌 주문은 이 Mac의 비공개 서버에서 할 수 있습니다.";
   let tradeSide, orderContext, reviewId, tradeBusy = false, tradeVersion = 0;
   let unsubscribeBook, pendingBook, bookPaint, bookRevision = 0, liveTradePrice, displayedBook;
@@ -80,7 +86,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
   function selectTradeSide(side) {
     tradeSide = side;
     trade.dataset.side = side;
-    tradeNext.textContent = "Review " + side + " order";
+    tradeNext.textContent = sideName[side] + " 주문 확인";
     for (const button of ticketSides) {
       button.setAttribute("aria-pressed", String(button.dataset.ticketSide === side));
     }
@@ -129,30 +135,41 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     updateTradeTotal();
   }
 
-  function renderBookSide(container, levels) {
+  function renderBookSide(container, levels, depth) {
     const largest = Math.max(1, ...levels.map(level => level.quantity ?? 0));
-    while (container.children.length > levels.length) container.lastElementChild.remove();
-    levels.forEach((level, index) => {
-      let button = container.children[index];
-      if (!button) {
-        button = document.createElement("button");
-        button.type = "button";
-        const prices = document.createElement("span");
-        prices.append(document.createElement("b"), document.createElement("small"));
-        button.append(prices, document.createElement("span"));
-        button.onclick = () => setTradePrice(Number(button.dataset.price));
-        container.append(button);
+    while (container.children.length > depth) container.lastElementChild.remove();
+    for (let index = 0; index < depth; index++) {
+      const level = levels[index];
+      let row = container.children[index];
+      const tag = level ? "button" : "span";
+      if (row?.localName !== tag) {
+        const next = document.createElement(tag);
+        if (row) row.replaceWith(next);
+        else container.append(next);
+        row = next;
+        if (level) {
+          row.type = "button";
+          const prices = document.createElement("span");
+          prices.append(document.createElement("b"), document.createElement("small"));
+          row.append(prices, document.createElement("span"));
+          row.onclick = () => setTradePrice(Number(row.dataset.price));
+        } else {
+          row.className = "book-empty-level";
+          row.setAttribute("aria-hidden", "true");
+          row.textContent = "—";
+        }
       }
-      button.dataset.price = level.price;
-      button.style.setProperty("--depth", (100 * (level.quantity ?? 0) / largest) + "%");
-      button.disabled = price.disabled;
-      const prices = button.firstElementChild, change = button.lastElementChild;
+      if (!level) continue;
+      row.dataset.price = level.price;
+      row.style.setProperty("--depth", (100 * (level.quantity ?? 0) / largest) + "%");
+      row.disabled = price.disabled;
+      const prices = row.firstElementChild, change = row.lastElementChild;
       prices.firstElementChild.textContent = dollars.format(level.price);
       prices.lastElementChild.textContent = orderContext?.fx > 0 ? won.format(level.price * orderContext.fx) : "₩—";
       const percent = orderContext?.previousClose > 0 ? (level.price / orderContext.previousClose - 1) * 100 : null;
       change.textContent = percent == null ? "—" : (percent > 0 ? "+" : "") + percent.toFixed(2) + "%";
       change.dataset.direction = percent > 0 ? "up" : percent < 0 ? "down" : "";
-    });
+    }
   }
 
   function setTicketQuote(value, label) {
@@ -171,8 +188,10 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
 
   function showOrderBook(book) {
     displayedBook = book;
-    const centerBook = bookLevels.hidden;
-    bookLevels.hidden = !(book.asks?.length || book.bids?.length);
+    const firstBook = bookLevels.hidden;
+    const asks = book.asks ?? [], bids = book.bids ?? [];
+    const depth = Math.max(asks.length, bids.length);
+    bookLevels.hidden = !depth;
     bookStatus.hidden = !bookLevels.hidden;
     bookStatus.textContent = "표시할 호가가 없습니다.";
     bookMode.textContent = book.live ? "실시간" : bookLevels.hidden ? "" : "최근 호가";
@@ -182,10 +201,10 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     const clock = book.time?.replace(/^(\d{2})(\d{2})(\d{2})$/, "$1:$2:$3");
     timestamp.textContent = [day, clock].filter(Boolean).join(" ");
     timestamp.title = [book.date, book.time].filter(Boolean).join(" ");
-    renderBookSide(get("trade-book-asks"), [...(book.asks ?? [])].reverse());
-    renderBookSide(get("trade-book-bids"), book.bids ?? []);
-    if (centerBook && !bookLevels.hidden) {
-      bookLevels.scrollTop = bookMarket.offsetTop + (bookMarket.offsetHeight - bookLevels.clientHeight) / 2;
+    renderBookSide(bookAsks, asks, depth);
+    renderBookSide(bookBids, bids, depth);
+    if (firstBook && depth) {
+      bookAsks.scrollTop = bookBids.scrollTop = 0;
     }
     updateTradeTotal();
   }
@@ -272,7 +291,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     get("trade-use-quote").hidden = true;
     get("trade-preview-symbol").textContent = displaySymbol(current);
     get("trade-company").textContent = quote?.name || nameFor(current) || "";
-    tradeStatus.textContent = "키움 주문 정보를 확인 중입니다.";
+    tradeStatus.textContent = "";
     setTicketQuote(quote?.price, quote?.fromKiwoom ? "최근 조회가" : "저장된 종가");
     updateTradeTotal();
     trade.showModal();
@@ -336,7 +355,8 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     if (orderContext?.enabled) {
       tradeBusy = true;
       tradeNext.disabled = true;
-      tradeStatus.textContent = "주문 내용을 확인 중입니다.";
+      tradeStatus.textContent = "";
+      tradeNext.textContent = "확인 중…";
       try {
         order = await orders.preview({...order, symbol: orderContext.symbol, exchange: orderContext.exchange});
       } catch (error) {
@@ -344,14 +364,17 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
         return;
       } finally {
         tradeBusy = false;
-        if (version === tradeVersion) tradeNext.disabled = false;
+        if (version === tradeVersion) {
+          tradeNext.disabled = false;
+          tradeNext.textContent = sideName[tradeSide] + " 주문 확인";
+        }
       }
     }
     if (version !== tradeVersion || !trade.open) return;
     reviewId = order.id ?? null;
     get("trade-review-title").textContent = "주문 확인";
-    tradeConfirm.textContent = "Place " + order.side + " order";
-    get("trade-review-side").textContent = sideName[order.side];
+    tradeConfirm.textContent = sideName[order.side] + " 주문하기";
+    get("trade-review-side").textContent = {buy:"Buy", sell:"Sell"}[order.side];
     get("trade-review-kind").textContent = orderKinds.get(order.kind);
     get("trade-review-quantity").textContent = Number(order.quantity).toLocaleString("ko-KR") + "주";
     get("trade-review-price").textContent = order.price ? dollars.format(order.price) : "시장가";
@@ -359,7 +382,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     tradeForm.hidden = true;
     tradeReview.hidden = false;
     tradeConfirm.disabled = !reviewId;
-    tradeStatus.textContent = reviewId ? "전송하면 키움 실계좌에 주문이 접수됩니다." : previewOnly;
+    tradeStatus.textContent = reviewId ? "" : previewOnly;
     get("trade-review-title").focus();
   });
 
@@ -380,7 +403,8 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     tradeBusy = true;
     tradeConfirm.disabled = true;
     tradeEdit.disabled = true;
-    tradeStatus.textContent = "키움에 주문을 전송 중입니다.";
+    tradeConfirm.textContent = "접수 중…";
+    tradeStatus.textContent = "";
     try {
       const order = await orders.submit(id);
       get("trade-review-title").textContent = sideName[tradeSide] + " 주문 접수";

@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=74">
-<script type="module" src="./journal.js?v=74"></script>
+<link rel="stylesheet" href="./style.css?v=75">
+<script type="module" src="./journal.js?v=75"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header><div class="head"><a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="36" height="36" alt=""></a></div></header>
@@ -286,11 +286,15 @@
       <button type="button" data-trade-step="quantity" value="1" aria-label="수량 한 주 늘리기">+</button>
     </div>
   </div>
+  <div class="trade-ticket-total">
+    <label for="trade-preview-total">예상 주문 금액</label>
+    <output id="trade-preview-total" for="trade-limit trade-quantity">—</output>
+    <small id="trade-preview-krw" hidden></small>
+  </div>
 </div>
 </div>
 <div class="trade-ticket-footer">
-<div class="trade-ticket-total"><span>예상 주문 금액</span><div><output id="trade-preview-total">—</output><small id="trade-preview-krw" hidden></small></div></div>
-<button id="trade-preview-next" type="submit" class="trade-ticket-primary">주문 내용 확인</button>
+<button id="trade-preview-next" type="submit" class="trade-ticket-primary">주문 확인</button>
 </div>
 </form>
 <section id="trade-preview-review" hidden aria-labelledby="trade-review-title">
@@ -305,7 +309,7 @@
 <div class="trade-review-actions">
 <button type="button" id="trade-preview-edit">수정</button>
 <button type="button" id="trade-review-pending" hidden>미체결 보기</button>
-<button type="button" id="trade-preview-confirm" disabled>실계좌 주문 전송</button>
+<button type="button" id="trade-preview-confirm" disabled>주문하기</button>
 </div>
 </section>
 <p class="order-notice" id="trade-preview-status" role="status"></p>
