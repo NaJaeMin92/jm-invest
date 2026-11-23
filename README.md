@@ -30,3 +30,13 @@ Kiwoom FE WebSocket for supported US equities and labels received prices
 **Kiwoom**. This mode enables quotes only. The existing `--live` mode enables
 quotes and orders. The local server uses the same mode-600 credentials file
 and registered IP as the order service.
+
+For phone access through the existing GitHub Pages site, run a dedicated
+`--quote-gateway --port 8767` instance behind an HTTPS reverse proxy. The
+proxy must preserve streaming, forward the Authorization header without
+logging it, and set the upstream Host to `127.0.0.1:8767`. Configure the
+public HTTPS URL ending in `/api/quotes/stream` as the
+`kiwoom-quote-gateway` meta tag in `index.html`. The gateway handles quote
+requests from the GitHub Pages origin and checks the signed-in owner session
+before subscribing to Kiwoom. Use only one active quote client across the
+local app and gateway, as Kiwoom limits simultaneous quote sessions.

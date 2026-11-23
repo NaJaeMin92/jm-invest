@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parent.parent
 KIWOOM = "https://api.kiwoom.com"
 SUPABASE = "https://mfycpprqyaidoixytdim.supabase.co"
 PUBLIC_KEY = "sb_publishable_KIxbzozNkk50oEZ9GehtZA_E484E5Lr"
+PAGES_ORIGIN = "https://najaemin92.github.io"
 OWNER = "9fc22c69-b253-406a-be2b-eb8ad9526a3c"
 STATIC = {
     "index.html", "journal.html", "style.css", "journal.js", "instrument.js", "instrument-chart.js",
@@ -210,6 +211,7 @@ class App(BaseHTTPRequestHandler):
     orders = None
     quote_broker = None
     quote_lock = Lock()
+    quotes_only = False
     host = ""
     origin = ""
 
@@ -220,6 +222,9 @@ class App(BaseHTTPRequestHandler):
         return True
 
     def serve_static(self, send):
+        if self.quotes_only:
+            self.send_error(404)
+            return
         resource = unquote(urlsplit(self.path).path).lstrip("/") or "index.html"
         source = (ROOT / resource).resolve()
         asset = source.is_file() and (ROOT / "assets") in source.parents
@@ -244,7 +249,7 @@ class App(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self.allowed_host():
             return
-        if urlsplit(self.path).path == "/api/orders/status":
+        if not self.quotes_only and urlsplit(self.path).path == "/api/orders/status":
             self.handle_order("status")
         else:
             self.serve_static(True)
@@ -256,10 +261,28 @@ class App(BaseHTTPRequestHandler):
         if path == "/api/quotes/stream":
             self.stream_quotes()
             return
-        if path not in ("/api/orders/preview","/api/orders/submit"):
+        if self.quotes_only or path not in ("/api/orders/preview","/api/orders/submit"):
             self.send_error(404)
             return
         self.handle_order(path.rsplit("/", 1)[-1])
+
+    def do_OPTIONS(self):
+        if not self.allowed_host():
+            return
+        if not self.quotes_only or self.path != "/api/quotes/stream" or self.headers.get("Origin") != self.origin:
+            self.send_error(403)
+            return
+        self.send_response(204)
+        self.quote_headers()
+        self.send_header("Access-Control-Allow-Methods", "POST")
+        self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+        self.end_headers()
+
+    def quote_headers(self):
+        self.send_header("X-Content-Type-Options", "nosniff")
+        if self.quotes_only and self.headers.get("Origin") == self.origin:
+            self.send_header("Access-Control-Allow-Origin", self.origin)
+            self.send_header("Vary", "Origin")
 
     def stream_quotes(self):
         opened = False
@@ -292,6 +315,7 @@ class App(BaseHTTPRequestHandler):
             first = next(ticks, None)
             self.send_response(200)
             self.send_header("Content-Type", "application/x-ndjson")
+            self.quote_headers()
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             opened = True
@@ -349,6 +373,8 @@ class App(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(content)))
+        if self.quotes_only:
+            self.quote_headers()
         self.end_headers()
         self.wfile.write(content)
 
@@ -358,10 +384,15 @@ def main():
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--live", action="store_true", help="Enable explicit orders on the real account")
     parser.add_argument("--quotes", action="store_true", help="Enable private read-only Kiwoom quotes")
+    parser.add_argument("--quote-gateway", action="store_true",
+                        help="Serve only authenticated quotes for GitHub Pages via an HTTPS reverse proxy")
     args = parser.parse_args()
+    if args.quote_gateway and args.live:
+        parser.error("--quote-gateway cannot be combined with --live")
     App.host = f"127.0.0.1:{args.port}"
-    App.origin = "http://" + App.host
-    if args.live or args.quotes:
+    App.quotes_only = args.quote_gateway
+    App.origin = PAGES_ORIGIN if args.quote_gateway else "http://" + App.host
+    if args.live or args.quotes or args.quote_gateway:
         os.umask(0o077)
         path = Path.home() / ".jm-invest-credentials.json"
         with path.open() as config:
@@ -374,7 +405,7 @@ def main():
         if args.live:
             App.orders = Orders(broker, Path.home() / ".jm-invest-orders.sqlite")
     with ThreadingHTTPServer(("127.0.0.1",args.port), App) as app:
-        print(App.origin, flush=True)
+        print("http://" + App.host, flush=True)
         app.serve_forever()
 
 

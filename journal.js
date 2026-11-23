@@ -376,12 +376,16 @@ publicQuote("NVDA").then(quote => {
 });
 
 const kiwoomTicks = new Map();
+const kiwoomQuoteStatus = document.querySelector("#kiwoom-quote-status");
+// Set the HTTPS URL of the authenticated, quote-only gateway when provisioned.
+const kiwoomGateway = document.querySelector('meta[name="kiwoom-quote-gateway"]')?.content;
+const kiwoomEndpoint = location.hostname === "127.0.0.1" ? "./api/quotes/stream" : kiwoomGateway;
 const kiwoomPhases = {"0": "Regular", "1": "Pre", "2": "After"};
 let kiwoomStream;
 let redrawQuotes;
 
 async function syncKiwoomQuotes() {
-  if (location.hostname !== "127.0.0.1") return;
+  if (!kiwoomEndpoint) return;
   const active = token && !document.hidden && document.body.dataset.view === "home";
   const items = active ? [...new Set(readWatchlist())].sort().flatMap(symbol => {
     const exchange = marketQuotes.get(symbol)?.exchange;
@@ -395,26 +399,35 @@ async function syncKiwoomQuotes() {
     kiwoomTicks.clear();
     renderWatchlist();
   }
-  if (!items.length) return;
+  if (!items.length) {
+    kiwoomQuoteStatus.textContent = active && readWatchlist().length ? "Waiting for supported Kiwoom symbols…" : "";
+    return;
+  }
+  kiwoomQuoteStatus.textContent = "Connecting to Kiwoom…";
 
   const controller = new AbortController();
   const stream = {key, token, controller};
   kiwoomStream = stream;
   try {
-    const response = await fetch("./api/quotes/stream", {
+    const response = await fetch(kiwoomEndpoint, {
       method: "POST",
       headers: {"Content-Type": "application/json", Authorization: "Bearer " + token},
       body: key,
       signal: controller.signal
     });
-    if (!response.ok || !response.body) return;
-    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+    if (!response.ok || !response.body) {
+      const issue = await response.json().catch(() => null);
+      throw new Error(issue?.message ?? `Kiwoom HTTP ${response.status}`);
+    }
+    kiwoomQuoteStatus.textContent = "Kiwoom connected. Waiting for a trade in this session…";
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
     let pending = "";
     try {
       while (kiwoomStream === stream) {
         const {done, value} = await reader.read();
         if (done || kiwoomStream !== stream) break;
-        const lines = (pending + value).split("\n");
+        const lines = (pending + decoder.decode(value, {stream: true})).split("\n");
         pending = lines.pop();
         for (const line of lines) {
           const tick = JSON.parse(line);
@@ -429,8 +442,9 @@ async function syncKiwoomQuotes() {
     } finally {
       await reader.cancel().catch(() => {});
     }
+    if (kiwoomStream === stream) kiwoomQuoteStatus.textContent = "Kiwoom disconnected. Showing available quotes.";
   } catch (error) {
-    if (!controller.signal.aborted) console.warn("Kiwoom quote stream disconnected", error);
+    if (kiwoomStream === stream) kiwoomQuoteStatus.textContent = error.message;
   } finally {
     if (kiwoomStream === stream) {
       kiwoomStream = null;
@@ -509,6 +523,9 @@ function renderWatchlist() {
     }
     return [symbol, watchQuoteForSession(marketQuotes.get(symbol), session)];
   }));
+  if ([...quotes.values()].some(quote => quote?.fromKiwoom)) {
+    kiwoomQuoteStatus.textContent = "";
+  }
   if (sortDirection) symbols.sort((a, b) => {
     const left = quotes.get(a)?.change, right = quotes.get(b)?.change;
     if (!Number.isFinite(left) || !Number.isFinite(right)) {
