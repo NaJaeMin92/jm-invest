@@ -1,6 +1,6 @@
 import {setupWatchEditor} from "./watch-editor.js?v=49";
-import {setupOrders} from "./orders.js?v=67";
-import { setupInstrument, sparkline } from "./instrument.js?v=69";
+import {setupOrders} from "./orders.js?v=70";
+import { setupInstrument, sparkline } from "./instrument.js?v=70";
 import {loadWatchSentiment} from "./market-panels.js?v=68";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -511,7 +511,7 @@ setInterval(refreshWatchlistQuotes, 30_000);
 document.addEventListener("visibilitychange", refreshWatchlistQuotes);
 window.addEventListener("online", refreshWatchlistQuotes);
 
-const orders = setupOrders(() => token);
+const orders = setupOrders(() => token, kiwoomEndpoint);
 const instrument = setupInstrument({
   orders,
   canLoadChart: () => Boolean(token && kiwoomEndpoint),

@@ -1,13 +1,13 @@
-export function setupOrders(readToken) {
+export function setupOrders(readToken, quoteEndpoint) {
   const get = id => document.getElementById(id);
   const dialog = get("order-dialog"), form = get("order-form"), review = get("order-review");
   const status = get("order-status"), launch = get("open-order"), confirm = get("order-confirm");
   let reviewId = null, busy = false, dialogVersion = 0;
   const publicSite = location.hostname === "najaemin92.github.io";
-  async function call(path, body) {
+  async function call(path, body, endpoint = "./api/orders/" + path) {
     const session = readToken();
     if (!session) throw new Error("로그인이 필요합니다.");
-    const response = await fetch("./api/orders/" + path, {
+    const response = await fetch(endpoint, {
       method:body ? "POST" : "GET", body:body && JSON.stringify(body),
       headers:{Authorization:"Bearer " + session,"Content-Type":"application/json"}, cache:"no-store"
     });
@@ -90,7 +90,13 @@ export function setupOrders(readToken) {
       catch { launch.hidden=true; }
     },
     stockContext(symbol) {
-      if (publicSite || !readToken()) return Promise.resolve(null);
+      if (!readToken()) return Promise.resolve(null);
+      if (publicSite) {
+        if (!quoteEndpoint) return Promise.resolve(null);
+        const endpoint = new URL("book", new URL(quoteEndpoint, location.href));
+        endpoint.searchParams.set("symbol", symbol);
+        return call("", null, endpoint).then(context => ({...context, enabled:false}));
+      }
       return call("context?symbol=" + encodeURIComponent(symbol));
     },
     preview: data => call("preview", data),

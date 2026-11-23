@@ -38,7 +38,9 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
   const tradeForm = get("trade-preview-form"), tradeReview = get("trade-preview-review");
   const tradeStatus = get("trade-preview-status"), tradeNext = get("trade-preview-next");
   const tradeConfirm = get("trade-preview-confirm"), tradeEdit = get("trade-preview-edit");
-  const book = get("trade-book"), bookRefresh = get("trade-book-refresh");
+  const bookLevels = get("trade-book-levels"), bookRefresh = get("trade-book-refresh");
+  const bookStatus = get("trade-book-status"), bookMarket = get("trade-book-market");
+  const ticketSides = [...tradeForm.querySelectorAll("[data-ticket-side]")];
   const quantity = tradeForm.querySelector('[name="quantity"]');
   const price = tradeForm.querySelector('[name="price"]');
   const dollars = new Intl.NumberFormat("en-US", {
@@ -49,6 +51,16 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
   const previewOnly = "미리보기 모드입니다. 실계좌 주문은 이 Mac의 비공개 서버에서 할 수 있습니다.";
   let tradeSide, orderContext, reviewId, tradeBusy = false, tradeVersion = 0;
 
+  function selectTradeSide(side) {
+    tradeSide = side;
+    trade.dataset.side = side;
+    get("trade-preview-title").textContent = sideName[side] + " 주문";
+    tradeNext.textContent = sideName[side] + " 검토";
+    for (const button of ticketSides) {
+      button.setAttribute("aria-pressed", String(button.dataset.ticketSide === side));
+    }
+  }
+
   function updateTradeTotal() {
     const amount = quantity.valueAsNumber * price.valueAsNumber;
     const valid = quantity.validity.valid && price.validity.valid && Number.isFinite(amount);
@@ -56,6 +68,9 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
     const converted = get("trade-preview-krw");
     converted.hidden = !valid || !Number.isFinite(orderContext?.fx);
     converted.textContent = converted.hidden ? "" : "약 " + won.format(amount * orderContext.fx);
+    for (const button of bookLevels.querySelectorAll("button")) {
+      button.setAttribute("aria-pressed", String(Number(button.dataset.price) === price.valueAsNumber));
+    }
   }
 
   function setTradePrice(value) {
@@ -68,6 +83,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
     container.replaceChildren(...(levels ?? []).map(level => {
       const button = document.createElement("button");
       button.type = "button";
+      button.dataset.price = level.price;
       const value = document.createElement("span");
       value.textContent = dollars.format(level.price);
       const volume = document.createElement("small");
@@ -92,13 +108,23 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
         currentPrice.textContent = "키움 현재가 · " + dollars.format(context.price);
         get("trade-use-quote").hidden = false;
       }
-      book.hidden = !(context?.asks?.length || context?.bids?.length);
+      get("trade-book-price").textContent = Number.isFinite(context?.price) ? dollars.format(context.price) : "—";
+      const centerBook = bookLevels.hidden;
+      bookLevels.hidden = !(context?.asks?.length || context?.bids?.length);
+      bookStatus.hidden = !bookLevels.hidden;
+      bookStatus.textContent = context ? "표시할 호가가 없습니다." : "로그인 후 호가를 볼 수 있습니다.";
       get("trade-book-time").textContent = [context?.date, context?.time].filter(Boolean).join(" ");
-      renderBookSide(get("trade-book-asks"), context?.asks);
+      renderBookSide(get("trade-book-asks"), [...(context?.asks ?? [])].reverse());
       renderBookSide(get("trade-book-bids"), context?.bids);
+      if (centerBook && !bookLevels.hidden) {
+        bookLevels.scrollTop = bookMarket.offsetTop + (bookMarket.offsetHeight - bookLevels.clientHeight) / 2;
+      }
       updateTradeTotal();
     } catch (error) {
-      if (version === tradeVersion && trade.open) tradeStatus.textContent = error.message;
+      if (version === tradeVersion && trade.open) {
+        tradeStatus.textContent = error.message;
+        if (bookLevels.hidden) bookStatus.textContent = "호가를 불러오지 못했습니다.";
+      }
     } finally {
       if (version === tradeVersion) {
         bookRefresh.disabled = false;
@@ -110,7 +136,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
   function openTrade(side) {
     if (tradeBusy || trade.open) return;
     tradeVersion += 1;
-    tradeSide = side;
+    selectTradeSide(side);
     orderContext = null;
     reviewId = null;
     tradeForm.reset();
@@ -119,12 +145,12 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
     tradeNext.disabled = true;
     tradeConfirm.disabled = true;
     tradeEdit.disabled = false;
-    book.hidden = true;
-    book.open = false;
+    bookLevels.hidden = true;
+    bookStatus.hidden = false;
+    bookStatus.textContent = "호가 조회 중…";
+    get("trade-book-time").textContent = "";
     get("trade-use-quote").hidden = true;
     get("trade-preview-symbol").textContent = displaySymbol(current);
-    get("trade-preview-title").textContent = sideName[side] + " 주문";
-    trade.dataset.side = side;
     tradeStatus.textContent = "키움 주문 정보를 확인 중입니다.";
     const referencePrice = get("trade-preview-quote");
     referencePrice.hidden = !Number.isFinite(quote?.price);
@@ -145,12 +171,23 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,canLoad
     reviewId = null;
   });
   bookRefresh.onclick = loadTradeContext;
+  for (const button of ticketSides) {
+    button.onclick = () => {
+      if (!tradeBusy && !tradeForm.hidden) selectTradeSide(button.dataset.ticketSide);
+    };
+  }
   get("trade-use-quote").onclick = () => setTradePrice(orderContext?.price);
   for (const button of tradeForm.querySelectorAll("[data-trade-step]")) {
     button.onclick = () => {
-      const field = button.dataset.tradeStep === "price" ? price : quantity;
-      if (button.value === "1") field.stepUp();
-      else field.stepDown();
+      if (button.dataset.tradeStep === "price") {
+        if (!Number.isFinite(price.valueAsNumber)) {
+          setTradePrice(orderContext?.price);
+          return;
+        }
+        const value = price.valueAsNumber + Number(button.value) * 0.01;
+        setTradePrice(Math.min(Number(price.max), Math.max(Number(price.min), value)));
+      } else if (button.value === "1") quantity.stepUp();
+      else quantity.stepDown();
       updateTradeTotal();
     };
   }

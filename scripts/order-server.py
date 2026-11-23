@@ -491,6 +491,8 @@ class App(BaseHTTPRequestHandler):
             self.handle_order("status")
         elif not self.quotes_only and path.path == "/api/orders/context":
             self.handle_order_context(parse_qs(path.query).get("symbol", [""])[0])
+        elif self.quotes_only and path.path == "/api/quotes/book":
+            self.handle_order_context(parse_qs(path.query).get("symbol", [""])[0])
         elif path.path == "/api/quotes/instrument":
             self.handle_instrument_chart(parse_qs(path.query))
         else:
@@ -511,7 +513,8 @@ class App(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         if not self.allowed_host():
             return
-        method = {"/api/quotes/stream": "POST", "/api/quotes/instrument": "GET"}.get(urlsplit(self.path).path)
+        method = {"/api/quotes/stream": "POST", "/api/quotes/instrument": "GET",
+                  "/api/quotes/book": "GET"}.get(urlsplit(self.path).path)
         if not self.quotes_only or not method or self.headers.get("Origin") != self.origin:
             self.send_error(403)
             return
@@ -651,6 +654,8 @@ class App(BaseHTTPRequestHandler):
 
     def handle_order_context(self, symbol):
         try:
+            if self.quotes_only and self.headers.get("Origin") != self.origin:
+                raise Problem(403, "허용되지 않은 시세 요청입니다.")
             owner_session(self.headers.get("Authorization"))
             if self.quote_broker is None:
                 raise Problem(503, "키움 시세 서버가 연결되어 있지 않습니다.")
