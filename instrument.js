@@ -1,5 +1,5 @@
-import {trendStyles} from "./assets/chart-trends.js?v=81";
-import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=81";
+import {trendStyles} from "./assets/chart-trends.js?v=82";
+import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=82";
 import {setupExecutionFlags} from "./chart-executions.js?v=77";
 import {showMarketPanel} from "./market-panels.js?v=68";
 
@@ -527,10 +527,10 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
       const data = await publicQuote(symbol);
       if (!data) return null;
       const bars = interval === "hour" ? data.hourly : isIntraday(interval) ? await minuteBars(symbol) : data.daily;
-      return bars.length ? {...prepareChart(bars, interval), daily:data.daily} : null;
+      return bars.length ? prepareChart(bars, interval) : null;
     }
   });
-  const trends = {long:true, short:true, support:true, resistance:true};
+  const trends = {long:true, short:true, support:true, resistance:true, fibonacci:false};
   const trendKey = "jm-invest:chart-trends:v1";
   try {
     const saved = JSON.parse(localStorage.getItem(trendKey));
@@ -720,7 +720,6 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
     const anchor = preserve && chart?.bars[start]?.[0];
     const atLatest = start === lastStart;
     chart = source?.length ? prepareChart(source, frame) : null;
-    if (chart) chart.daily = quote?.daily;
     get("trend-controls").hidden = !chart;
     if (!preserve) { windowSize = visibleBars; rangeMode = ""; }
     else if (rangeMode === "all" && chart) windowSize = chart.bars.length;

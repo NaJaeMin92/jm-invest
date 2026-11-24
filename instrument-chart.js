@@ -1,4 +1,4 @@
-import {beforeTime, chartTrends, trendStyles} from "./assets/chart-trends.js?v=81";
+import {chartTrends, trendStyles} from "./assets/chart-trends.js?v=82";
 import {study} from "./technical-indicators.js?v=76";
 import {renderAnnotations} from "./chart-annotations.js?v=58";
 
@@ -153,25 +153,19 @@ export function drawChart(canvas, chart, frame, start, options) {
     }
   }
 
-  if (options.trends && Object.values(options.trends).some(Boolean) && chart.daily?.length) {
-    const time = shown.at(-1)[0];
-    const day = isIntraday(frame) ? Date.parse(sessionDate.format(time*1000)+"T00:00:00Z")/1000
-      : Math.floor(time/86400)*86400;
-    const through = beforeTime(chart.daily, day);
-    const close = chart.daily[through-1]?.[4];
-    const monday = day - ((new Date(day*1000).getUTCDay()+6)%7)*86400;
-    if (through && (chart.trendCache?.through !== through || chart.trendCache.monday !== monday)) {
-      const history = chart.daily.slice(Math.max(0,through-650),through);
-      const weekly = aggregate(history.slice(0,beforeTime(history,monday)), "week");
-      chart.trendCache = {through, monday, lines:chartTrends(history, weekly, close)};
+  if (options.trends && Object.values(options.trends).some(Boolean)) {
+    // The last visible candle may still be forming, including during replay.
+    const through = end-1;
+    if (chart.trendCache?.through !== through) {
+      chart.trendCache = {through, lines:chartTrends(bars,frame,through)};
     }
     ctx.save();
     ctx.beginPath();
     ctx.rect(pad,top,width-pad,bottom-top);
     ctx.clip();
-    for (const guide of through ? chart.trendCache.lines : []) {
+    for (const guide of chart.trendCache.lines) {
       if (!options.trends[guide.key]) continue;
-      const first = beforeTime(shown,guide.time);
+      const first = Math.max(0,guide.index-start);
       if (first >= shown.length) continue;
       const color = trendStyles[guide.key].color;
       if (guide.halfWidth) {
@@ -183,10 +177,14 @@ export function drawChart(canvas, chart, frame, start, options) {
       ctx.setLineDash(guide.key === "short" ? [5,3] : guide.halfWidth ? [2,3] : []);
       const points = [];
       for (let i=first; i<shown.length; i++) {
-        const value = guide.price + guide.slope*(shown[i][0]-guide.time);
+        const value = guide.price + guide.slope*(start+i-guide.index);
         if (value>0) points.push([x(i),y(value)]);
       }
       line(points,color,guide.key === "long" ? 1.8 : 1.25);
+      if (guide.label) {
+        const textWidth = ctx.measureText(guide.label).width;
+        label(guide.label, Math.max(x(first),width-textWidth-5), y(guide.price)-3, color);
+      }
     }
     ctx.restore();
   }
