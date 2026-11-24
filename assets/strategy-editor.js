@@ -5,6 +5,15 @@ const get=id=>document.getElementById("strategy-"+id);
 const option=(value,label)=>new Option(label,value);
 const shortName={day:"일봉",week:"주봉",month:"월봉"};
 
+const draftFactors = {
+  relativeStrength: "상대강도 · SOXX/QQQ",
+  goldenCross: "골든크로스",
+  anchoredVwap: "Anchored VWAP · 앵커 거래량가중평균가",
+  volumeProfile: "Volume Profile · 매물대",
+  marketBreadth: "Market Breadth · 시장 폭"
+};
+const isDraft=key=>Object.hasOwn(draftFactors,key);
+
 export function setupStrategy({getSymbol,loadChart,orders,canLoadChart}) {
   const sheet=get("sheet"), form=get("form"), fields=get("fields"), list=get("conditions"), state=get("state");
   const f=form.elements;
@@ -13,22 +22,42 @@ export function setupStrategy({getSymbol,loadChart,orders,canLoadChart}) {
     const row=document.createElement("div"), factor=document.createElement("select"), op=document.createElement("select");
     row.className="strategy-row";
     for (const [key,[name]] of Object.entries(factors)) factor.add(option(key,name));
+    const group=document.createElement("optgroup");
+    group.label="백테스트 후보";
+    for (const [key,name] of Object.entries(draftFactors)) group.append(option(key,name));
+    factor.append(group);
     factor.required=true;
-    if (!Object.hasOwn(factors,c.key)) {
+    if (!Object.hasOwn(factors,c.key) && !isDraft(c.key)) {
       const missing=option("","대체 조건 선택");
       missing.disabled=true;
       factor.prepend(missing);
       state.textContent="사용이 종료된 조건을 교체하거나 삭제하세요.";
     }
-    factor.value=Object.hasOwn(factors,c.key) ? c.key : ""; factor.setAttribute("aria-label","판단 요소");
+    factor.value=(Object.hasOwn(factors,c.key) || isDraft(c.key)) ? c.key : ""; factor.setAttribute("aria-label","판단 요소");
     op.add(option("lte","이하 ≤")); op.add(option("gte","이상 ≥")); op.value=c.op; op.setAttribute("aria-label","비교");
     const input=document.createElement("input"); input.type="number"; input.step="any"; input.required=true;
-    input.value=c.value; input.setAttribute("aria-label","기준값"); factor.onchange=()=>{input.value=factors[factor.value][1]};
+    input.value=c.value ?? ""; input.setAttribute("aria-label","기준값"); function updateRow() {
+      const draft=isDraft(factor.value);
+      op.hidden=op.disabled=input.hidden=input.disabled=draft;
+    }
+    updateRow();
+    factor.onchange=()=>{
+      input.value=factors[factor.value]?.[1] ?? "";
+      op.value="lte";
+      updateRow();
+      sync();
+    };
     const remove=document.createElement("button"); remove.type="button"; remove.textContent="×";
-    remove.setAttribute("aria-label","조건 삭제"); remove.onclick=()=>row.remove();
+    remove.setAttribute("aria-label","조건 삭제"); remove.onclick=()=>{row.remove();sync();};
     row.append(factor,op,input,remove); list.append(row);
   }
   function sync() {
+    const draft=Array.from(list.children).some(row=>isDraft(row.firstElementChild.value));
+    if(draft) f.mode.value="signal";
+    f.mode.disabled=draft;
+    get("draft-note").hidden=!draft;
+    get("start").disabled=draft;
+    get("save").textContent=draft ? "초안 저장" : "규칙 저장";
     const live=f.mode.value==="live";
     get("price").hidden=!live; f.price.required=live;
     get("start").textContent=live ? "실계좌 "+(f.side.value==="buy"?"매수":"매도")+" 1회 자동주문 시작" : "신호 감시 시작";
@@ -40,7 +69,7 @@ export function setupStrategy({getSymbol,loadChart,orders,canLoadChart}) {
     if (!form.reportValidity()) return;
     const conditions=Array.from(list.children,row=>{
       const [factor,op,input]=row.children;
-      return {key:factor.value,op:op.value,value:input.valueAsNumber};
+      return isDraft(factor.value) ? {key:factor.value} : {key:factor.value,op:op.value,value:input.valueAsNumber};
     });
     if (!conditions.length) {state.textContent="판단 조건을 하나 이상 추가하세요.";return;}
     if(f.mode.value==="live" && !/^\d{1,7}(\.\d{1,4})?$/.test(f.price.value)) {state.textContent="지정가 자릿수를 확인하세요.";return;}
@@ -58,7 +87,7 @@ export function setupStrategy({getSymbol,loadChart,orders,canLoadChart}) {
   };
   get("save").onclick=()=>{
     const r=rule(); if(!r) return;
-    try {localStorage.setItem(savedKey(),JSON.stringify(r));state.textContent="규칙을 저장했습니다.";}
+    try {localStorage.setItem(savedKey(),JSON.stringify(r));state.textContent=r.conditions.some(c=>isDraft(c.key)) ? "초안을 저장했습니다." : "규칙을 저장했습니다.";}
     catch {state.textContent="이 브라우저에 저장하지 못했습니다.";}
   };
   get("add").onclick=()=>add(); f.mode.onchange=sync; f.side.onchange=sync;
@@ -120,6 +149,7 @@ export function setupStrategy({getSymbol,loadChart,orders,canLoadChart}) {
   get("start").onclick=async ()=>{
     if(run)return;
     const r=rule();if(!r)return;
+    if(r.conditions.some(c=>isDraft(c.key)))return;
     if(!canLoadChart()){state.textContent="시세 조회를 위해 계좌에 로그인하세요.";return;}
     if(r.mode==="live" && !["127.0.0.1","localhost"].includes(location.hostname)){state.textContent="실주문은 비공개 로컬 주문 서버에서 실행하세요.";return;}
     const ctrl=new AbortController();run=ctrl;sync();state.textContent=r.symbol+" · "+shortName[r.frame]+" · 조건 확인 중";
