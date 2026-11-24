@@ -1,7 +1,7 @@
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=95";
 import {setupWatchEditor} from "./watch-editor.js?v=95";
 import {setupOrders} from "./orders.js?v=83";
-import { setupInstrument, sparkline } from "./instrument.js?v=90";
+import { setupInstrument, sparkline } from "./instrument.js?v=96";
 import {loadWatchSentiment} from "./market-panels.js?v=89";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -52,11 +52,14 @@ const holdingsPanel = document.querySelector("#account-holdings");
 const holdingsToggle = document.querySelector("#open-kiwoom");
 const logout = document.querySelector("#logout");
 const navigation = document.querySelector("#bottom-nav");
+const accountNavLabel=document.getElementById("account-nav-label");
 const navButtons = [...navigation.querySelectorAll("button")];
 function selectView(view) {
   if (!token && view !== "account") returnToStock = null;
   const needsLogin = !["home","strategies"].includes(view) && !token;
   document.getElementById("watch-login").hidden = Boolean(token);
+  accountNavLabel.textContent=token ? "Account" : "로그인";
+  accountNavLabel.lang=token ? "en" : "ko";
   document.body.dataset.view = view;
   setDetail(view === "account" && !needsLogin);
   login.hidden = !needsLogin;
@@ -733,7 +736,7 @@ async function loadChart(symbol, frame, before, signal, day) {
 const canLoadChart=()=>Boolean(token && kiwoomEndpoint);
 const strategy=setupStrategy({loadChart,orders,canLoadChart,tickerIcon});
 const instrument = setupInstrument({
-  orders,strategy,
+  orders,strategy,isSignedIn:()=>Boolean(token),
   async readPositionSnapshot(symbol) {
     const session = token;
     const balance = await valuationSnapshot;
@@ -1067,7 +1070,10 @@ async function openWorkspace(session, remember) {
 
 async function restoreSession() {
   if (!storedSession()) return;
-  login.hidden = true;
+  if(!login.hidden){
+    login.hidden=true;
+    message.textContent="저장된 로그인 정보를 확인하고 있습니다.";
+  }
   try {
     const resume = async () => {
       const refreshToken = storedSession();
@@ -1091,5 +1097,5 @@ async function restoreSession() {
   }
 }
 
-selectView("home");
+selectView(new URLSearchParams(location.search).get("view")==="account" ? "account" : "home");
 restoreSession();

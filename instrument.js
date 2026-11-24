@@ -70,7 +70,7 @@ function mergeDaily(oldBars, newBars) {
   return [...days.values()].sort((a,b) => a[0] - b[0]);
 }
 
-export function setupInstrument({strategy,search,nameFor,readList,saveList,orders,readPositionSnapshot,subscribeOrderBook,canLoadChart,loadChart,loadExecutions,signIn}) {
+export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,saveList,orders,readPositionSnapshot,subscribeOrderBook,canLoadChart,loadChart,loadExecutions,signIn}) {
   const dialog=get("stock-detail"), canvas=get("market-chart");
   const executions = setupExecutionFlags(loadExecutions);
   let current="", quote=null, frame="day", afterClose=null, quoteRequest=0;
@@ -851,7 +851,7 @@ export function setupInstrument({strategy,search,nameFor,readList,saveList,order
     get("stock-name").textContent = [quote.name || nameFor(current), quote.exchange === "NasdaqGS" ? "NASDAQ" : quote.exchange].filter(Boolean).join("  ");
     get("stock-quote-source").hidden = false;
     get("stock-quote-source").textContent = quote.source || (quote.fromKiwoom ? "Kiwoom" : "Snapshot");
-    get("stock-chart-sign-in").hidden = canLoadChart();
+    get("stock-chart-sign-in").hidden = isSignedIn();
     const when = Number.isFinite(quote.asOf) ? dateFormat.format(quote.asOf * 1000) : "";
     get("stock-time").textContent = quote.fromKiwoom ? "Latest quote"
       : current === "SKHY" ? "Closed 19:59 11/20 ET" : "Closed · " + when + " ET";
@@ -907,9 +907,9 @@ export function setupInstrument({strategy,search,nameFor,readList,saveList,order
       }
     }
     if (id !== quoteRequest) return;
-    get("stock-time").textContent = canLoadChart() ? message : "Sign in to load the chart.";
+    get("stock-time").textContent = isSignedIn() ? message : "Sign in to load the chart.";
     get("stock-quote-source").hidden = true;
-    get("stock-chart-sign-in").hidden = canLoadChart();
+    get("stock-chart-sign-in").hidden = isSignedIn();
     get("stock-quote-retry").hidden = !canLoadChart();
     get("stock-frames").hidden = true;
   }
@@ -932,7 +932,7 @@ export function setupInstrument({strategy,search,nameFor,readList,saveList,order
     for (const id of ["stock-price","stock-range","stock-volume","stock-cap"]) get(id).textContent="—";
     get("stock-change").textContent="";get("stock-time").textContent="Loading quote…";
     get("stock-quote-source").hidden = true;
-    get("stock-chart-sign-in").hidden = true;
+    get("stock-chart-sign-in").hidden = isSignedIn();
     get("external-chart").replaceChildren();get("external-chart").hidden=true;
     canvas.hidden=true;get("stock-frames").hidden=true;
     setFavorite();setFrame("day");
@@ -994,6 +994,7 @@ export function setupInstrument({strategy,search,nameFor,readList,saveList,order
       sync();
     },
     refresh() {
+      get("stock-chart-sign-in").hidden=isSignedIn();
       if (current && canLoadChart()) loadInstrumentQuote(current);
     }
   };
