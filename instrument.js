@@ -1,6 +1,6 @@
 import {setupStrategy} from "./assets/strategy-editor.js?v=86";
 import {trendStyles} from "./assets/chart-trends.js?v=82";
-import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=82";
+import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=87";
 import {setupExecutionFlags} from "./chart-executions.js?v=77";
 import {showMarketPanel} from "./market-panels.js?v=68";
 
@@ -20,6 +20,7 @@ export function publicQuote(symbol) {
   }
   return cache.get(symbol);
 }
+let sparkId=0;
 export function sparkline(points, container) {
   const ns = "http://www.w3.org/2000/svg";
   let path = container.querySelector("polyline");
@@ -31,17 +32,33 @@ export function sparkline(points, container) {
     path.setAttribute("fill","none");
     path.setAttribute("stroke","currentColor");
     path.setAttribute("stroke-width","1.6");
-    svg.append(path);
+    const gradient=document.createElementNS(ns,"linearGradient");
+    gradient.id="spark-fill-"+(++sparkId);
+    gradient.setAttribute("x2","0"); gradient.setAttribute("y2","1");
+    for(const [offset,opacity] of [["0%","0.30"],["100%","0"]]){
+      const stop=document.createElementNS(ns,"stop");
+      stop.setAttribute("offset",offset); stop.setAttribute("stop-color","currentColor"); stop.setAttribute("stop-opacity",opacity);
+      gradient.append(stop);
+    }
+    const fill=document.createElementNS(ns,"polygon"), dot=document.createElementNS(ns,"circle");
+    fill.setAttribute("fill","url(#"+gradient.id+")");
+    dot.setAttribute("r","2");dot.setAttribute("fill","currentColor");
+    path.setAttribute("stroke-linejoin","round");
+    svg.append(gradient,fill,path,dot);
     container.append(svg);
   }
   const prices = points.map(point => point[1]);
   const min = Math.min(...prices), max = Math.max(...prices), start = points[0][0];
   const span = points.at(-1)[0] - start;
-  path.setAttribute("points",points.map(([stamp, value]) => {
+  const coords=points.map(([stamp, value]) => {
     const x = 1 + 98 * (stamp - start) / span;
     const y = min === max ? 22 : 40 - 36 * (value - min) / (max - min);
     return x.toFixed(2) + "," + y.toFixed(2);
-  }).join(" "));
+  });
+  path.setAttribute("points",coords.join(" "));
+  path.previousElementSibling.setAttribute("points","1,44 "+coords.join(" ")+" 99,44");
+  const [cx,cy]=coords.at(-1).split(",");
+  path.nextElementSibling.setAttribute("cx",cx);path.nextElementSibling.setAttribute("cy",cy);
 }
 const signed = n => (n>=0?"+":"")+n.toFixed(2);
 const displaySymbol = s => ({BZMAIN:"BZmain",CLMAIN:"CLmain"}[s] || s);
@@ -943,6 +960,11 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
   window.addEventListener("popstate",sync);
   sync();
   return {
+    leave:back,
+    openStrategy(symbol) {
+      this.open(symbol);
+      get("strategy-open").click();
+    },
     clearAccountData() { resetPosition(); executions.reset(); },
     open(symbol) {
       history.pushState({stockEntry:true},"","#stock="+encodeURIComponent(symbol));

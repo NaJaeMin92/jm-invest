@@ -307,12 +307,26 @@ export function drawChart(canvas, chart, frame, start, options) {
     const values = [...lines.flatMap(series=>series.values), ...histogram, ...levels].filter(Number.isFinite);
     const [min,max] = lower.domain || [Math.min(...values),Math.max(...values)];
     const ly = value => h - 7 - (h - axis - 36) * (value - min)/(max-min || 1);
+    if(isRsi){
+      ctx.fillStyle="#a78af918";
+      ctx.fillRect(pad,ly(levels[1]),width-pad,ly(levels[0])-ly(levels[1]));
+    }
     for (const level of levels) line([[pad,ly(level)],[width,ly(level)]],isRsi ? "#65758f" : "#465168");
     if (isRsi) {
-      const upperY = ly(levels[1]) + 3;
-      const lowerY = Math.min(h - 3, Math.max(ly(levels[0]) + 3, upperY + 12));
-      label(String(levels[1]),width + 4,Math.min(upperY, lowerY - 12),"#b9c5da");
-      label(String(levels[0]),width + 4,lowerY,"#b9c5da");
+      const current=lines[0]?.values.at(-1);
+      const badgeY=Number.isFinite(current) ? Math.min(h-12,Math.max(ly(100)+7,ly(current))) : null;
+      for(const level of levels){
+        let baseline=ly(level)+3;
+        if(badgeY!==null && Math.abs(baseline-3-badgeY)<14){
+          baseline=badgeY+(baseline-3<badgeY ? -10 : 18);
+        }
+        label(String(level),width+4,Math.max(ly(100),Math.min(h-2,baseline)),"#b9c5da");
+      }
+      if(badgeY!==null){
+        ctx.fillStyle="#7454ac";
+        ctx.beginPath();ctx.roundRect(width+1,badgeY-8,38,16,4);ctx.fill();
+        label(current.toFixed(1),width+5,badgeY+4,"#fff");
+      }
     }
     histogram.forEach((value,i) => {
       if (value == null) return;
@@ -321,9 +335,11 @@ export function drawChart(canvas, chart, frame, start, options) {
     });
     let cursor = pad;
     for (const series of lines) {
-      line(pointsFor(series.values,ly),series.color,1.3);
+      const color=isRsi ? "#b29af6" : series.color;
+      line(pointsFor(series.values,ly),color,isRsi ? 1.7 : 1.3);
       const value = series.values.at(-1);
-      cursor += label(series.label + " " + (value?.toFixed(2) ?? "—"),cursor,axis+28,series.color) + 8;
+      if(isRsi){cursor+=label("RSI (14)",cursor,axis+28,"#c9cbd4")+8;}
+      cursor += label((isRsi ? "" : series.label) + " " + (value?.toFixed(2) ?? "—"),cursor,axis+28,color) + 8;
     }
     if (!lines.length) label("Volume",pad,axis+28,"#a2abc1");
   }

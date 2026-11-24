@@ -1,6 +1,6 @@
 import {setupWatchEditor} from "./watch-editor.js?v=49";
 import {setupOrders} from "./orders.js?v=83";
-import { setupInstrument, sparkline } from "./instrument.js?v=86";
+import { setupInstrument, sparkline } from "./instrument.js?v=87";
 import {loadWatchSentiment} from "./market-panels.js?v=68";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -54,16 +54,16 @@ const navigation = document.querySelector("#bottom-nav");
 const navButtons = [...navigation.querySelectorAll("button")];
 function selectView(view) {
   if (!token && view !== "account") returnToStock = null;
-  const needsLogin = view !== "home" && !token;
+  const needsLogin = !["home","strategies"].includes(view) && !token;
   document.getElementById("watch-login").hidden = Boolean(token);
   document.body.dataset.view = view;
   setDetail(view === "account" && !needsLogin);
   login.hidden = !needsLogin;
   workspace.hidden = needsLogin;
   message.textContent = "";
+  for (const panel of document.querySelectorAll("#private > [id^=tab-]")) panel.hidden=panel.id!=="tab-"+view || needsLogin;
   for (const button of navButtons) {
-    const active = button.dataset.view === view;
-    document.querySelector(`#tab-${button.dataset.view}`).hidden = !active || needsLogin;
+    const active = button.dataset.view === (["more","profit"].includes(view) ? "account" : view);
     if (active) {
       document.querySelector("#section-icon").replaceChildren(button.querySelector("svg").cloneNode(true));
       button.setAttribute("aria-current", "page");
@@ -71,7 +71,7 @@ function selectView(view) {
     else button.removeAttribute("aria-current");
   }
   document.querySelector("#page-heading").textContent = {
-    home:"My Watchlist", account:"계좌", profit:"Realized P&L", more:"Menu"
+    strategies:"Strategies", home:"My Watchlist", account:"계좌", profit:"Realized P&L", more:"Menu"
   }[view];
   const korean = view === "account";
   document.querySelector("#page-heading").lang = korean ? "ko" : "en";
@@ -83,12 +83,63 @@ function selectView(view) {
     ["login-remember-label","Keep me signed in on this device","이 기기에서 로그인 유지"],
     ["login-submit","Sign in","로그인"],
   ]) document.getElementById(id).textContent = korean ? translated : english;
+  if(view==="strategies") renderStrategies();
   window.scrollTo(0, 0);
   if (view === "home") refreshWatchlistQuotes();
   else syncKiwoomQuotes();
 }
+function renderStrategies() {
+  const list=document.getElementById("strategy-library");
+  list.replaceChildren();
+  const prefix="jm-invest:strategy:v1:";
+  let symbols=[];
+  try { symbols=Object.keys(localStorage).filter(k=>k.startsWith(prefix)).map(k=>k.slice(prefix.length)).sort(); } catch {}
+  for (const symbol of symbols.filter(s=>/^[A-Z][A-Z0-9.-]{0,11}$/.test(s))) {
+    const btn=document.createElement("button");
+    btn.className="menu-link"; btn.textContent=symbol+" ›";
+    btn.onclick=()=>instrument.openStrategy(symbol);
+    list.append(btn);
+  }
+  if(!list.children.length)list.textContent="저장한 전략이 없습니다.";
+}
+document.getElementById("strategy-picker").onsubmit=e=>{
+  e.preventDefault();
+  instrument.openStrategy(document.getElementById("strategy-symbol").value.toUpperCase());
+};
+document.getElementById("strategy-sheet").addEventListener("close",()=>{
+  if(document.body.dataset.view==="strategies")renderStrategies();
+});
+
+// Native modal dialogs make the rest of the document inert. Keep the single
+// navigation bar inside the most recently opened modal so touch and keyboard work.
+const navAnchor=document.createComment("main navigation");
+navigation.before(navAnchor);
+const modalStack=[];
+function placeNavigation() {
+  const top=modalStack.filter(d=>d.open).at(-1);
+  if(top && navigation.parentElement!==top)top.append(navigation);
+  if(!top && navigation.previousSibling!==navAnchor)navAnchor.after(navigation);
+}
+const modalObserver=new MutationObserver(records=>{
+  for(const {target} of records){
+    const i=modalStack.indexOf(target);
+    if(i>=0)modalStack.splice(i,1);
+    if(target.open)modalStack.push(target);
+  }
+  placeNavigation();
+});
+for(const d of document.querySelectorAll("dialog"))modalObserver.observe(d,{attributes:true,attributeFilter:["open"]});
 for (const button of navButtons) {
-  button.addEventListener("click", () => selectView(button.dataset.view));
+  button.addEventListener("click",()=>{
+    const go=()=>selectView(button.dataset.view);
+    for(const d of modalStack.slice().reverse()){
+      if(!d.open)continue;
+      if(d.id==="stock-detail"){instrument.leave(go);return;}
+      if(d.dispatchEvent(new Event("cancel",{cancelable:true})))d.close();
+      if(d.open)return;
+    }
+    go();
+  });
 }
 
 for (const button of document.querySelectorAll("[data-shortcut]")) {
@@ -729,7 +780,7 @@ function paintWatchRow(row, symbol, market, session) {
     const date = tradingDate(end);
     if (tradingDate(visible[0][0]) !== date) visible = visible.filter(([stamp]) => tradingDate(stamp) === date);
     if (visible.length > 1) {
-      chart.style.color = visible.at(-1)[1] < visible[0][1] ? "var(--down)" : "var(--up)";
+      chart.style.color = visible.at(-1)[1] < visible[0][1] ? "#f58ba6" : "#78ddbd";
       sparkline(visible, chart);
     } else chart.replaceChildren();
   } else chart.replaceChildren();
