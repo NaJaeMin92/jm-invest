@@ -274,7 +274,7 @@ button.broker-row:hover { background:#2a2c31; }
 
 .ui-icon { width:24px; height:24px; flex:none; display:block; }
 .trade-page[data-view="home"] { --bg:#101720; --text:#f0f3f6; --down:#74d8bb; --up:#ff9eae; background:var(--bg); }
-[data-view="home"] .page-title { display:none; }
+.trade-page:is([data-view="home"],[data-view="account"]) .page-title { display:none; }
 .trade-page .app-masthead { background:transparent; padding-top:env(safe-area-inset-top); }
 .trade-page .app-masthead .head { max-width:680px; min-height:60px; padding-inline:max(18px,env(safe-area-inset-left)) max(16px,env(safe-area-inset-right)); }
 .app-masthead .brand-home { min-height:44px; gap:9px; font-size:15px; font-weight:640; letter-spacing:-.025em; }
@@ -406,7 +406,7 @@ body.instrument-open { overflow:hidden; }
 .instrument-quote dd { margin:3px 0 0; color:var(--txt); text-align:left; font-size:13px; font-weight:570; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
 .quote-time { justify-content:space-between; margin:0 18px; padding:0 0 10px; color:var(--sub); font-size:12px; }
 .quote-time small { color:#8ca6eb; background:#1b2745; border-radius:4px; padding:2px 4px; font-size:9px; }
-.instrument-tabs { margin:0 14px 10px; padding:3px; gap:3px; border-radius:12px; background:#1b2633; }
+.instrument-tabs { margin:0 14px 10px; padding:3px; gap:3px; border-radius:12px; }
 .instrument-tabs button { flex:1; min-height:42px; padding:0 5px; border-radius:9px; font-size:14px; font-weight:560; color:#adbdce; white-space:nowrap; }
 .instrument-tabs [aria-current] { background:#354654; color:#f6f8fb; box-shadow:0 1px 3px #0004; }
 #chart-area { width:100%; background:#10172a; }
@@ -468,10 +468,10 @@ body.instrument-open { overflow:hidden; }
 #profit-list li { align-items:center; margin:0; padding:12px 0; min-height:60px; }
 #profit-list li span { display:grid; gap:4px; }
 #profit-list small { color:var(--muted); font-size:12px; }
-#tab-more .menu-link,#tab-more #logout { display:flex; justify-content:space-between; align-items:center; width:100%; padding:14px 0; border:0; background:transparent; border-bottom:1px solid var(--line); border-radius:0; text-align:left; min-height:52px; }
+#tab-more .menu-link { display:flex; justify-content:space-between; align-items:center; width:100%; padding:14px 0; border:0; background:transparent; border-bottom:1px solid var(--line); border-radius:0; text-align:left; min-height:52px; }
 #tab-more .menu-link span { color:var(--muted); font-size:20px; }
 #private #tab-more h2:not(:first-child) { margin-top:24px; }
-#tab-more #logout { color:#ff709e; }
+#account-home #logout { margin-top:16px; min-height:44px; background:transparent; color:var(--muted); }
 
 #chart-area.pannable { touch-action:pan-y pinch-zoom; user-select:none; -webkit-user-select:none; cursor:grab; }
 #chart-area.zoomable { touch-action:none; }
@@ -1055,7 +1055,7 @@ body.instrument-open { overflow:hidden; }
 #watch-editor .watch-editor-shell {padding-bottom:var(--nav-space)}
 #chart-tool-dialog {bottom:calc(var(--nav-space) + 6px);max-height:min(65dvh,calc(100dvh - var(--nav-space) - 10px))}
 dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(--nav-space) - 10px)}
-#stock-detail .instrument-tabs {background:#101218;margin:0 0 6px;padding:0 12px;gap:4px;border-radius:0;border-bottom:1px solid #393c47}
+#stock-detail .instrument-tabs {background:transparent;margin:0 0 6px;padding:0 12px;gap:4px;border-radius:0;border-bottom:1px solid #393c47}
 #stock-detail .instrument-tabs button {position:relative;flex:0 0 auto;min-height:37px;padding:0 12px;font-size:13px;color:#aeb1bf;border-radius:0;background:transparent;box-shadow:none;font-weight:500}
 #stock-detail .instrument-tabs [aria-current] {color:white;font-weight:700}
 .instrument-tabs [aria-current]::after {content:"";position:absolute;bottom:0;left:12px;right:12px;height:2px;background:#b593fa;border-radius:2px 2px 0 0}
@@ -1063,8 +1063,8 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 #stock-frames [aria-pressed=false] {color:#b2bac8}
 .mini-chart {max-width:88px;aspect-ratio:100/36}
 .mini-chart svg {overflow:visible}
-.account-shortcuts,#strategy-picker div {display:flex;gap:8px}
-.account-shortcuts button,#strategy-picker button {background:#263347;border:0;border-radius:10px;padding:9px 14px;color:#e0ebf6;min-height:42px}
+#strategy-picker div {display:flex;gap:8px}
+#strategy-picker button {background:#263347;border:0;border-radius:10px;padding:9px 14px;color:#e0ebf6;min-height:42px}
 #strategy-picker {display:grid;gap:6px;margin-bottom:22px}
 #strategy-picker input {min-width:0;flex:1}
 #strategy-library {color:#aebccd}
