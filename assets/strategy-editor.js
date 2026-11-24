@@ -15,6 +15,21 @@ const draftFactors = {
 };
 const isDraft=key=>Object.hasOwn(draftFactors,key);
 
+export const strategyPrefix="jm-invest:strategy:v1:";
+
+export function readStrategy(symbol) {
+  try {
+    const rule=JSON.parse(localStorage.getItem(strategyPrefix+symbol));
+    return Array.isArray(rule?.conditions) ? rule : null;
+  } catch { return null; }
+}
+
+export function strategySummary(rule) {
+  return [shortName[rule.frame], rule.side==="sell" ? "매도" : "매수",
+    rule.allocation ? `$${rule.allocation.amount} · ${rule.allocation.units}분할` : `${rule.quantity}주`,
+    "조건 "+rule.conditions.length+"개"].join(" · ");
+}
+
 export function setupStrategy({loadChart,orders,canLoadChart}) {
   const sheet=get("sheet"), form=get("form"), fields=get("fields"), list=get("conditions"), state=get("state");
   const f=form.elements;
@@ -101,11 +116,27 @@ export function setupStrategy({loadChart,orders,canLoadChart}) {
     }
     return {allocation,symbol,frame:f.frame.value,join:f.join.value,side:f.side.value,quantity:f.quantity.value,price:f.price.value,mode:f.mode.value,conditions};
   }
-  const savedKey=()=>"jm-invest:strategy:v1:"+symbol;
-  function open(ticker){
+  function showStock(symbol) {
+    const rule=readStrategy(symbol);
+    const panel=document.getElementById("stock-strategy-panel");
+    panel.querySelector("h3").textContent=symbol+" 전략";
+    panel.querySelector("p").textContent=rule ? strategySummary(rule) : "저장한 전략이 없습니다.";
+    const conditions=panel.querySelector("ul");
+    conditions.replaceChildren();
+    for (const c of rule?.conditions || []) {
+      const item=document.createElement("li");
+      item.textContent=draftFactors[c.key] || [factors[c.key]?.[0] || c.key,c.op==="gte" ? "≥" : "≤",c.value].join(" ");
+      conditions.append(item);
+    }
+    const edit=panel.querySelector("button");
+    edit.textContent=rule ? "전략 편집" : "전략 만들기";
+    edit.onclick=()=>open(symbol,panel);
+  }
+  function open(ticker,host=document.getElementById("tab-strategies")){
+    if(sheet.open)return;
+    if(sheet.parentElement!==host)host.append(sheet);
     symbol=ticker; form.reset(); list.replaceChildren(); state.textContent="";
-    let saved;
-    try { saved=JSON.parse(localStorage.getItem(savedKey())); } catch {}
+    const saved=readStrategy(symbol);
     if(saved) for(const k of ["frame","join","side","quantity","price"]) f[k].value=saved[k];
     if(saved?.allocation){
       f.sizing.value="split";
@@ -118,7 +149,7 @@ export function setupStrategy({loadChart,orders,canLoadChart}) {
   }
   get("save").onclick=()=>{
     const r=rule(); if(!r) return;
-    try {localStorage.setItem(savedKey(),JSON.stringify(r));state.textContent=r.allocation || r.conditions.some(c=>isDraft(c.key)) ? "초안을 저장했습니다." : "규칙을 저장했습니다.";}
+    try {localStorage.setItem(strategyPrefix+symbol,JSON.stringify(r));state.textContent=r.allocation || r.conditions.some(c=>isDraft(c.key)) ? "초안을 저장했습니다." : "규칙을 저장했습니다.";}
     catch {state.textContent="이 브라우저에 저장하지 못했습니다.";}
   };
   f.sizing.onchange=sync; get("budget").oninput=sync;
@@ -197,5 +228,5 @@ export function setupStrategy({loadChart,orders,canLoadChart}) {
       } else await watch(r,ctrl);
     }catch(error){if(run===ctrl)stop(error.message);}
   };
-  return {open,close};
+  return {open,close,showStock};
 }

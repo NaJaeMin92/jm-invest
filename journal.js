@@ -1,7 +1,7 @@
-import {setupStrategy} from "./assets/strategy-editor.js?v=88";
+import {setupStrategy,readStrategy,strategyPrefix,strategySummary} from "./assets/strategy-editor.js?v=90";
 import {setupWatchEditor} from "./watch-editor.js?v=49";
 import {setupOrders} from "./orders.js?v=83";
-import { setupInstrument, sparkline } from "./instrument.js?v=89";
+import { setupInstrument, sparkline } from "./instrument.js?v=90";
 import {loadWatchSentiment} from "./market-panels.js?v=89";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -92,25 +92,36 @@ function selectView(view) {
 function renderStrategies() {
   const list=document.getElementById("strategy-library");
   list.replaceChildren();
-  const prefix="jm-invest:strategy:v1:";
   let symbols=[];
-  try { symbols=Object.keys(localStorage).filter(k=>k.startsWith(prefix)).map(k=>k.slice(prefix.length)).sort(); } catch {}
+  try { symbols=Object.keys(localStorage).filter(k=>k.startsWith(strategyPrefix)).map(k=>k.slice(strategyPrefix.length)).sort(); } catch {}
   for (const symbol of symbols.filter(s=>/^[A-Z][A-Z0-9.-]{0,11}$/.test(s))) {
     const btn=document.createElement("button");
     btn.className="menu-link strategy-card";
     const title=document.createElement("strong"), summary=document.createElement("small");
     title.textContent=symbol;
-    try {
-      const rule=JSON.parse(localStorage.getItem(prefix+symbol));
-      summary.textContent=[{day:"일봉",week:"주봉",month:"월봉"}[rule.frame], rule.side==="sell"?"매도":"매수",
-        "조건 "+rule.conditions.length+"개",rule.allocation?"분할 계획":""].filter(Boolean).join(" · ");
-    } catch { summary.textContent="설정 열기"; }
+    const rule=readStrategy(symbol);
+    summary.textContent=rule ? strategySummary(rule) : "설정 열기";
     btn.append(title,summary);
     btn.onclick=()=>strategy.open(symbol);
-    list.append(btn);
+    const row=document.createElement("div"), remove=document.createElement("button");
+    row.className="strategy-entry";
+    remove.type="button";
+    remove.className="strategy-delete";
+    remove.textContent="삭제";
+    remove.setAttribute("aria-label",symbol+" 전략 삭제");
+    remove.onclick=()=>{
+      if(!window.confirm(symbol+" 전략을 삭제할까요?"))return;
+      try {localStorage.removeItem(strategyPrefix+symbol);renderStrategies();}
+      catch {window.alert("전략을 삭제하지 못했습니다.");}
+    };
+    row.append(btn,remove);
+    list.append(row);
   }
   if(!list.children.length)list.textContent="저장한 전략이 없습니다.";
 }
+window.addEventListener("storage",event=>{
+  if(document.body.dataset.view==="strategies" && (!event.key || event.key.startsWith(strategyPrefix)))renderStrategies();
+});
 document.getElementById("strategy-picker").onsubmit=e=>{
   e.preventDefault();
   strategy.open(document.getElementById("strategy-symbol").value.toUpperCase());
@@ -249,6 +260,38 @@ function sortHoldings() {
 }
 holdingSort.onchange = sortHoldings;
 
+const weightPercent = new Intl.NumberFormat("ko-KR",{style:"percent",maximumFractionDigits:2});
+
+function renderHoldingWeights(holdings) {
+  const distribution=document.getElementById("holding-distribution");
+  const bar=distribution.querySelector(".distribution-bar"), legend=distribution.querySelector("ul");
+  bar.replaceChildren();
+  legend.replaceChildren();
+  distribution.hidden=true;
+  if(!holdings.every(h=>numeric(h.value_krw) && Number(h.value_krw)>=0))return 0;
+  const values=new Map();
+  for(const holding of holdings){
+    const symbol=holding.symbol || holding.name || "—";
+    values.set(symbol,(values.get(symbol) || 0)+Number(holding.value_krw));
+  }
+  const total=[...values.values()].reduce((sum,value)=>sum+value,0);
+  if(!total)return 0;
+  const sorted=[...values].sort((a,b)=>b[1]-a[1] || a[0].localeCompare(b[0]));
+  for(const [index,[symbol,value]] of sorted.entries()){
+    const segment=document.createElement("i"), label=document.createElement("li");
+    const color=`hsl(${(215+index*137.5)%360} 62% 69%)`;
+    segment.style.backgroundColor=color;
+    segment.style.flexGrow=value/total;
+    label.style.setProperty("--holding-color",color);
+    label.textContent=symbol+" "+weightPercent.format(value/total);
+    segment.title=label.textContent;
+    bar.append(segment);
+    legend.append(label);
+  }
+  distribution.hidden=false;
+  return total;
+}
+
 function showHoldings(balance) {
   holdingsList.replaceChildren();
   const holdings = balance?.holdings;
@@ -256,23 +299,7 @@ function showHoldings(balance) {
   document.getElementById("holding-count").textContent = Array.isArray(holdings) ? holdings.length : "";
   document.getElementById("holding-columns").hidden = !hasRows;
   holdingSort.hidden = !hasRows || holdings.length < 2;
-  const distribution = document.getElementById("holding-distribution");
-  const counts = [0, 0, 0];
-  for (const holding of hasRows ? holdings : []) {
-    if (!numeric(holding.return_pct)) continue;
-    const rate = Number(holding.return_pct);
-    const group = rate > 0 ? 0 : rate < 0 ? 2 : 1;
-    counts[group]++;
-  }
-  distribution.hidden = !counts.some(Boolean);
-  if (!distribution.hidden) {
-    const labels = ["수익", "보합", "손실"];
-    distribution.querySelector("p").textContent = counts.map((n, i) => labels[i] + " " + n + "종목").join(" · ");
-    [...distribution.querySelectorAll("i")].forEach((segment, i) => {
-      segment.hidden = !counts[i];
-      segment.style.flexGrow = counts[i];
-    });
-  }
+  const totalHoldingsValue=renderHoldingWeights(hasRows ? holdings : []);
   if (!hasRows) {
     const item = document.createElement("li");
     item.textContent = Array.isArray(holdings) ? "보유 중인 미국주식이 없습니다." : "잔고 동기화 대기";
@@ -299,12 +326,12 @@ function showHoldings(balance) {
 
     const metrics = document.createElement("dl");
     metrics.className = "holding-values";
-    const weight = numeric(holding.value_krw) && Number(balance.value_krw) > 0
-      ? (100 * Number(holding.value_krw) / Number(balance.value_krw)).toFixed(2) + "%" : "—";
+    const weight = totalHoldingsValue > 0
+      ? weightPercent.format(Number(holding.value_krw) / totalHoldingsValue) : "—";
     for (const [label,value] of [
       ["보유수량", numeric(holding.quantity) ? Number(holding.quantity).toLocaleString("ko-KR", {maximumFractionDigits:8}) + "주" : "—"],
       ["주식 내 비중",weight], ["매입가",formatHolding(holding.cost_price,holdingUSD)],
-      ["현재가",formatHolding(holding.current_price,holdingUSD)], ["매입금액",formatHolding(holding.cost_krw,holdingKRW)],
+      ["매입금액",formatHolding(holding.cost_krw,holdingKRW)], ["현재가",formatHolding(holding.current_price,holdingUSD)],
       ["평가금액",formatHolding(holding.value_krw,holdingKRW)], ["전일 거래수량",tradedQuantity(holding.previous_buy_qty,holding.previous_sell_qty)],
       ["금일 거래수량",tradedQuantity(holding.today_buy_qty,holding.today_sell_qty)]
     ]) {
@@ -617,7 +644,7 @@ async function loadChart(symbol, frame, before, signal, day) {
 const canLoadChart=()=>Boolean(token && kiwoomEndpoint);
 const strategy=setupStrategy({loadChart,orders,canLoadChart});
 const instrument = setupInstrument({
-  orders,
+  orders,strategy,
   async readPositionSnapshot(symbol) {
     const session = token;
     const balance = await valuationSnapshot;

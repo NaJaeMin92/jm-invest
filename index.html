@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=88">
-<script type="module" src="./journal.js?v=89"></script>
+<link rel="stylesheet" href="./style.css?v=90">
+<script type="module" src="./journal.js?v=90"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header class="app-masthead"><div class="head">
@@ -100,9 +100,9 @@
 <section id="account-holdings" aria-label="미국주식 보유종목" hidden>
 <div class="holdings-heading"><h3>보유종목 <span id="holding-count"></span></h3>
 <select id="holding-sort" aria-label="보유종목 정렬" hidden><option value="value">평가금액순</option><option value="high">수익률 높은 순</option><option value="low">수익률 낮은 순</option></select></div>
-<div id="holding-distribution" aria-label="수익률별 종목 수" hidden>
-  <div class="distribution-bar" aria-hidden="true"><i></i><i></i><i></i></div>
-  <p></p>
+<div id="holding-distribution" role="group" aria-label="종목별 평가금액 비중" hidden>
+  <div class="distribution-bar" aria-hidden="true"></div>
+  <ul class="distribution-legend"></ul>
 </div>
 <div id="holding-columns" class="position-line" aria-hidden="true" hidden><span>종목</span><span>평가손익</span><span>수익률</span></div>
 <ul id="holdings-list"></ul>
@@ -191,7 +191,7 @@
 <dl><div><dt>Day range</dt><dd id="stock-range">—</dd></div><div><dt>Volume</dt><dd id="stock-volume">—</dd></div><div><dt>Market cap</dt><dd id="stock-cap">—</dd></div></dl></div>
 <div class="quote-time"><span id="stock-time"></span><small id="stock-quote-source">Snapshot</small><button id="stock-chart-sign-in" type="button" hidden>Sign in</button><button id="stock-quote-retry" type="button" hidden>Retry</button></div>
 <nav class="instrument-tabs" aria-label="Symbol information">
-<button type="button" id="chart-tab" data-panel="chart" aria-current="page" aria-controls="chart-panel">Chart</button><button type="button" data-panel="sigma" aria-controls="sigma-panel">Sigma</button>
+<button type="button" id="chart-tab" data-panel="chart" aria-current="page" aria-controls="chart-panel">Chart</button><button type="button" data-panel="sigma" aria-controls="sigma-panel">Sigma</button><button type="button" data-panel="strategies" aria-controls="stock-strategy-panel">Strategies</button>
 </nav>
 <section id="chart-panel">
 <details id="trend-menu" hidden>
@@ -258,6 +258,11 @@
 <label>Option expiration<input type="date" name="expiry" required></label>
 <button type="submit">Calculate</button><p id="sigma-error" role="status"></p>
 </form></details>
+</section>
+<section class="market-panel" id="stock-strategy-panel" lang="ko" aria-labelledby="stock-strategy-title" hidden>
+<h3 id="stock-strategy-title"></h3>
+<p id="stock-strategy-summary"></p><ul id="stock-strategy-conditions"></ul>
+<button type="button" id="stock-strategy-edit" aria-haspopup="dialog" aria-controls="strategy-sheet"></button>
 </section>
 <div id="stock-order-bar" role="group" aria-label="Stock order">
 <button id="stock-buy" type="button" aria-haspopup="dialog" aria-controls="trade-preview">

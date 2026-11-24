@@ -70,7 +70,7 @@ function mergeDaily(oldBars, newBars) {
   return [...days.values()].sort((a,b) => a[0] - b[0]);
 }
 
-export function setupInstrument({search,nameFor,readList,saveList,orders,readPositionSnapshot,subscribeOrderBook,canLoadChart,loadChart,loadExecutions,signIn}) {
+export function setupInstrument({strategy,search,nameFor,readList,saveList,orders,readPositionSnapshot,subscribeOrderBook,canLoadChart,loadChart,loadExecutions,signIn}) {
   const dialog=get("stock-detail"), canvas=get("market-chart");
   const executions = setupExecutionFlags(loadExecutions);
   let current="", quote=null, frame="day", afterClose=null, quoteRequest=0;
@@ -581,8 +581,14 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
       if (selected) tab.setAttribute("aria-current", "page");
       else tab.removeAttribute("aria-current");
     }
+    if (panel === "strategies") strategy.showStock(current);
     if (panel === "sigma") showSigmaPanel(current, nameFor(current));
   }
+  function refreshStockStrategy() {
+    if(dialog.open && !get("stock-strategy-panel").hidden)strategy.showStock(current);
+  }
+  get("strategy-sheet").addEventListener("close",refreshStockStrategy);
+  window.addEventListener("storage",refreshStockStrategy);
   for (const tab of tabs) tab.addEventListener("click", () => selectPanel(tab.dataset.panel));
 
   function draw() {
@@ -911,6 +917,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
     executions.reset();
     get("trend-menu").open=false;
     if (trade.open) trade.close();
+    if(dialog.contains(get("strategy-sheet")))strategy.close();
     current=symbol;quote=null;historyState="";sessionDate.value="";
     selectPanel("chart");
     document.body.classList.add("instrument-open");
@@ -941,6 +948,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
     quoteRequest += 1;
     historyAbort?.abort();
     if (trade.open) trade.close();
+    if(dialog.contains(get("strategy-sheet")))strategy.close();
     executions.reset();
     current="";quote=null;chart=null;endDrag();
     tools.updateSeries(null,current,frame);
