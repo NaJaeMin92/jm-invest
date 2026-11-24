@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=92">
-<script type="module" src="./journal.js?v=92"></script>
+<link rel="stylesheet" href="./style.css?v=93">
+<script type="module" src="./journal.js?v=93"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header class="app-masthead"><div class="head">
@@ -51,10 +51,11 @@
 <div id="strategy-suggestions" role="group" aria-label="관심종목에서 선택"></div>
 </form>
 <div id="strategy-toolbar" hidden>
-<div id="strategy-filter" role="group" aria-label="주문 방향으로 필터"><button type="button" data-side="all" aria-pressed="true">전체</button><button type="button" data-side="buy" aria-pressed="false">매수</button><button type="button" data-side="sell" aria-pressed="false">매도</button></div>
+<div id="strategy-filter" role="group" aria-label="전략 목록 필터"><button type="button" data-side="all" aria-pressed="true">전체</button><button type="button" data-side="buy" aria-pressed="false">매수</button><button type="button" data-side="sell" aria-pressed="false">매도</button><button type="button" data-side="selected" aria-pressed="false">선택됨 <span id="strategy-selected-count">0</span></button></div>
 <button type="button" id="strategy-manage" aria-pressed="false">관리</button></div>
 <div id="strategy-library"></div>
 <template id="strategy-entry-template"><div class="strategy-entry">
+<label class="rule-select"><input type="checkbox"></label>
 <button type="button" class="strategy-card" aria-haspopup="dialog" aria-controls="strategy-sheet">
 <span class="rule-head"><strong></strong><span class="rule-side"></span></span>
 <span class="rule-conditions"></span><span class="rule-meta"></span>

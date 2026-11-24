@@ -93,7 +93,8 @@ const strategyLibrary=document.getElementById("strategy-library");
 const strategyPicker=document.getElementById("strategy-picker");
 const newStrategy=document.getElementById("strategy-new");
 const manageStrategies=document.getElementById("strategy-manage");
-let strategySide="all", managingStrategies=false, pickingSymbol=false;
+const selectionPrefix="jm-invest:selected-strategy:v1:";
+let strategyFilter="all", managingStrategies=false, pickingSymbol=false;
 
 function openLibraryStrategy(symbol) {
   pickingSymbol=false;
@@ -101,12 +102,16 @@ function openLibraryStrategy(symbol) {
 }
 function renderStrategies() {
   let symbols=[];
+  const selected=new Set();
   try {
-    symbols=Object.keys(localStorage).filter(k=>k.startsWith(strategyPrefix)).map(k=>k.slice(strategyPrefix.length))
+    const keys=Object.keys(localStorage);
+    for(const key of keys)if(key.startsWith(selectionPrefix))selected.add(key.slice(selectionPrefix.length));
+    symbols=keys.filter(k=>k.startsWith(strategyPrefix)).map(k=>k.slice(strategyPrefix.length))
       .filter(s=>/^[A-Z][A-Z0-9.-]{0,11}$/.test(s)).sort();
   } catch {}
+  document.getElementById("strategy-selected-count").textContent=symbols.filter(symbol=>selected.has(symbol)).length;
   const empty=symbols.length===0;
-  if(empty){managingStrategies=false;strategySide="all";}
+  if(empty){managingStrategies=false;strategyFilter="all";}
   document.getElementById("strategy-count").textContent=empty ? "아직 저장한 전략이 없습니다" : "저장한 종목 "+symbols.length+"개";
   document.getElementById("strategy-toolbar").hidden=empty;
   newStrategy.hidden=empty;
@@ -127,14 +132,33 @@ function renderStrategies() {
   manageStrategies.textContent=managingStrategies ? "완료" : "관리";
   manageStrategies.setAttribute("aria-pressed",String(managingStrategies));
   for(const filter of document.querySelectorAll("#strategy-filter button")){
-    filter.setAttribute("aria-pressed",String(filter.dataset.side===strategySide));
+    filter.setAttribute("aria-pressed",String(filter.dataset.side===strategyFilter));
   }
   strategyLibrary.replaceChildren();
   for(const symbol of symbols){
     const rule=readStrategy(symbol);
-    if(strategySide!=="all" && rule?.side!==strategySide)continue;
+    if(strategyFilter==="selected"){
+      if(!selected.has(symbol))continue;
+    }else if(strategyFilter!=="all" && rule?.side!==strategyFilter)continue;
     const row=document.getElementById("strategy-entry-template").content.firstElementChild.cloneNode(true);
     const card=row.querySelector(".strategy-card"), side=row.querySelector(".rule-side");
+    const checkbox=row.querySelector("input");
+    checkbox.checked=selected.has(symbol);
+    checkbox.setAttribute("aria-label",symbol+" 전략 선택");
+    checkbox.onchange=()=>{
+      try {
+        if(checkbox.checked)localStorage.setItem(selectionPrefix+symbol,"1");
+        else localStorage.removeItem(selectionPrefix+symbol);
+      } catch {
+        checkbox.checked=!checkbox.checked;
+        window.alert("전략 선택을 저장하지 못했습니다.");
+        return;
+      }
+      renderStrategies();
+      const focusTarget=strategyLibrary.querySelector('input[aria-label="'+symbol+' 전략 선택"]')
+        || document.querySelector('#strategy-filter [aria-pressed="true"]');
+      focusTarget.focus({preventScroll:true});
+    };
     card.querySelector("strong").textContent=symbol;
     side.hidden=!rule;
     if(rule){
@@ -150,7 +174,7 @@ function renderStrategies() {
     remove.setAttribute("aria-label",symbol+" 전략 삭제");
     remove.onclick=()=>{
       if(!window.confirm(symbol+" 전략을 삭제할까요?"))return;
-      try {localStorage.removeItem(strategyPrefix+symbol);renderStrategies();}
+      try {localStorage.removeItem(selectionPrefix+symbol);localStorage.removeItem(strategyPrefix+symbol);renderStrategies();}
       catch {window.alert("전략을 삭제하지 못했습니다.");}
     };
     strategyLibrary.append(row);
@@ -158,7 +182,7 @@ function renderStrategies() {
   if(!empty && !strategyLibrary.children.length){
     const message=document.createElement("p");
     message.className="rule-empty";
-    message.textContent=(strategySide==="sell" ? "매도" : "매수")+" 전략이 없습니다.";
+    message.textContent=strategyFilter==="selected" ? "선택한 전략이 없습니다." : (strategyFilter==="sell" ? "매도" : "매수")+" 전략이 없습니다.";
     strategyLibrary.append(message);
   }
 }
@@ -172,10 +196,10 @@ manageStrategies.onclick=()=>{
   renderStrategies();
 };
 for(const filter of document.querySelectorAll("#strategy-filter button")){
-  filter.onclick=()=>{strategySide=filter.dataset.side;renderStrategies();};
+  filter.onclick=()=>{strategyFilter=filter.dataset.side;renderStrategies();};
 }
 window.addEventListener("storage",event=>{
-  if(document.body.dataset.view==="strategies" && (!event.key || event.key.startsWith(strategyPrefix)))renderStrategies();
+  if(document.body.dataset.view==="strategies" && (!event.key || event.key.startsWith(strategyPrefix) || event.key.startsWith(selectionPrefix)))renderStrategies();
 });
 strategyPicker.onsubmit=e=>{
   e.preventDefault();
