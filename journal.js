@@ -1,5 +1,5 @@
-import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=94";
-import {setupWatchEditor} from "./watch-editor.js?v=49";
+import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=95";
+import {setupWatchEditor} from "./watch-editor.js?v=95";
 import {setupOrders} from "./orders.js?v=83";
 import { setupInstrument, sparkline } from "./instrument.js?v=90";
 import {loadWatchSentiment} from "./market-panels.js?v=89";
@@ -532,13 +532,12 @@ const signedWatchPercent = change => `${change > 0 ? "+" : ""}${change.toFixed(2
 const nameFor = symbol => snapshots.get(symbol)?.name
   || marketSymbols.find(item => item.symbol === symbol)?.name
   || stockDirectory?.find(item => item.symbol === symbol)?.name || symbol;
-const watchEditor = setupWatchEditor({watchKey, nameFor, refresh() {
+const watchEditor = setupWatchEditor({watchKey, nameFor, tickerIcon, refresh() {
   renderWatchlist();
   refreshWatchlistQuotes();
 }});
 document.getElementById("home-search").onclick = () => {
-  watchEditor.open();
-  document.getElementById("watch-symbol").focus();
+  watchEditor.open(true);
 };
 const readWatchlist = watchEditor.readList;
 const kiwoomTicks = new Map();
@@ -732,7 +731,7 @@ async function loadChart(symbol, frame, before, signal, day) {
   return payload;
 }
 const canLoadChart=()=>Boolean(token && kiwoomEndpoint);
-const strategy=setupStrategy({loadChart,orders,canLoadChart});
+const strategy=setupStrategy({loadChart,orders,canLoadChart,tickerIcon});
 const instrument = setupInstrument({
   orders,strategy,
   async readPositionSnapshot(symbol) {
@@ -762,8 +761,7 @@ const instrument = setupInstrument({
   },
   search() {
     selectView("home");
-    watchEditor.open();
-    document.querySelector("#watch-symbol").focus();
+    watchEditor.open(true);
   },
   nameFor,
   readList: readWatchlist,

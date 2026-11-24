@@ -589,30 +589,47 @@ body.instrument-open { overflow:hidden; }
 
 #watch-editor {
   position:fixed; inset:0; margin:0; width:100%; height:100dvh; max-width:none; max-height:none;
-  border:0; padding:0; background:#10192d; color:#f3f6ff; font-family:"Geist",system-ui,sans-serif;
+  border:0; padding:0; background:#101720; color:#eff3f7; font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
 }
-.watch-editor-shell { max-width:680px; min-height:100%; margin:auto; padding:env(safe-area-inset-top) 14px env(safe-area-inset-bottom); }
-.watch-editor-shell header { display:flex; align-items:center; justify-content:space-between; padding:12px 0; background:transparent; border-bottom:1px solid #2d3a53; }
-.watch-editor-shell h2 { margin:0; font-size:21px; }
-#watch-selection { margin:2px 0 0; color:#a0b2d0; font-size:12px; }
-#watch-editor button,#watch-editor select,#watch-editor input:not([type=checkbox]) { border:1px solid #34476a; background:#1c2a46; color:#e8f0ff; font:inherit; font-size:13px; border-radius:8px; }
-#watch-editor button:disabled { opacity:.45; }
-.watch-editor-lists,.watch-bulk,#watch-create-list,#watch-move-form { display:flex; align-items:end; gap:8px; margin-top:10px; }
-.watch-editor-lists label,#watch-create-list label,#watch-move-form label { min-width:0; flex:1; color:#abbadb; }
-#watch-editor select { min-height:44px; width:100%; padding:6px; }
-#watch-editor-rows { padding:0; margin:0; list-style:none; }
-#watch-editor-rows li { display:grid; grid-template-columns:minmax(0,1fr) 38px 38px; align-items:center; gap:5px; min-height:64px; border-bottom:1px solid #293652; }
-#watch-editor-rows li label { display:flex; align-items:center; gap:12px; color:#edf2fe; cursor:pointer; min-width:0; }
-#watch-editor-rows li label div { min-width:0; }
-#watch-editor-rows strong,#watch-editor-rows small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-#watch-editor-rows small { color:#a6b3cf; font-size:12px; margin-top:3px; }
-#watch-editor input[type=checkbox] { width:19px; height:19px; flex:none; min-height:19px; accent-color:#4998ff; }
-#watch-editor-rows li button { padding:0; min-height:34px; font-size:17px; }
-.reorder-handle { touch-action:none; cursor:grab; user-select:none; }
-#watch-editor-rows .drag-source { opacity:.5; }
-#watch-editor-rows .drag-target { box-shadow:inset 0 2px #559dff; background:#1e3355; }
-.watch-bulk { position:sticky; z-index:1; bottom:0; align-items:center; padding:8px 0; background:#10192d; border-top:1px solid #34435f; }
-.watch-bulk label { flex:1; display:flex; align-items:center; color:#eaf2ff; }
+.watch-editor-shell { max-width:680px; min-height:100%; margin:auto; padding:env(safe-area-inset-top) 16px 0; display:flex; flex-direction:column }
+.watch-editor-shell header,.watch-editor-lists,.watch-bulk,#watch-create-list,#watch-move-form { display:flex; align-items:center; justify-content:space-between; gap:10px }
+.watch-editor-shell header { padding:17px 0 14px; background:transparent; border:0 }
+#watch-editor-title { margin:0; font-size:clamp(27px,6vw,34px); letter-spacing:-.05em }
+#watch-selection { margin:3px 0 0; color:#aab8c9; font-size:13px }
+#watch-editor button { border:0; background:transparent; color:#bdccda; min-height:44px; padding:0 10px; font:550 14px system-ui; cursor:pointer }
+#watch-editor #watch-editor-done,#watch-editor .watch-form button[type=submit] { padding-inline:15px; background:#203831; color:#c6e6d8; border-radius:11px }
+#watch-editor button:disabled { opacity:.4 }
+#watch-editor input:not([type=checkbox]),#watch-editor select { min-height:44px; min-width:0; padding:8px 10px; border:1px solid #394757; border-radius:9px; background:#192330; color:#eff3f7; font:500 16px system-ui }
+.watch-editor-lists { border-top:1px solid #2b3744; padding:12px 0 }
+#watch-active-list { flex:1 }
+#watch-create-list,#watch-move-form { align-items:end; margin-bottom:10px }
+#watch-create-list label,#watch-move-form label { flex:1; min-width:0; color:#bdc8d6 }
+.editor-switch { display:flex; align-items:center; border-bottom:1px solid #34404d }
+.editor-switch button,#watch-editor .editor-switch button { position:relative; border:0; padding:0 12px; min-height:44px; border-radius:0; background:transparent; color:#aab8c9; font:550 14px system-ui }
+.editor-switch [aria-pressed=true],#watch-editor .editor-switch [aria-pressed=true] { color:#f1f4f8 }
+.editor-switch [aria-pressed=true]::after { content:""; position:absolute; left:12px; right:12px; bottom:-1px; height:2px; background:#b593fa; border-radius:2px }
+#watch-manage-panel { flex:1 }
+#watch-editor .watch-select-line { display:flex; align-items:center; gap:9px; min-height:44px; font-size:12px; color:#aab8c9 }
+#watch-editor-rows { padding:0; margin:0; list-style:none }
+#watch-editor-rows li { display:grid; grid-template-columns:minmax(0,1fr) 44px 44px; align-items:center; min-height:61px; border-top:1px solid #293541; margin:0 }
+#watch-editor-rows li label { min-width:0; display:flex; align-items:center; gap:9px; min-height:50px; cursor:pointer }
+#watch-editor-rows label > span:last-child { min-width:0 }
+#watch-editor-rows .watch-ticker-icon { flex:none }
+#watch-editor-rows strong,#watch-editor-rows small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+#watch-editor-rows strong { font-size:16px; color:#edf2f6 }
+#watch-editor-rows small { font-size:12px; color:#aab8c9 }
+#watch-editor input[type=checkbox] { width:18px; height:18px; margin:0; flex:none; accent-color:#b6dccc }
+#watch-editor-rows li:has(:checked) { background:#182729 }
+#watch-editor-rows li button { font:500 19px/1 system-ui; color:#a8b9ca }
+.reorder-handle { touch-action:none; cursor:grab; user-select:none }
+#watch-editor-rows .drag-source { opacity:.5 }
+#watch-editor-rows .drag-target { box-shadow:inset 0 2px #b6dccc }
+#watch-actions { position:sticky; bottom:var(--nav-space); background:#17212d; border-top:1px solid #364450; padding:0 10px; z-index:1 }
+.watch-bulk span { margin-right:auto; color:#d3dce5; font-size:13px }
+#watch-editor #watch-delete { color:#e7bcb5 }
+#watch-list-empty,#watch-editor .watch-status { color:#adbdcc; font-size:13px }
+#watch-results { max-height:none }
+#watch-results button { padding:9px 4px; border-bottom:1px solid #293541; border-radius:0 }
 #watch-empty { padding:12px; }
 .watch-heading { min-height:49px; }
 #watch-editor #home-value { min-height:0; color:#b5ccf6; }
@@ -1021,21 +1038,51 @@ body.instrument-open { overflow:hidden; }
 #drawing-styles button { flex:1; font-size:12px; }
 #drawing-move-hint { grid-column:1/-1; margin:1px 2px; color:#b9d4f6; font-size:11px; }
 
-#strategy-sheet button:not(.sheet-icon) { border:1px solid #425068; border-radius:12px; background:#243047; color:#e0e8f4; padding:9px 13px; font:600 .84rem system-ui; min-height:42px }
-#strategy-sheet { max-height:85dvh; overflow:auto; color:#edf2fa; padding:0 16px 18px }
-#strategy-sheet form,#strategy-fields,#strategy-conditions {display:grid;gap:12px}
-#strategy-fields {margin:0;border:0;padding:0;min-width:0}
-#strategy-sheet label {display:grid;gap:5px;font-size:.8rem;color:#b9c7db}
-#strategy-sheet select,#strategy-sheet input {width:100%;min-width:0;box-sizing:border-box;color:#eef3fb;background:#172336;border:1px solid #37465b;border-radius:9px;min-height:42px;padding:6px}
-.strategy-pair,.strategy-row {display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.strategy-row {grid-template-columns:1fr 1fr auto;padding:10px;background:#1c283a;border-radius:13px}
-.strategy-row select:first-child {grid-column:1/-1}
-#strategy-sheet p {font-size:.83rem;color:#b4c2d6;line-height:1.5}
-#strategy-sheet [hidden] {display:none}
-#strategy-sheet #strategy-start {background:#bdd9ce;color:#142b24}
-#strategy-budget {display:grid;gap:12px;min-width:0;padding:12px;border:1px solid #37465b;border-radius:12px}
-#strategy-budget legend {padding:0 5px;font-weight:600}
-#strategy-allocation {white-space:pre-line;font-variant-numeric:tabular-nums;line-height:1.65;color:#c9e2d7}
+#strategy-sheet { width:min(460px,calc(100% - 28px)); padding:0; overflow:hidden; background:#151e2a }
+#strategy-sheet[open] { display:grid; grid-template-rows:auto auto minmax(0,1fr) auto }
+#strategy-sheet .order-sheet-head { padding:16px 18px 8px }
+.strategy-identity { display:flex; align-items:center; gap:10px }
+.strategy-identity small { color:#aebccb; font-size:12px }
+#strategy-sheet #strategy-title { margin:0; font:670 24px/1.15 system-ui; letter-spacing:-.045em }
+#strategy-close { font-size:23px }
+#strategy-sheet .editor-switch { padding:0 8px }
+#strategy-form { min-height:0; overflow:auto; overscroll-behavior:contain; padding:16px 18px }
+#strategy-fields,.strategy-choice { margin:0; padding:0; border:0; min-width:0 }
+#strategy-signals,#strategy-orders,#strategy-budget { display:grid; gap:15px }
+#strategy-sheet label,.strategy-choice legend,#strategy-budget legend { display:grid; gap:5px; color:#b5c3d1; font-size:13px }
+.strategy-choice legend { margin-bottom:6px }
+.strategy-choice > div { display:flex; padding:3px; border-radius:11px; background:#101822 }
+.strategy-choice label { position:relative; flex:1 }
+.strategy-choice input { position:absolute; width:1px; height:1px; opacity:0 }
+.strategy-choice span { display:grid; min-height:38px; place-items:center; border-radius:8px; font:600 14px system-ui; cursor:pointer }
+.strategy-choice :checked + span { background:#344251; color:#f3f6fa }
+.strategy-choice [value=buy]:checked + span { background:#234036; color:#bfe5d4 }
+.strategy-choice [value=sell]:checked + span { background:#3d3034; color:#f1c8c0 }
+.strategy-choice :focus-visible + span { outline:2px solid #c2d5ec }
+.conditions-head,.strategy-actionbar > div { display:flex; align-items:center; justify-content:space-between; gap:8px }
+.conditions-head h3 { margin:0; font-size:17px }
+#strategy-add,.condition-remove { min-height:44px; border:0; background:transparent; color:#bddccf; font:600 13px system-ui }
+#strategy-conditions { display:grid; gap:8px; margin-top:-10px }
+.strategy-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) 32px; gap:10px; padding:12px; background:#1d2937; border:1px solid #334351; border-radius:12px }
+.condition-factor { grid-column:1/3 }
+.condition-remove { align-self:start; color:#b3bdc8; font-size:22px; padding:0 }
+.condition-comparison { grid-column:2/4 }
+#strategy-sheet select,#strategy-sheet input:not([type=radio]) { width:100%; min-width:0; border:1px solid #3b4a59; border-radius:9px; background:#141e2a; color:#edf3f7; font:500 16px system-ui; min-height:44px; padding:6px 8px }
+.strategy-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px }
+.strategy-pair:has(> [hidden]) > label:not([hidden]) { grid-column:1/-1 }
+#strategy-sheet select,#watch-editor select {
+  appearance:none; height:44px; padding-right:30px; background-image:linear-gradient(45deg,transparent 50%,#aebccb 50%),linear-gradient(135deg,#aebccb 50%,transparent 50%);
+  background-size:5px 5px; background-repeat:no-repeat; background-position:calc(100% - 16px) center,calc(100% - 11px) center;
+}
+#strategy-budget { min-width:0; margin:0; padding:10px; border:1px solid #344350; border-radius:12px }
+#strategy-allocation { white-space:pre-line; color:#c6dfd4; font-size:13px }
+.strategy-actionbar { padding:10px 16px; border-top:1px solid #33414e }
+.strategy-actionbar button { flex:1; min-height:44px; border:0; border-radius:10px; background:#273442; color:#e5edf4; font:600 14px system-ui }
+#strategy-save { background:#badaca; color:#142b23 }
+#strategy-sheet[data-stage=conditions] #strategy-start,#strategy-sheet[data-stage=orders] #strategy-next { display:none }
+#strategy-sheet p { margin:0; color:#afbdca; font:400 12px/1.5 system-ui }
+#strategy-sheet .strategy-actionbar p:not(:empty) { padding-bottom:6px }
+@media(max-width:540px) { #strategy-sheet { width:100% } }
 
 :root { --nav-space:calc(62px + env(safe-area-inset-bottom)) }
 .trade-page #bottom-nav {
@@ -1106,7 +1153,6 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
   .strategy-entry:has(.strategy-delete:not([hidden])) .strategy-card { grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"title order" "conditions order" "mode order" }
 }
 #tab-strategies :is(button,input):focus-visible { outline:2px solid #bedcce; outline-offset:-2px }
-.strategy-section-title { margin:5px 0 0; padding-top:12px; border-top:1px solid var(--separator); font:600 14px system-ui; color:var(--ink) }
 
 #trend-menu {margin:0 12px 8px;color:#ecedf4}
 #trend-menu[hidden] {display:none}

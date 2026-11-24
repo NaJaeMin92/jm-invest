@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=94">
-<script type="module" src="./journal.js?v=94"></script>
+<link rel="stylesheet" href="./style.css?v=95">
+<script type="module" src="./journal.js?v=95"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header class="app-masthead"><div class="head">
@@ -63,13 +63,22 @@
 <small class="rule-mode"></small>
 </button><button type="button" class="strategy-delete" hidden>삭제</button></div></template>
 <dialog id="strategy-sheet" class="order-sheet" aria-labelledby="strategy-title" lang="ko">
-<header class="order-sheet-head"><h3 id="strategy-title">자동매매 설정</h3><button type="button" class="sheet-icon" id="strategy-close" aria-label="닫기">×</button></header>
+<header class="order-sheet-head"><div class="strategy-identity"><span id="strategy-logo"></span><div><small>자동매매 설정</small><h2 id="strategy-title"></h2></div></div><button type="button" class="sheet-icon" id="strategy-close" aria-label="닫기">×</button></header>
+<nav class="editor-switch" aria-label="전략 설정"><button type="button" data-stage="conditions" aria-controls="strategy-signals" aria-pressed="true">판단 조건</button><button type="button" data-stage="orders" aria-controls="strategy-orders" aria-pressed="false">주문·실행</button></nav>
 <form id="strategy-form"><fieldset id="strategy-fields">
-<div class="strategy-pair"><label>기준 봉<select name="frame"><option value="day">일봉</option><option value="week">주봉</option><option value="month">월봉</option></select></label>
-<label>조건 조합<select name="join"><option value="all">모두 충족 (AND)</option><option value="any">하나 이상 (OR)</option></select></label></div>
-<h4 class="strategy-section-title">판단 조건</h4><div id="strategy-conditions"></div><button type="button" id="strategy-add">＋ 조건 추가</button>
-<h4 class="strategy-section-title">주문 설정</h4><div class="strategy-pair"><label>주문 방향<select name="side"><option value="buy">매수</option><option value="sell">매도</option></select></label><label id="strategy-quantity">수량 (주)<input name="quantity" type="number" min="1" max="999999" step="1" value="1" required></label></div>
-<label id="strategy-sizing">매수 방식<select name="sizing"><option value="fixed">고정 수량</option><option value="split">예산 분할 계획</option></select></label>
+<section id="strategy-signals">
+<fieldset class="strategy-choice"><legend>기준 봉</legend><div><label><input type="radio" name="frame" value="day" checked><span>일봉</span></label><label><input type="radio" name="frame" value="week"><span>주봉</span></label><label><input type="radio" name="frame" value="month"><span>월봉</span></label></div></fieldset>
+<div class="conditions-head"><h3 id="strategy-condition-count">조건 1개</h3><button type="button" id="strategy-add">＋ 조건 추가</button></div>
+<div id="strategy-conditions"></div>
+<template id="strategy-row-template"><div class="strategy-row">
+<label class="condition-factor">지표<select required aria-label="판단 요소"></select></label><button type="button" class="condition-remove" aria-label="조건 삭제">×</button>
+<label class="condition-limit">기준값<input type="number" step="any" aria-label="기준값" required></label>
+<label class="condition-comparison">비교<select aria-label="비교"><option value="lte">이하 ≤</option><option value="gte">이상 ≥</option></select></label></div></template>
+<label id="strategy-join">조건 조합<select name="join"><option value="all">모두 충족 (AND)</option><option value="any">하나 이상 (OR)</option></select></label>
+</section>
+<section id="strategy-orders" hidden>
+<fieldset class="strategy-choice"><legend>주문 방향</legend><div><label><input type="radio" name="side" value="buy" checked><span>매수</span></label><label><input type="radio" name="side" value="sell"><span>매도</span></label></div></fieldset>
+<div class="strategy-pair"><label id="strategy-sizing">매수 방식<select name="sizing"><option value="fixed">고정 수량</option><option value="split">예산 분할 계획</option></select></label><label id="strategy-quantity">주문 수량 (주)<input name="quantity" type="number" min="1" max="999999" step="1" value="1" required></label></div>
 <fieldset id="strategy-budget" hidden disabled>
 <legend>분할매수 예산</legend>
 <label>총예산 (USD)<input name="budget" type="number" min="0.01" step="0.01" inputmode="decimal" required></label>
@@ -79,10 +88,10 @@
 </fieldset>
 <label>실행 방식<select name="mode"><option value="signal">신호만 확인</option><option value="live">키움 실계좌 지정가 주문</option></select></label>
 <label id="strategy-price" hidden>주문 지정가 (USD)<input name="price" type="number" min="0.0001" step="any"></label>
-</fieldset><p id="strategy-watch-note">이 창이 열려 있는 동안 1분마다 확인합니다. 조건 충족 시 한 번 실행하고 종료합니다. 차트 지표는 직전 완료 봉 기준입니다.</p>
-<p id="strategy-draft-note" hidden>백테스트 후보가 포함된 규칙은 초안으로 저장할 수 있습니다.</p>
-<button type="button" id="strategy-save">규칙 저장</button><button type="button" id="strategy-start">신호 감시 시작</button></form>
-<button type="button" id="strategy-stop" hidden>감시 중지</button><p id="strategy-state" role="status"></p></dialog>
+<p id="strategy-watch-note">이 창이 열려 있는 동안 직전 완료 봉을 기준으로 1분마다 확인합니다. 조건을 충족하면 한 번 실행합니다.</p>
+</section></fieldset></form>
+<div class="strategy-actionbar"><p id="strategy-draft-note" hidden></p><p id="strategy-state" role="status"></p>
+<div><button type="button" id="strategy-next">주문 설정 ›</button><button type="button" id="strategy-save">규칙 저장</button><button type="button" id="strategy-start">신호 감시 시작</button><button type="button" id="strategy-stop" hidden>감시 중지</button></div></div></dialog>
 </section>
 <section id="tab-profit" class="tab-panel" hidden>
 <h2>US equity realized P&L</h2>
@@ -132,20 +141,18 @@
 </div>
 <dialog id="watch-editor" aria-labelledby="watch-editor-title" lang="en">
 <div class="watch-editor-shell">
-<header><div><h2 id="watch-editor-title">Edit watchlist</h2><p id="watch-selection">0 selected</p></div><button type="button" id="watch-editor-done">Done</button></header>
-<div class="watch-editor-lists"><label>Watchlist <select id="watch-active-list"></select></label><button type="button" id="watch-new-list">New list</button></div>
-<form id="watch-create-list" hidden>
-<label>List name<input name="title" maxlength="30" required></label><button type="submit">Create</button>
-</form>
-<div id="watch-tools">
-<form id="watch-form" class="watch-form"><label for="watch-symbol">Search stocks and ETFs</label>
-<div><input id="watch-symbol" maxlength="80" placeholder="Symbol or company name" autocomplete="off" required><button type="submit">Search</button></div>
-<ul id="watch-results" class="watch-results" aria-live="polite"></ul></form>
-<p id="home-value" class="watch-status" role="status"></p><p id="kiwoom-quote-status" class="watch-status" role="status"></p></div>
-
-<ul id="watch-editor-rows" aria-label="Watchlist symbols"></ul>
-<div class="watch-bulk"><label><input type="checkbox" id="watch-select-all">Select all</label><button type="button" id="watch-move">Move to…</button><button type="button" id="watch-delete">Delete</button></div>
-<form id="watch-move-form" hidden><label>Destination <select id="watch-destination" required></select></label><button type="submit">Move</button></form>
+<header><div><h2 id="watch-editor-title">Edit Watchlist</h2><p id="watch-selection"></p></div><button type="button" id="watch-editor-done">Done</button></header>
+<div class="watch-editor-lists"><select id="watch-active-list" aria-label="Active watchlist"></select><button type="button" id="watch-new-list">＋ New list</button></div>
+<form id="watch-create-list" hidden><label>List name<input name="title" maxlength="30" required></label><button type="submit">Create</button></form>
+<nav class="editor-switch" aria-label="Watchlist tools"><button type="button" id="watch-manage-tab" aria-controls="watch-manage-panel" aria-pressed="true">Manage symbols</button><button type="button" id="watch-search-tab" aria-controls="watch-tools" aria-pressed="false">Add symbols</button></nav>
+<div id="watch-tools" hidden><form id="watch-form" class="watch-form">
+<div><input id="watch-symbol" maxlength="80" aria-label="Symbol or company name" placeholder="Symbol or company name" autocomplete="off" required><button type="submit">Search</button></div>
+<ul id="watch-results" class="watch-results" aria-live="polite"></ul></form></div>
+<p id="home-value" class="watch-status" role="status"></p><p id="kiwoom-quote-status" class="watch-status" role="status"></p>
+<section id="watch-manage-panel"><label class="watch-select-line"><input type="checkbox" id="watch-select-all">Select all</label>
+<ul id="watch-editor-rows" aria-label="Watchlist symbols"></ul><p id="watch-list-empty" hidden>No symbols in this list.</p></section>
+<div id="watch-actions" hidden><div class="watch-bulk"><span id="watch-selected-count"></span><button type="button" id="watch-move">Move to…</button><button type="button" id="watch-delete">Delete</button></div>
+<form id="watch-move-form" hidden><label>Destination<select id="watch-destination" required></select></label><button type="submit">Move</button></form></div>
 </div></dialog>
 <dialog id="pending-orders" class="order-sheet" lang="ko" aria-labelledby="pending-title">
 <header class="order-sheet-head">

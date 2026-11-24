@@ -49,13 +49,25 @@ export function libraryDetails(rule) {
   };
 }
 
-export function setupStrategy({loadChart,orders,canLoadChart}) {
+export function setupStrategy({loadChart,orders,canLoadChart,tickerIcon}) {
   const sheet=get("sheet"), form=get("form"), fields=get("fields"), list=get("conditions"), state=get("state");
   const f=form.elements;
   let symbol, run, sending=false;
+  function setStage(stage) {
+    sheet.dataset.stage=stage;
+    get("signals").hidden=stage!=="conditions";
+    get("orders").hidden=stage!=="orders";
+    for(const button of sheet.querySelectorAll("[data-stage]")){
+      button.setAttribute("aria-pressed",String(button.dataset.stage===stage));
+    }
+    form.scrollTop=0;
+  }
+  for(const button of sheet.querySelectorAll("[data-stage]"))button.onclick=()=>setStage(button.dataset.stage);
+  get("next").onclick=()=>setStage("orders");
   function add(c={key:"rsi",op:"lte",value:30}) {
-    const row=document.createElement("div"), factor=document.createElement("select"), op=document.createElement("select");
-    row.className="strategy-row";
+    const row=get("row-template").content.firstElementChild.cloneNode(true);
+    const factor=row.querySelector(".condition-factor select"),op=row.querySelector(".condition-comparison select");
+    const input=row.querySelector("input");
     for (const [key,[name]] of Object.entries(factors)) factor.add(option(key,name));
     const group=document.createElement("optgroup");
     group.label="백테스트 후보";
@@ -69,11 +81,11 @@ export function setupStrategy({loadChart,orders,canLoadChart}) {
       state.textContent="사용이 종료된 조건을 교체하거나 삭제하세요.";
     }
     factor.value=(Object.hasOwn(factors,c.key) || isDraft(c.key)) ? c.key : ""; factor.setAttribute("aria-label","판단 요소");
-    op.add(option("lte","이하 ≤")); op.add(option("gte","이상 ≥")); op.value=c.op; op.setAttribute("aria-label","비교");
-    const input=document.createElement("input"); input.type="number"; input.step="any"; input.required=true;
-    input.value=c.value ?? ""; input.setAttribute("aria-label","기준값"); function updateRow() {
+    op.value=c.op || "lte";
+    input.value=c.value ?? "";
+    function updateRow() {
       const draft=isDraft(factor.value);
-      op.hidden=op.disabled=input.hidden=input.disabled=draft;
+      op.parentElement.hidden=op.disabled=input.parentElement.hidden=input.disabled=draft;
     }
     updateRow();
     factor.onchange=()=>{
@@ -82,11 +94,13 @@ export function setupStrategy({loadChart,orders,canLoadChart}) {
       updateRow();
       sync();
     };
-    const remove=document.createElement("button"); remove.type="button"; remove.textContent="×";
-    remove.setAttribute("aria-label","조건 삭제"); remove.onclick=()=>{row.remove();sync();};
-    row.append(factor,op,input,remove); list.append(row);
+    row.querySelector("button").onclick=()=>{row.remove();sync();};
+    list.append(row);
+
   }
   function sync() {
+    get("condition-count").textContent="조건 "+list.children.length+"개";
+    get("join").hidden=list.children.length<2;
     const buy=f.side.value==="buy";
     const split=buy && f.sizing.value==="split";
     get("sizing").hidden=!buy;
@@ -102,7 +116,7 @@ export function setupStrategy({loadChart,orders,canLoadChart}) {
       })].join("\n") : "총예산과 분할 수를 입력하세요. 각 분할에는 최소 1센트를 배정합니다.";
       f.perBuy.max=f.units.value;
     }
-    const draft=split || Array.from(list.children).some(row=>isDraft(row.firstElementChild.value));
+    const draft=split || Array.from(list.children).some(row=>isDraft(row.querySelector(".condition-factor select").value));
     if(draft) f.mode.value="signal";
     f.mode.disabled=draft;
     get("draft-note").hidden=!draft;
@@ -118,9 +132,15 @@ export function setupStrategy({loadChart,orders,canLoadChart}) {
     get("close").disabled=sending;
   }
   function rule() {
-    if (!form.reportValidity()) return;
+    const invalid=form.querySelector(":invalid:not(fieldset)");
+    if(invalid){
+      setStage(get("signals").contains(invalid) ? "conditions" : "orders");
+      invalid.reportValidity();
+      return;
+    }
     const conditions=Array.from(list.children,row=>{
-      const [factor,op,input]=row.children;
+      const [factor,op]=row.querySelectorAll("select");
+      const input=row.querySelector("input");
       return isDraft(factor.value) ? {key:factor.value} : {key:factor.value,op:op.value,value:input.valueAsNumber};
     });
     if (!conditions.length) {state.textContent="판단 조건을 하나 이상 추가하세요.";return;}
@@ -164,7 +184,9 @@ export function setupStrategy({loadChart,orders,canLoadChart}) {
       f.perBuy.value=saved.allocation.perBuy;
     }
     for(const c of saved?.conditions||[{key:"rsi",op:"lte",value:30}]) add(c);
-    get("title").textContent=symbol+" 자동매매 설정"; sync(); sheet.showModal();
+    get("title").textContent=symbol;
+    get("logo").replaceChildren(tickerIcon(symbol));
+    setStage("conditions"); sync(); sheet.showModal();
   }
   get("save").onclick=()=>{
     const r=rule(); if(!r) return;
@@ -172,7 +194,9 @@ export function setupStrategy({loadChart,orders,canLoadChart}) {
     catch {state.textContent="이 브라우저에 저장하지 못했습니다.";}
   };
   f.sizing.onchange=sync; get("budget").oninput=sync;
-  get("add").onclick=()=>add(); f.mode.onchange=sync; f.side.onchange=sync;
+  get("add").onclick=()=>{add();sync();list.lastElementChild.querySelector("select").focus();};
+  f.mode.onchange=sync;
+  for(const radio of form.querySelectorAll('[name="side"]'))radio.onchange=sync;
   function stop(message) {
     if(run){run.abort();run=null;}
     if(message) state.textContent=message;

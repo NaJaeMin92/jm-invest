@@ -12,7 +12,7 @@ const node = (tag, text) => {
   return item;
 };
 
-export function setupWatchEditor({watchKey, nameFor, refresh}) {
+export function setupWatchEditor({watchKey, nameFor, tickerIcon, refresh}) {
   const editor = get("watch-editor"), rows = get("watch-editor-rows"), notice = get("home-value");
   let selected = new Set(), drag, undo;
   const groups = () => safeRead(groupsKey, []);
@@ -54,7 +54,12 @@ export function setupWatchEditor({watchKey, nameFor, refresh}) {
   function selectionChanged() {
     const symbols = readList();
     const count = selected.size;
-    get("watch-selection").textContent = count + " selected";
+    get("watch-selection").textContent=symbols.length+(symbols.length===1 ? " symbol" : " symbols");
+    get("watch-selected-count").textContent=count+" selected";
+    get("watch-actions").hidden=!count || get("watch-manage-panel").hidden;
+    if(!count)get("watch-move-form").hidden=true;
+    get("watch-list-empty").hidden=Boolean(symbols.length);
+    get("watch-select-all").disabled=!symbols.length;
     get("watch-delete").disabled = !count;
     get("watch-move").disabled = !count;
     get("watch-select-all").checked = Boolean(count && count === symbols.length);
@@ -80,7 +85,7 @@ export function setupWatchEditor({watchKey, nameFor, refresh}) {
     check.type="checkbox";check.setAttribute("aria-label","Select "+symbol);
     check.onchange=()=>{if(check.checked) selected.add(symbol);else selected.delete(symbol);selectionChanged();};
     const identity = node("label","");
-    identity.append(check,node("div",""));
+    identity.append(check,tickerIcon(symbol),node("span",""));
     identity.lastElementChild.append(node("strong",symbol),node("small",nameFor(symbol)));
     const top = makeButton("Move "+symbol+" to top","↑",()=>move(index,0));
     top.disabled = index===0;
@@ -129,11 +134,23 @@ export function setupWatchEditor({watchKey, nameFor, refresh}) {
     rows.replaceChildren(...symbols.map(rowFor));
     selectionChanged();
   }
-  function open() {
+  function selectTool(search) {
+    get("watch-tools").hidden=!search;
+    get("watch-manage-panel").hidden=search;
+    get("watch-manage-tab").setAttribute("aria-pressed",String(!search));
+    get("watch-search-tab").setAttribute("aria-pressed",String(search));
+    selectionChanged();
+    if(search)get("watch-symbol").focus();
+  }
+  get("watch-manage-tab").onclick=()=>selectTool(false);
+  get("watch-search-tab").onclick=()=>selectTool(true);
+  function open(search=false) {
     selected=new Set();
     notice.textContent="";
     render();
     if (!editor.open) editor.showModal();
+    selectTool(search);
+    editor.scrollTop=0;
   }
   editor.addEventListener("close",()=>{
     get("watch-create-list").hidden=true;
@@ -141,7 +158,7 @@ export function setupWatchEditor({watchKey, nameFor, refresh}) {
     get("watch-results").replaceChildren();
     get("watch-form").reset();
   });
-  get("watch-edit").onclick=open;
+  get("watch-edit").onclick=()=>open();
   get("watch-editor-done").onclick=()=>editor.close();
   get("watch-active-list").onchange=event=>{
     localStorage.setItem(activeKey,JSON.stringify(event.target.value));
