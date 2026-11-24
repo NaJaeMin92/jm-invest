@@ -1,4 +1,5 @@
-import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=77";
+import {trendStyles} from "./chart-trends.js?v=81";
+import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=81";
 import {setupExecutionFlags} from "./chart-executions.js?v=77";
 import {showMarketPanel} from "./market-panels.js?v=68";
 
@@ -526,9 +527,31 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
       const data = await publicQuote(symbol);
       if (!data) return null;
       const bars = interval === "hour" ? data.hourly : isIntraday(interval) ? await minuteBars(symbol) : data.daily;
-      return bars.length ? prepareChart(bars, interval) : null;
+      return bars.length ? {...prepareChart(bars, interval), daily:data.daily} : null;
     }
   });
+  const trends = {long:true, short:true, support:true, resistance:true};
+  const trendKey = "jm-invest:chart-trends:v1";
+  try {
+    const saved = JSON.parse(localStorage.getItem(trendKey));
+    for (const key of Object.keys(trends)) if (typeof saved?.[key] === "boolean") trends[key] = saved[key];
+  } catch {}
+  for (const [key, style] of Object.entries(trendStyles)) {
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.textContent = style.label;
+    toggle.dataset.trend = key;
+    toggle.style.setProperty("--guide",style.color);
+    toggle.setAttribute("aria-pressed",String(trends[key]));
+    toggle.onclick = () => {
+      trends[key] = !trends[key];
+      toggle.setAttribute("aria-pressed",String(trends[key]));
+      try { localStorage.setItem(trendKey,JSON.stringify(trends)); } catch {}
+      draw();
+    };
+    get("trend-controls").append(toggle);
+  }
+
   function selectPanel(panel) {
     if (panel !== "chart") tools.pause();
     for (const tab of tabs) {
@@ -544,7 +567,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
   function draw() {
     area.classList.toggle("moving-drawing",tools.drawingOptions());
     if (!chart || !chart.bars.length || !dialog.open) return;
-    const options = {...tools.chartOptions(), windowSize};
+    const options = {...tools.chartOptions(), windowSize, trends};
     canvas.hidden = false;
     canvas.classList.toggle("with-rsi", options.lower === "RSI");
     geometry = drawChart(canvas, chart, frame, start, options);
@@ -697,6 +720,8 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
     const anchor = preserve && chart?.bars[start]?.[0];
     const atLatest = start === lastStart;
     chart = source?.length ? prepareChart(source, frame) : null;
+    if (chart) chart.daily = quote?.daily;
+    get("trend-controls").hidden = !chart;
     if (!preserve) { windowSize = visibleBars; rangeMode = ""; }
     else if (rangeMode === "all" && chart) windowSize = chart.bars.length;
     touchPoints.clear();

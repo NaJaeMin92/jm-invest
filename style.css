@@ -1027,3 +1027,13 @@ body.instrument-open { overflow:hidden; }
 #drawing-colors button::after { content:""; width:15px; height:15px; border-radius:50%; background:var(--swatch); }
 #drawing-styles button { flex:1; font-size:12px; }
 #drawing-move-hint { grid-column:1/-1; margin:1px 2px; color:#b9d4f6; font-size:11px; }
+
+#trend-controls { display:flex; flex-wrap:wrap; align-items:center; gap:3px; width:fit-content; max-width:100%; margin:8px 0 4px; padding:3px; background:#172133; border:1px solid #344156; border-radius:15px }
+#trend-controls[hidden] { display:none }
+#trend-controls button { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:42px; padding:0 10px; border:1px solid transparent; border-radius:11px; font:600 .76rem/1.15 system-ui,sans-serif; color:#a9b3c3; background:transparent; cursor:pointer }
+#trend-controls button::before { content:""; width:11px; border-top:2px solid currentColor; opacity:.55 }
+#trend-controls [data-trend="short"]::before { border-top-style:dashed }
+#trend-controls [data-trend="support"]::before,#trend-controls [data-trend="resistance"]::before { border-top-width:4px; border-radius:2px }
+#trend-controls button[aria-pressed="true"] { color:#f4f6fa; background:#2a364a; border-color:#415168; box-shadow:0 1px 3px #0003 }
+#trend-controls button[aria-pressed="true"]::before { color:var(--guide); opacity:1 }
+#trend-controls button:focus-visible { outline:2px solid #a6ccff; outline-offset:1px }
