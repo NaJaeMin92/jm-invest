@@ -1050,3 +1050,6 @@ body.instrument-open { overflow:hidden; }
 #strategy-sheet p {font-size:.83rem;color:#b4c2d6;line-height:1.5}
 #strategy-sheet [hidden] {display:none}
 #strategy-sheet #strategy-start {background:#bdd9ce;color:#142b24}
+#strategy-budget {display:grid;gap:12px;min-width:0;padding:12px;border:1px solid #37465b;border-radius:12px}
+#strategy-budget legend {padding:0 5px;font-weight:600}
+#strategy-allocation {white-space:pre-line;font-variant-numeric:tabular-nums;line-height:1.65;color:#c9e2d7}

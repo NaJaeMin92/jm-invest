@@ -1,4 +1,4 @@
-import {setupStrategy} from "./assets/strategy-editor.js?v=85";
+import {setupStrategy} from "./assets/strategy-editor.js?v=86";
 import {trendStyles} from "./assets/chart-trends.js?v=82";
 import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=82";
 import {setupExecutionFlags} from "./chart-executions.js?v=77";

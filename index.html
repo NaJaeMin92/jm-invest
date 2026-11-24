@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=83">
-<script type="module" src="./journal.js?v=85"></script>
+<link rel="stylesheet" href="./style.css?v=86">
+<script type="module" src="./journal.js?v=86"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header class="app-masthead"><div class="head">
@@ -175,10 +175,18 @@
 <div class="strategy-pair"><label>기준 봉<select name="frame"><option value="day">일봉</option><option value="week">주봉</option><option value="month">월봉</option></select></label>
 <label>조건 조합<select name="join"><option value="all">모두 충족 (AND)</option><option value="any">하나 이상 (OR)</option></select></label></div>
 <div id="strategy-conditions"></div><button type="button" id="strategy-add">＋ 조건 추가</button>
-<div class="strategy-pair"><label>주문 방향<select name="side"><option value="buy">매수</option><option value="sell">매도</option></select></label><label>수량 (주)<input name="quantity" type="number" min="1" max="999999" step="1" value="1" required></label></div>
+<div class="strategy-pair"><label>주문 방향<select name="side"><option value="buy">매수</option><option value="sell">매도</option></select></label><label id="strategy-quantity">수량 (주)<input name="quantity" type="number" min="1" max="999999" step="1" value="1" required></label></div>
+<label id="strategy-sizing">매수 방식<select name="sizing"><option value="fixed">고정 수량</option><option value="split">예산 분할 계획</option></select></label>
+<fieldset id="strategy-budget" hidden disabled>
+<legend>분할매수 예산</legend>
+<label>총예산 (USD)<input name="budget" type="number" min="0.01" step="0.01" inputmode="decimal" required></label>
+<div class="strategy-pair"><label>전체 분할 수<input name="units" type="number" min="1" step="1" value="10" required></label>
+<label>한 번에 쓸 분할 수<input name="perBuy" type="number" min="1" step="1" value="1" required></label></div>
+<output id="strategy-allocation" aria-live="polite"></output>
+</fieldset>
 <label>실행 방식<select name="mode"><option value="signal">신호만 확인</option><option value="live">키움 실계좌 지정가 주문</option></select></label>
 <label id="strategy-price" hidden>주문 지정가 (USD)<input name="price" type="number" min="0.0001" step="any"></label>
-</fieldset><p>이 창이 열려 있는 동안 1분마다 확인합니다. 조건 충족 시 한 번 실행하고 종료합니다. 차트 지표는 직전 완료 봉 기준입니다.</p>
+</fieldset><p id="strategy-watch-note">이 창이 열려 있는 동안 1분마다 확인합니다. 조건 충족 시 한 번 실행하고 종료합니다. 차트 지표는 직전 완료 봉 기준입니다.</p>
 <p id="strategy-draft-note" hidden>백테스트 후보가 포함된 규칙은 초안으로 저장할 수 있습니다.</p>
 <button type="button" id="strategy-save">규칙 저장</button><button type="button" id="strategy-start">신호 감시 시작</button></form>
 <button type="button" id="strategy-stop" hidden>감시 중지</button><p id="strategy-state" role="status"></p></dialog>

@@ -1,3 +1,4 @@
+import {splitBudget} from "./split-budget.js?v=86";
 import {factors, metrics, matches} from "./strategy.js?v=84";
 
 const nyDate = new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
@@ -52,10 +53,27 @@ export function setupStrategy({getSymbol,loadChart,orders,canLoadChart}) {
     row.append(factor,op,input,remove); list.append(row);
   }
   function sync() {
-    const draft=Array.from(list.children).some(row=>isDraft(row.firstElementChild.value));
+    const buy=f.side.value==="buy";
+    const split=buy && f.sizing.value==="split";
+    get("sizing").hidden=!buy;
+    f.sizing.disabled=!buy;
+    get("quantity").hidden=f.quantity.disabled=split;
+    get("budget").hidden=get("budget").disabled=!split;
+    if(split) {
+      const plan=splitBudget(f.budget.value,f.units.valueAsNumber,f.perBuy.valueAsNumber);
+      const usd=new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"});
+      get("allocation").textContent=plan ? ["총 "+plan.rounds+"회 매수", ...plan.ranges.map(r=>{
+        const range=r.first===r.end ? r.first : r.first+"–"+r.end;
+        return range+"회차 · "+r.size+"분할 · 회당 "+usd.format(r.cents/100);
+      })].join("\n") : "총예산과 분할 수를 입력하세요. 각 분할에는 최소 1센트를 배정합니다.";
+      f.perBuy.max=f.units.value;
+    }
+    const draft=split || Array.from(list.children).some(row=>isDraft(row.firstElementChild.value));
     if(draft) f.mode.value="signal";
     f.mode.disabled=draft;
     get("draft-note").hidden=!draft;
+    get("watch-note").hidden=split;
+    get("draft-note").textContent=split ? "여러 거래일에 걸쳐 사용할 계획입니다. 회차별 예산을 초안으로 저장합니다." : "백테스트 후보가 포함된 규칙은 초안으로 저장할 수 있습니다.";
     get("start").disabled=draft;
     get("save").textContent=draft ? "초안 저장" : "규칙 저장";
     const live=f.mode.value==="live";
@@ -74,7 +92,14 @@ export function setupStrategy({getSymbol,loadChart,orders,canLoadChart}) {
     if (!conditions.length) {state.textContent="판단 조건을 하나 이상 추가하세요.";return;}
     if(f.mode.value==="live" && !/^\d{1,7}(\.\d{1,4})?$/.test(f.price.value)) {state.textContent="지정가 자릿수를 확인하세요.";return;}
     if(f.mode.value==="live" && Number(f.price.value)>=1 && (f.price.value.split(".")[1]||"").length>2) {state.textContent="$1 이상은 소수점 두 자리까지 입력하세요.";return;}
-    return {symbol,frame:f.frame.value,join:f.join.value,side:f.side.value,quantity:f.quantity.value,price:f.price.value,mode:f.mode.value,conditions};
+    let allocation;
+    if(f.side.value==="buy" && f.sizing.value==="split"){
+      allocation={amount:f.budget.value,units:f.units.valueAsNumber,perBuy:f.perBuy.valueAsNumber};
+      if(!splitBudget(allocation.amount,allocation.units,allocation.perBuy)){
+        state.textContent="총예산과 분할 수를 확인하세요.";return;
+      }
+    }
+    return {allocation,symbol,frame:f.frame.value,join:f.join.value,side:f.side.value,quantity:f.quantity.value,price:f.price.value,mode:f.mode.value,conditions};
   }
   const savedKey=()=>"jm-invest:strategy:v1:"+symbol;
   get("open").onclick=()=>{
@@ -82,14 +107,21 @@ export function setupStrategy({getSymbol,loadChart,orders,canLoadChart}) {
     let saved;
     try { saved=JSON.parse(localStorage.getItem(savedKey())); } catch {}
     if(saved) for(const k of ["frame","join","side","quantity","price"]) f[k].value=saved[k];
+    if(saved?.allocation){
+      f.sizing.value="split";
+      f.budget.value=saved.allocation.amount;
+      f.units.value=saved.allocation.units;
+      f.perBuy.value=saved.allocation.perBuy;
+    }
     for(const c of saved?.conditions||[{key:"rsi",op:"lte",value:30}]) add(c);
     get("title").textContent=symbol+" 자동매매 설정"; sync(); sheet.showModal();
   };
   get("save").onclick=()=>{
     const r=rule(); if(!r) return;
-    try {localStorage.setItem(savedKey(),JSON.stringify(r));state.textContent=r.conditions.some(c=>isDraft(c.key)) ? "초안을 저장했습니다." : "규칙을 저장했습니다.";}
+    try {localStorage.setItem(savedKey(),JSON.stringify(r));state.textContent=r.allocation || r.conditions.some(c=>isDraft(c.key)) ? "초안을 저장했습니다." : "규칙을 저장했습니다.";}
     catch {state.textContent="이 브라우저에 저장하지 못했습니다.";}
   };
+  f.sizing.onchange=sync; get("budget").oninput=sync;
   get("add").onclick=()=>add(); f.mode.onchange=sync; f.side.onchange=sync;
   function stop(message) {
     if(run){run.abort();run=null;}
@@ -149,7 +181,7 @@ export function setupStrategy({getSymbol,loadChart,orders,canLoadChart}) {
   get("start").onclick=async ()=>{
     if(run)return;
     const r=rule();if(!r)return;
-    if(r.conditions.some(c=>isDraft(c.key)))return;
+    if(r.allocation || r.conditions.some(c=>isDraft(c.key)))return;
     if(!canLoadChart()){state.textContent="시세 조회를 위해 계좌에 로그인하세요.";return;}
     if(r.mode==="live" && !["127.0.0.1","localhost"].includes(location.hostname)){state.textContent="실주문은 비공개 로컬 주문 서버에서 실행하세요.";return;}
     const ctrl=new AbortController();run=ctrl;sync();state.textContent=r.symbol+" · "+shortName[r.frame]+" · 조건 확인 중";
