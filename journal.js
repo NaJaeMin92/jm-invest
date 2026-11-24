@@ -1,6 +1,6 @@
 import {setupWatchEditor} from "./watch-editor.js?v=49";
 import {setupOrders} from "./orders.js?v=78";
-import { setupInstrument, sparkline } from "./instrument.js?v=78";
+import { setupInstrument, sparkline } from "./instrument.js?v=79";
 import {loadWatchSentiment} from "./market-panels.js?v=68";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -10,6 +10,8 @@ const login = document.querySelector("#login");
 const workspace = document.querySelector("#private");
 const message = document.querySelector("#status");
 let token = null;
+let valuationSnapshot = null;
+let returnToStock = null;
 const heldWatchSymbols = new Set();
 const watchSymbolKey = symbol => symbol.trim().toUpperCase().replaceAll(".", "-");
 const storageKey = "jm-invest:private-refresh:v1";
@@ -51,7 +53,9 @@ const logout = document.querySelector("#logout");
 const navigation = document.querySelector("#bottom-nav");
 const navButtons = [...navigation.querySelectorAll("button")];
 function selectView(view) {
+  if (!token && view !== "account") returnToStock = null;
   const needsLogin = view !== "home" && !token;
+  document.getElementById("watch-login").hidden = Boolean(token);
   document.body.dataset.view = view;
   setDetail(view === "account" && !needsLogin);
   login.hidden = !needsLogin;
@@ -129,11 +133,13 @@ login.addEventListener("submit", async (event) => {
 document.querySelector("#logout").addEventListener("click", () => {
   const accessToken = token;
   token = null;
+  valuationSnapshot = null;
   heldWatchSymbols.clear();
   orders.signOut();
   instrument.clearAccountData();
   saveSession(null);
   holdingsList.replaceChildren();
+  document.getElementById("holding-distribution").hidden = true;
   document.querySelector("#profit-list").replaceChildren();
   document.querySelector("#profit-period").textContent = "";
   document.querySelector("#profit-updated").textContent = "";
@@ -189,6 +195,23 @@ function showHoldings(balance) {
   document.getElementById("holding-count").textContent = Array.isArray(holdings) ? holdings.length : "";
   document.getElementById("holding-columns").hidden = !hasRows;
   holdingSort.hidden = !hasRows || holdings.length < 2;
+  const distribution = document.getElementById("holding-distribution");
+  const counts = [0, 0, 0];
+  for (const holding of hasRows ? holdings : []) {
+    if (!numeric(holding.return_pct)) continue;
+    const rate = Number(holding.return_pct);
+    const group = rate > 0 ? 0 : rate < 0 ? 2 : 1;
+    counts[group]++;
+  }
+  distribution.hidden = !counts.some(Boolean);
+  if (!distribution.hidden) {
+    const labels = ["수익", "보합", "손실"];
+    distribution.querySelector("p").textContent = counts.map((n, i) => labels[i] + " " + n + "종목").join(" · ");
+    [...distribution.querySelectorAll("i")].forEach((segment, i) => {
+      segment.hidden = !counts[i];
+      segment.style.flexGrow = counts[i];
+    });
+  }
   if (!hasRows) {
     const item = document.createElement("li");
     item.textContent = Array.isArray(holdings) ? "보유 중인 미국주식이 없습니다." : "잔고 동기화 대기";
@@ -335,6 +358,10 @@ const watchEditor = setupWatchEditor({watchKey, nameFor, refresh() {
   renderWatchlist();
   refreshWatchlistQuotes();
 }});
+document.getElementById("home-search").onclick = () => {
+  watchEditor.open();
+  document.getElementById("watch-symbol").focus();
+};
 const readWatchlist = watchEditor.readList;
 const kiwoomTicks = new Map();
 const lastKiwoomPrices = new Map();
@@ -517,6 +544,17 @@ window.addEventListener("online", refreshWatchlistQuotes);
 const orders = setupOrders(() => token, kiwoomEndpoint);
 const instrument = setupInstrument({
   orders,
+  async readPositionSnapshot(symbol) {
+    const session = token;
+    const balance = await valuationSnapshot;
+    if (!session || token !== session || !balance?.observed_at || !Array.isArray(balance.holdings)) return null;
+    const row = balance.holdings.find(h => h.currency === "USD" && typeof h.symbol === "string" &&
+      watchSymbolKey(h.symbol) === watchSymbolKey(symbol));
+    const observed = Date.parse(balance.observed_at);
+    if (!row || !numeric(row.quantity) || !Number.isFinite(observed)) return null;
+    return {quantity:Number(row.quantity), averagePrice:numeric(row.cost_price) ? Number(row.cost_price) : null,
+      markPrice:numeric(row.current_price) ? Number(row.current_price) : null, observed};
+  },
   subscribeOrderBook,
   canLoadChart: () => Boolean(token && kiwoomEndpoint),
   async loadExecutions(symbol, from, to, signal) {
@@ -537,7 +575,10 @@ const instrument = setupInstrument({
     if (!response.ok) throw new Error(payload.message || "Kiwoom chart unavailable.");
     return payload;
   },
-  signIn: () => selectView("account"),
+  signIn(symbol) {
+    returnToStock = symbol;
+    selectView("account");
+  },
   search() {
     selectView("home");
     watchEditor.open();
@@ -547,10 +588,18 @@ const instrument = setupInstrument({
   readList: readWatchlist,
   saveList: watchEditor.saveList,
 });
+const watchDate = new Intl.DateTimeFormat("en-US", {month:"short", day:"numeric", timeZone:"America/New_York"});
 function renderWatchlist(changed) {
   watchEditor.renameHeading();
   const symbols = readWatchlist();
   const session = usMarketSession();
+  const summary = document.getElementById("watch-summary");
+  const summaryKey = session.date + "/" + symbols.length;
+  if (summary.dataset.key !== summaryKey) {
+    summary.dataset.key = summaryKey;
+    summary.textContent = watchDate.format(new Date(session.date + "T12:00:00Z")) + " ET · " +
+      symbols.length + (symbols.length === 1 ? " symbol" : " symbols");
+  }
   const date = session.date.replaceAll("-", "");
   const quotes = new Map(symbols.map(symbol => {
     if (!token) return [symbol, null];
@@ -617,7 +666,7 @@ function makeWatchRow(symbol) {
     row.style.setProperty("--sprite-position", (snapshot.index * 12.5) + "%");
     badge.classList.add("reference-logo");
   } else {
-    badge.textContent = symbol.slice(0, 2);
+    badge.textContent = symbol === "VIX" ? symbol : symbol.slice(0, 2);
     if (logoFiles[symbol]) {
       const image = document.createElement("img");
       image.src = "./assets/companies/" + logoFiles[symbol] + ".png?v=29";
@@ -696,7 +745,7 @@ function paintWatchRow(row, symbol, market, session) {
   if (market) {
     price.textContent = market.marketType === "Futures" ? "Delayed" : "";
   } else {
-    price.textContent = !token ? "Sign in for quotes" : unavailableSymbols.has(symbol) ? "Unavailable on Kiwoom" : "Waiting for quote";
+    price.textContent = !token ? "" : unavailableSymbols.has(symbol) ? "Unavailable on Kiwoom" : "Waiting for quote";
   }
   price.hidden = !price.textContent;
   extra.hidden = !Number.isFinite(market?.extendedChange);
@@ -801,6 +850,7 @@ async function loadValuation(accessToken) {
     showHoldings(balance);
 
     showProfit(balance.realized_profit);
+    return balance;
   } catch (error) {
     if (token === accessToken) value.textContent = error.code === "PGRST205" ? "잔고 설정 대기" : "잔고를 불러오지 못했습니다";
   }
@@ -818,9 +868,15 @@ async function openWorkspace(session, remember) {
   setDetail(false);
   workspace.hidden = false;
   navigation.hidden = false;
-  selectView(document.body.dataset.view || "home");
-  instrument.refresh();
-  loadValuation(token);
+  if (returnToStock) {
+    selectView("home");
+    instrument.open(returnToStock);
+    returnToStock = null;
+  } else {
+    selectView(document.body.dataset.view || "home");
+    instrument.refresh();
+  }
+  valuationSnapshot = loadValuation(token);
   message.textContent = remember && !stored ? "This browser could not save your session." : "";
 }
 

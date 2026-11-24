@@ -52,7 +52,7 @@ function mergeDaily(oldBars, newBars) {
   return [...days.values()].sort((a,b) => a[0] - b[0]);
 }
 
-export function setupInstrument({search,nameFor,readList,saveList,orders,subscribeOrderBook,canLoadChart,loadChart,loadExecutions,signIn}) {
+export function setupInstrument({search,nameFor,readList,saveList,orders,readPositionSnapshot,subscribeOrderBook,canLoadChart,loadChart,loadExecutions,signIn}) {
   const dialog=get("stock-detail"), canvas=get("market-chart");
   const executions = setupExecutionFlags(loadExecutions);
   let current="", quote=null, frame="day", afterClose=null, quoteRequest=0;
@@ -81,6 +81,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
   const positionReturn = get("trade-position-return"), retryPosition = get("trade-position-retry");
   const sharesFormat = new Intl.NumberFormat("ko-KR", {maximumFractionDigits:8});
   const returnFormat = new Intl.NumberFormat("en-US", {style:"percent", minimumFractionDigits:2, signDisplay:"exceptZero"});
+  const positionDate = new Intl.DateTimeFormat("ko-KR", {dateStyle:"short", timeStyle:"short", timeZone:"Asia/Seoul"});
   const dollars = new Intl.NumberFormat("en-US", {
     style: "currency", currency: "USD", maximumFractionDigits: 4
   });
@@ -104,7 +105,16 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     positionPanel.querySelector("dl").hidden = false;
     positionPanel.removeAttribute("aria-busy");
     positionMessage.hidden = true;
+    get("trade-position-quantity-label").textContent = "보유수량";
     heldShares.textContent = averagePrice.textContent = "—";
+    updatePositionReturn();
+  }
+
+  function showPosition(result) {
+    position = result;
+    get("trade-position-quantity-label").textContent = result.observed != null ? "결제기준 수량" : "보유수량";
+    heldShares.textContent = sharesFormat.format(result.quantity) + "주";
+    averagePrice.textContent = result.averagePrice > 0 ? dollars.format(result.averagePrice) : "—";
     updatePositionReturn();
   }
 
@@ -117,22 +127,23 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
       const result = await orders.stockPosition(current, controller.signal);
       if (controller.signal.aborted) return;
       if (result) {
-        position = result;
-        heldShares.textContent = sharesFormat.format(position.quantity) + "주";
-        averagePrice.textContent = position.averagePrice > 0 ? dollars.format(position.averagePrice) : "—";
-        updatePositionReturn();
+        showPosition(result);
         return;
       }
       positionMessage.firstElementChild.textContent = "로그인 후 보유 잔고를 볼 수 있습니다.";
       retryPosition.hidden = true;
     } catch {
       if (controller.signal.aborted) return;
-      positionMessage.firstElementChild.textContent = "보유 잔고를 불러오지 못했습니다.";
+      const saved = await readPositionSnapshot(current);
+      if (controller.signal.aborted) return;
+      if (saved) showPosition(saved);
+      positionMessage.firstElementChild.textContent = saved
+        ? "최근 동기화 · " + positionDate.format(saved.observed) + " KST" : "보유 잔고를 불러오지 못했습니다.";
       retryPosition.hidden = false;
     } finally {
       if (!controller.signal.aborted) positionPanel.removeAttribute("aria-busy");
     }
-    positionPanel.querySelector("dl").hidden = true;
+    positionPanel.querySelector("dl").hidden = !position;
     positionMessage.hidden = false;
   }
   retryPosition.onclick = loadPosition;
@@ -759,14 +770,14 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
       ? (pct < 0 ? "▼ " : "▲ ") + signed(price - price / (1 + pct / 100)) + "  " + signed(pct) + "%" : "";
     if (hasChange) get("stock-price").parentElement.dataset.direction = pct < 0 ? "down" : "up";
     get("stock-range").textContent = Number.isFinite(quote.high) && Number.isFinite(quote.low)
-      ? quote.high.toFixed(2) + "–" + quote.low.toFixed(2) : "—";
+      ? quote.low.toFixed(2) + "–" + quote.high.toFixed(2) : "—";
     get("stock-volume").textContent = Number.isFinite(quote.volume) ? compact.format(quote.volume) : "—";
     get("stock-cap").textContent = Number.isFinite(quote.marketCap) ? compact.format(quote.marketCap)
       : current === "SKHY" ? "754.89B" : "—";
     get("stock-name").textContent = [quote.name || nameFor(current), quote.exchange === "NasdaqGS" ? "NASDAQ" : quote.exchange].filter(Boolean).join("  ");
     get("stock-quote-source").hidden = false;
     get("stock-quote-source").textContent = quote.source || (quote.fromKiwoom ? "Kiwoom" : "Snapshot");
-    get("stock-chart-sign-in").hidden = true;
+    get("stock-chart-sign-in").hidden = canLoadChart();
     const when = Number.isFinite(quote.asOf) ? dateFormat.format(quote.asOf * 1000) : "";
     get("stock-time").textContent = quote.fromKiwoom ? "Latest quote"
       : current === "SKHY" ? "Closed 19:59 11/20 ET" : "Closed · " + when + " ET";
@@ -776,6 +787,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
   }
   async function loadInstrumentQuote(symbol) {
     const id = ++quoteRequest;
+    get("stock-quote-retry").hidden = true;
     historyAbort?.abort();
     historyAbort = new AbortController();
     const signal = historyAbort.signal;
@@ -824,6 +836,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
     get("stock-time").textContent = canLoadChart() ? message : "Sign in to load the chart.";
     get("stock-quote-source").hidden = true;
     get("stock-chart-sign-in").hidden = canLoadChart();
+    get("stock-quote-retry").hidden = !canLoadChart();
     get("stock-frames").hidden = true;
   }
   async function open(symbol) {
@@ -876,7 +889,11 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,subscri
   get("stock-back").onclick=()=>back();
   dialog.addEventListener("cancel",e=>{e.preventDefault();back();});
   get("stock-search").onclick=()=>back(search);
-  get("stock-chart-sign-in").onclick = () => back(signIn);
+  get("stock-chart-sign-in").onclick = () => {
+    const symbol = current;
+    back(() => signIn(symbol));
+  };
+  get("stock-quote-retry").onclick = () => loadInstrumentQuote(current);
   get("stock-buy").onclick = () => openTrade("buy");
   get("stock-sell").onclick = () => openTrade("sell");
   get("stock-star").onclick=()=>{

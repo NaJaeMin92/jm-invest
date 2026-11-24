@@ -1,19 +1,21 @@
 # JM Invest
 
-모바일과 데스크톱에서 열리는 정적 시그마 페이지입니다. 종목별 범위와 σ 위치를 비교하고, 기준가·관측가·예상 변동폭을 입력해 계산할 수 있습니다. 기본 종목 값은 예시이며 실시간 시세나 옵션 데이터에 연결되어 있지 않습니다.
+아이폰과 데스크톱에서 관심종목, 종목 차트, 키움 계좌 잔고와 실현손익을 확인하는 웹 앱입니다. 로컬 앱과 GitHub Pages는 같은 프런트엔드를 사용합니다. 주소의 `#stock=ANT` 같은 값은 열 종목을 선택합니다.
 
 ## GitHub Pages 배포
 
-1. GitHub에 공개 저장소를 만들고 이 폴더의 파일을 `main` 브랜치 루트에 올립니다. `.nojekyll`도 포함합니다.
-2. 저장소의 **Settings → Pages**에서 **Deploy from a branch**를 선택합니다.
-3. 브랜치를 `main`, 폴더를 `/ (root)`로 선택하고 저장합니다.
-4. Pages 화면에 표시된 주소를 공유합니다. 프로젝트 사이트 주소는 보통 `https://<계정>.github.io/<저장소>/`입니다.
+GitHub Pages는 `najaemin92/jm-invest` 저장소의 `main` 루트에서 배포됩니다. 변경 사항을 커밋한 뒤 로컬 앱과 공개 사이트를 차례로 검증합니다.
 
-실거래 파일, 일지 및 인증키는 공개 저장소에 포함하지 마세요. 이 버전에는 로그인이나 비공개 거래 저장 기능이 없습니다.
+```sh
+python3 scripts/publish-site.py check-local
+python3 scripts/publish-site.py publish
+```
+
+배포 명령은 대상 커밋을 기록하고 일반 푸시를 수행합니다. Pages의 HTML, CSS, JavaScript, 공개 자산이 커밋과 일치하면 대기를 해제합니다. 연결이 끊기면 `python3 scripts/publish-site.py retry`로 같은 커밋을 재개할 수 있습니다. 이 Mac의 LaunchAgent가 로그인 세션에서 대기 중인 배포를 재시도합니다.
 
 ## Private US stock orders
 
-The GitHub Pages build serves the public analysis site. Run the owner-only order service on a Mac whose external IP is registered with Kiwoom.
+The GitHub Pages frontend offers signed-in quotes through the Mac gateway and order previews. Live submissions use the local order server. Keep the backend host awake and connected on its Kiwoom-registered IP while using its services.
 
 ```sh
 python3 scripts/order-server.py --live
