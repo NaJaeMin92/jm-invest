@@ -66,10 +66,10 @@ export function executionGroups(view, records) {
 }
 
 export function setupExecutionFlags(load) {
-  const layer = document.getElementById("execution-flags"), retry = document.getElementById("execution-retry");
+  const layer = document.getElementById("execution-flags");
   const dialog = document.getElementById("execution-detail"), list = document.getElementById("execution-list");
   const blocks = new Map();
-  let view, range, symbol, controller, timer, failed = false;
+  let view, range, symbol, controller, timer;
   document.getElementById("execution-close").onclick = () => dialog.close();
   dialog.addEventListener("cancel",event=>event.stopPropagation());
 
@@ -148,7 +148,7 @@ export function setupExecutionFlags(load) {
     timer = setTimeout(next,delay);
   }
   async function next() {
-    if (!view || controller || failed) return;
+    if (!view || controller) return;
     if (document.hidden || !layer.getClientRects().length) { schedule(60000); return; }
     const today = Math.floor(Date.now()/dayMs);
     let key = range.last;
@@ -163,6 +163,7 @@ export function setupExecutionFlags(load) {
     const cached = blocks.get(key);
     const start = Math.max(key*blockDays, cached ? today-2 : -Infinity);
     const end = Math.min((key+1)*blockDays-1,today+1);
+    let delay = 0;
     try {
       const data = await load(symbol,dateString(start),dateString(end),request.signal);
       if (request.signal.aborted) return;
@@ -171,12 +172,11 @@ export function setupExecutionFlags(load) {
       paint();
     } catch {
       if (request.signal.aborted) return;
-      failed = true;
-      retry.hidden = false;
+      delay = 60000;
     } finally {
       if (controller === request) {
         controller = null;
-        if (!failed) schedule(0);
+        schedule(delay);
       }
     }
   }
@@ -185,15 +185,12 @@ export function setupExecutionFlags(load) {
     controller = null;
     clearTimeout(timer);
     view = range = symbol = undefined;
-    failed = false;
-    retry.hidden = true;
     blocks.clear();
     layer.replaceChildren();
     if (dialog.open) dialog.close();
     list.replaceChildren();
     document.getElementById("execution-title").textContent = "";
   }
-  retry.onclick = () => { failed = false; retry.hidden = true; next(); };
   return {
     reset,
     show(nextSymbol,nextView) {
@@ -206,8 +203,6 @@ export function setupExecutionFlags(load) {
       range = {first,last};
       paint();
       if (changed) {
-        failed = false;
-        retry.hidden = true;
         schedule(180);
       }
     }

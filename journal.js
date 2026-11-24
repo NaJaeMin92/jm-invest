@@ -1,6 +1,7 @@
+import {setupStrategy} from "./assets/strategy-editor.js?v=88";
 import {setupWatchEditor} from "./watch-editor.js?v=49";
 import {setupOrders} from "./orders.js?v=83";
-import { setupInstrument, sparkline } from "./instrument.js?v=87";
+import { setupInstrument, sparkline } from "./instrument.js?v=88";
 import {loadWatchSentiment} from "./market-panels.js?v=68";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -96,15 +97,23 @@ function renderStrategies() {
   try { symbols=Object.keys(localStorage).filter(k=>k.startsWith(prefix)).map(k=>k.slice(prefix.length)).sort(); } catch {}
   for (const symbol of symbols.filter(s=>/^[A-Z][A-Z0-9.-]{0,11}$/.test(s))) {
     const btn=document.createElement("button");
-    btn.className="menu-link"; btn.textContent=symbol+" ›";
-    btn.onclick=()=>instrument.openStrategy(symbol);
+    btn.className="menu-link strategy-card";
+    const title=document.createElement("strong"), summary=document.createElement("small");
+    title.textContent=symbol;
+    try {
+      const rule=JSON.parse(localStorage.getItem(prefix+symbol));
+      summary.textContent=[{day:"일봉",week:"주봉",month:"월봉"}[rule.frame], rule.side==="sell"?"매도":"매수",
+        "조건 "+rule.conditions.length+"개",rule.allocation?"분할 계획":""].filter(Boolean).join(" · ");
+    } catch { summary.textContent="설정 열기"; }
+    btn.append(title,summary);
+    btn.onclick=()=>strategy.open(symbol);
     list.append(btn);
   }
   if(!list.children.length)list.textContent="저장한 전략이 없습니다.";
 }
 document.getElementById("strategy-picker").onsubmit=e=>{
   e.preventDefault();
-  instrument.openStrategy(document.getElementById("strategy-symbol").value.toUpperCase());
+  strategy.open(document.getElementById("strategy-symbol").value.toUpperCase());
 };
 document.getElementById("strategy-sheet").addEventListener("close",()=>{
   if(document.body.dataset.view==="strategies")renderStrategies();
@@ -186,6 +195,7 @@ document.querySelector("#logout").addEventListener("click", () => {
   token = null;
   valuationSnapshot = null;
   heldWatchSymbols.clear();
+  strategy.close();
   orders.signOut();
   instrument.clearAccountData();
   saveSession(null);
@@ -593,6 +603,19 @@ document.addEventListener("visibilitychange", refreshWatchlistQuotes);
 window.addEventListener("online", refreshWatchlistQuotes);
 
 const orders = setupOrders(() => token, kiwoomEndpoint);
+async function loadChart(symbol, frame, before, signal, day) {
+  if (!token || !kiwoomEndpoint) return null;
+  const endpoint = new URL("instrument", new URL(kiwoomEndpoint, location.href));
+  endpoint.search = new URLSearchParams({symbol, frame});
+  if (before) endpoint.searchParams.set("before", before);
+  if (day) endpoint.searchParams.set("date", day.replaceAll("-",""));
+  const response = await fetch(endpoint, {headers: {Authorization: "Bearer " + token}, cache: "no-store", signal});
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.message || "Kiwoom chart unavailable.");
+  return payload;
+}
+const canLoadChart=()=>Boolean(token && kiwoomEndpoint);
+const strategy=setupStrategy({loadChart,orders,canLoadChart});
 const instrument = setupInstrument({
   orders,
   async readPositionSnapshot(symbol) {
@@ -607,7 +630,7 @@ const instrument = setupInstrument({
       markPrice:numeric(row.current_price) ? Number(row.current_price) : null, observed};
   },
   subscribeOrderBook,
-  canLoadChart: () => Boolean(token && kiwoomEndpoint),
+  canLoadChart,
   async loadExecutions(symbol, from, to, signal) {
     const endpoint = new URL("executions", new URL(kiwoomEndpoint, location.href));
     endpoint.search = new URLSearchParams({symbol,from:from.replaceAll("-",""),to:to.replaceAll("-","")});
@@ -615,17 +638,7 @@ const instrument = setupInstrument({
     if (!response.ok) throw new Error("체결 내역을 불러오지 못했습니다.");
     return (await response.json()).executions;
   },
-  async loadChart(symbol, frame, before, signal, day) {
-    if (!token || !kiwoomEndpoint) return null;
-    const endpoint = new URL("instrument", new URL(kiwoomEndpoint, location.href));
-    endpoint.search = new URLSearchParams({symbol, frame});
-    if (before) endpoint.searchParams.set("before", before);
-    if (day) endpoint.searchParams.set("date", day.replaceAll("-",""));
-    const response = await fetch(endpoint, {headers: {Authorization: "Bearer " + token}, cache: "no-store", signal});
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.message || "Kiwoom chart unavailable.");
-    return payload;
-  },
+  loadChart,
   signIn(symbol) {
     returnToStock = symbol;
     selectView("account");

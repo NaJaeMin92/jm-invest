@@ -1,7 +1,6 @@
-import {setupStrategy} from "./assets/strategy-editor.js?v=86";
 import {trendStyles} from "./assets/chart-trends.js?v=82";
-import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=87";
-import {setupExecutionFlags} from "./chart-executions.js?v=77";
+import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=88";
+import {setupExecutionFlags} from "./chart-executions.js?v=88";
 import {showMarketPanel} from "./market-panels.js?v=68";
 
 import {setupChartTools} from "./chart-tools.js?v=76";
@@ -75,9 +74,8 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
   const dialog=get("stock-detail"), canvas=get("market-chart");
   const executions = setupExecutionFlags(loadExecutions);
   let current="", quote=null, frame="day", afterClose=null, quoteRequest=0;
-  const strategy = setupStrategy({getSymbol:()=>current, loadChart, orders, canLoadChart});
   const fullHistory = new Map();
-  let historyAbort, historyState = "", rangeMode = "";
+  let historyAbort, historyState = "";
   const trade = get("trade-preview");
   const tradeForm = get("trade-preview-form"), tradeReview = get("trade-preview-review");
   const tradeStatus = get("trade-preview-status"), tradeNext = get("trade-preview-next");
@@ -526,11 +524,11 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
     get("stock-star").setAttribute("aria-pressed",String(saved));
     get("stock-star").setAttribute("aria-label",saved?"Remove from watchlist":"Add to watchlist");
   }
-  const area = get("chart-area"), latest = get("chart-latest");
+  const area = get("chart-area");
   const dateFormat = new Intl.DateTimeFormat("en-US", {
     month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York"
   });
-  const first = get("chart-first"), coverage = get("chart-coverage");
+  const coverage = get("chart-coverage");
   const chartStatus = get("chart-status");
   const sessionDate = get("chart-session-date");
   sessionDate.onchange = () => setFrame(frame);
@@ -558,13 +556,17 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
   for (const [key, style] of Object.entries(trendStyles)) {
     const toggle = document.createElement("button");
     toggle.type = "button";
-    toggle.textContent = style.label;
+    const sample=document.createElement("span"), name=document.createElement("span"), knob=document.createElement("span");
+    sample.className="guide-sample"; knob.className="guide-switch";
+    sample.setAttribute("aria-hidden","true"); knob.setAttribute("aria-hidden","true");
+    name.textContent=style.label; toggle.append(sample,name,knob);
+    toggle.setAttribute("role","switch");
     toggle.dataset.trend = key;
     toggle.style.setProperty("--guide",style.color);
-    toggle.setAttribute("aria-pressed",String(trends[key]));
+    toggle.setAttribute("aria-checked",String(trends[key]));
     toggle.onclick = () => {
       trends[key] = !trends[key];
-      toggle.setAttribute("aria-pressed",String(trends[key]));
+      toggle.setAttribute("aria-checked",String(trends[key]));
       try { localStorage.setItem(trendKey,JSON.stringify(trends)); } catch {}
       draw();
     };
@@ -589,6 +591,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
     const options = {...tools.chartOptions(), windowSize, trends};
     canvas.hidden = false;
     canvas.classList.toggle("with-rsi", options.lower === "RSI");
+    clearInspector();
     geometry = drawChart(canvas, chart, frame, start, options);
     const end = Math.min(options.end ?? chart.bars.length, start + windowSize) - 1;
     if (geometry && canLoadChart() && !["BZMAIN","CLMAIN","VIX"].includes(current)) {
@@ -597,10 +600,6 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
     drawSecondary(start,end,options);
     const dates = [start, end].map(i => dateFormat.format(chart.bars[i][0] * 1000));
     get("chart-dates").textContent = dates.join(" – ");
-    latest.disabled = options.end != null || start === lastStart && rangeMode !== "all";
-    first.disabled = start === 0 && rangeMode !== "all";
-    get("chart-all").disabled = options.end != null;
-    get("chart-all").setAttribute("aria-pressed", String(rangeMode === "all"));
   }
   function drawSecondary(start,end,options) {
     const secondary = tools.secondary();
@@ -623,12 +622,34 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
     const limit = tools.replayEnd() == null ? lastStart : Math.min(lastStart, tools.replayEnd() - 1);
     const next = Math.min(limit, Math.max(0, Math.round(index)));
     if (next !== start) {
-      rangeMode = "";
+
       start = next;
       draw();
     }
   }
+  const inspector=get("candle-inspector"), readout=inspector.querySelector(".candle-readout");
+  const intradayStamp=new Intl.DateTimeFormat("ko-KR",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit",hourCycle:"h23"});
+  let holdTimer;
+  function clearInspector(){
+    clearTimeout(holdTimer);
+    inspector.hidden=true;
+  }
+  function inspectAt(clientX,clientY){
+    const hit=geometry?.inspect(clientX,clientY);
+    if(!hit || canvas.hidden){inspector.hidden=true;return false;}
+    const [time,o,h,l,c,v]=hit.bar;
+    const fmt=n=>n.toFixed(n<1 ? 4 : 2);
+    inspector.style.cssText="--cx:"+hit.x+"px;--cy:"+hit.y+"px;--ct:"+hit.top+"px;--cb:"+hit.bottom+"px;--cw:"+hit.width+"px;--cp:"+hit.pad+"px";
+    inspector.querySelector(".cross-price").textContent=hit.price;
+    readout.style.top=(hit.y<(hit.top+hit.bottom)/2 ? Math.max(hit.top,hit.bottom-62) : hit.top+2)+"px";
+    readout.firstElementChild.textContent=(isIntraday(frame)?intradayStamp:dateFormat).format(time*1000)+(isIntraday(frame)?" ET":"");
+    readout.lastElementChild.textContent="시 "+fmt(o)+"   고 "+fmt(h)+"   저 "+fmt(l)+"   종 "+fmt(c)+"   거래량 "+v.toLocaleString("ko-KR");
+    inspector.hidden=false;return true;
+  }
+  area.addEventListener("pointerleave",e=>{if(e.pointerType==="mouse")clearInspector();});
+  area.addEventListener("contextmenu",e=>{if(!inspector.hidden)e.preventDefault();});
   function endDrag() {
+    clearInspector();
     if (drag && area.hasPointerCapture(drag.id)) area.releasePointerCapture(drag.id);
     drag = null;
     area.classList.remove("dragging");
@@ -638,11 +659,12 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
     const bounds = area.getBoundingClientRect();
     return {
       distance: Math.hypot(first.x - second.x, first.y - second.y),
-      anchor: Math.max(0, Math.min(1, ((first.x + second.x) / 2 - bounds.left - 8) / Math.max(1, bounds.width - 48)))
+      anchor: Math.max(0, Math.min(1, ((first.x + second.x) / 2 - bounds.left - (geometry?.pad ?? 8)) / Math.max(1, (geometry?.width ?? bounds.width-45) - (geometry?.pad ?? 8))))
     };
   }
 
   area.addEventListener("pointerdown", event => {
+    clearInspector();
     if (!chart || event.button !== 0 || event.target.closest("#drawing-actions")) return;
     const flag = event.target.closest(".execution-flag");
     if (flag && event.pointerType !== "touch") return;
@@ -676,18 +698,29 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
       return;
     }
     drag = {id: event.pointerId, x: event.clientX, y:event.clientY, start, moved:false, flag,
-      step: Math.max(1, (area.clientWidth - 48) / windowSize)};
+      step: geometry?.step ?? 1};
     area.setPointerCapture(event.pointerId);
+    if(event.pointerType==="touch" && !flag){
+      const id=event.pointerId;
+      holdTimer=setTimeout(()=>{
+        if(drag?.id===id && !drag.moved && !pinch && inspectAt(drag.x,drag.y))drag.inspect=true;
+      },400);
+    }
     area.classList.add("dragging");
   });
   area.addEventListener("pointermove", event => {
+    if(event.pointerType==="mouse" && !drag && !tools.activeDrawing() && !tools.drawingOptions()){
+      if(event.target===canvas)inspectAt(event.clientX,event.clientY);else clearInspector();
+      return;
+    }
+    if(drag?.inspect && drag.id===event.pointerId){inspectAt(event.clientX,event.clientY);return;}
     if (touchPoints.has(event.pointerId)) {
       touchPoints.set(event.pointerId, {x:event.clientX, y:event.clientY});
       if (pinch && chart && touchPoints.size === 2) {
         const {distance, anchor} = pinchGeometry();
         const count = tools.replayEnd() ?? chart.bars.length;
         const max = count;
-        rangeMode = "";
+
         windowSize = Math.max(Math.min(8, max), Math.min(max,
           Math.round(pinch.windowSize * pinch.distance / Math.max(1, distance))));
         lastStart = Math.max(0, chart.bars.length - windowSize);
@@ -705,6 +738,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
       if (target) tools.moveDrawing(geometry.translate(drag.points,drag.origin,target));
     } else {
       drag.moved ||= Math.hypot(drag.x-event.clientX,drag.y-event.clientY)>7;
+      if(drag.moved)clearInspector();
       if (drag.moved && lastStart) moveTo(drag.start + (drag.x - event.clientX) / drag.step);
     }
   });
@@ -712,6 +746,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
     area.addEventListener(type, event => {
       if (touchPoints.delete(event.pointerId)) pinch = null;
       if (drag?.id !== event.pointerId) return;
+      if(drag.inspect){endDrag();return;}
       if (drag.freehand) tools.finishFreehand();
       else if (drag.points) tools.finishMove();
       else if (type === "pointerup" && !drag.moved && drag.flag?.isConnected) drag.flag.click();
@@ -721,33 +756,19 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
       endDrag();
     });
   }
-  function selectRange(mode) {
-    if (!chart) return;
-    rangeMode = mode;
-    windowSize = mode === "all" ? chart.bars.length : visibleBars;
-    lastStart = Math.max(0, chart.bars.length - windowSize);
-    start = mode === "latest" ? lastStart : 0;
-    area.classList.toggle("pannable", lastStart > 0);
-    draw();
-  }
-  latest.addEventListener("click", () => selectRange("latest"));
-  first.addEventListener("click", () => selectRange("first"));
-  get("chart-all").onclick = () => selectRange("all");
-  get("chart-history-retry").onclick = () => loadInstrumentQuote(current);
   new ResizeObserver(draw).observe(area);
   function finishFrame(source, preserve = false) {
+    clearInspector();
     const anchor = preserve && chart?.bars[start]?.[0];
     const atLatest = start === lastStart;
     chart = source?.length ? prepareChart(source, frame) : null;
-    get("trend-controls").hidden = !chart;
-    if (!preserve) { windowSize = visibleBars; rangeMode = ""; }
-    else if (rangeMode === "all" && chart) windowSize = chart.bars.length;
+    get("trend-menu").hidden = !chart;
+    if (!preserve) windowSize = visibleBars;
     touchPoints.clear();
     pinch = null;
     lastStart = Math.max(0, (chart?.bars.length || 0) - windowSize);
     start = lastStart;
-    if (preserve && chart && (rangeMode === "first" || rangeMode === "all")) start = 0;
-    else if (anchor && chart && !atLatest) {
+    if (anchor && chart && !atLatest) {
       const index = chart.bars.findIndex(bar => bar[0] >= anchor);
       if (index >= 0) start = Math.min(index,lastStart);
     }
@@ -761,7 +782,6 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
       const endDate = dateFormat.format(source.at(-1)[0] * 1000);
       coverage.textContent = (isIntraday(frame) ? "Intraday history" : historyState || "Available history")
         + " · " + startDate + " – " + endDate + " ET";
-      get("chart-history-retry").hidden = isIntraday(frame) || historyState !== "Partial history";
       draw();
     } else {
       canvas.hidden = true;
@@ -889,7 +909,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
   }
   async function open(symbol) {
     executions.reset();
-    strategy.close();
+    get("trend-menu").open=false;
     if (trade.open) trade.close();
     current=symbol;quote=null;historyState="";sessionDate.value="";
     selectPanel("chart");
@@ -920,7 +940,6 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
     requestId += 1;
     quoteRequest += 1;
     historyAbort?.abort();
-    strategy.close();
     if (trade.open) trade.close();
     executions.reset();
     current="";quote=null;chart=null;endDrag();
@@ -961,10 +980,6 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
   sync();
   return {
     leave:back,
-    openStrategy(symbol) {
-      this.open(symbol);
-      get("strategy-open").click();
-    },
     clearAccountData() { resetPosition(); executions.reset(); },
     open(symbol) {
       history.pushState({stockEntry:true},"","#stock="+encodeURIComponent(symbol));

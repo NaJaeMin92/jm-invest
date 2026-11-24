@@ -100,9 +100,12 @@ export function drawChart(canvas, chart, frame, start, options) {
     overlayLines.push({ label:"VWAP", color:"#80d6bd", values });
   }
 
-  const pad = 8, top = 35, width = w - 43;
+  const priceText = value => value.toFixed(Math.abs(value)<1 ? 4 : 2);
+  ctx.font="11px system-ui";
+  const axisWidth=Math.max(45,Math.ceil(ctx.measureText(priceText(shown.reduce((v,b)=>Math.max(v,b[2]),0))).width)+12);
+  const pad = 8, top = 35, width = w-axisWidth;
   const isRsi = options.lower === "RSI";
-  const axis = lower ? h * (isRsi ? .61 : .73) : h - 19;
+  const axis = isRsi ? h - Math.max(120, Math.min(165, w * .28)) : lower ? h * .73 : h - 19;
   const bottom = options.layers.volume ? axis - 29 : axis - 4;
   const comparison = matchingCloses(shown, options.compare, frame);
   const firstMatch = comparison.findIndex(Number.isFinite);
@@ -120,8 +123,9 @@ export function drawChart(canvas, chart, frame, start, options) {
   for (const overlay of overlayLines) overlay.values.forEach(include);
   const logarithmic = options.log && rawLow > 0;
   const units = logarithmic ? Math.log : value => value;
-  const low = units(rawLow), high = units(rawHigh), spread = high - low || 1;
-  const step = (w - 48) / Math.max(shown.length, 8);
+  const margin=rawHigh===rawLow ? (logarithmic ? .005 : Math.max(rawLow*.005,.0001)) : (units(rawHigh)-units(rawLow))*.045;
+  const low=units(rawLow)-margin, high=units(rawHigh)+margin, spread=high-low;
+  const step = (width-pad) / Math.max(shown.length, 8);
   const x = i => pad + (i + .5) * step;
   const y = price => bottom - (units(price) - low) / spread * (bottom - top);
   const point = (clientX, clientY) => {
@@ -146,12 +150,19 @@ export function drawChart(canvas, chart, frame, start, options) {
     return ctx.measureText(text).width;
   }
   const pointsFor = (values, vertical) => values.flatMap((value, i) => value == null ? [] : [[x(i),vertical(value)]]);
-  if (options.layers.grid) {
-    for (let i=0;i<=4;i+=1) {
-      const py = top + (bottom - top) * i / 4;
-      line([[pad,py],[width,py]], "#29374f");
-    }
+  const last=shown.at(-1)[4];
+  const priceBadgeY=Math.max(top+8,Math.min(bottom-8,y(last)));
+  const tickCount=Math.max(2,Math.min(8,Math.floor((bottom-top)/30)));
+  const approx=spread/tickCount;
+  const magnitude=10**Math.floor(Math.log10(approx));
+  const interval=([1,2,2.5,5,10].find(n=>n*magnitude>=approx) ?? 10)*magnitude;
+  for(let tick=Math.ceil(low/interval);tick<=Math.floor(high/interval);tick++){
+    const price=logarithmic ? Math.exp(tick*interval) : tick*interval;
+    const py=y(price);
+    if(options.layers.grid)line([[pad,py],[width,py]],"#30323c");
+    if(!options.layers.price || Math.abs(py-priceBadgeY)>14)label(priceText(price),width+4,py+4,"#b6b7c3");
   }
+  line([[width,top],[width,bottom]],"#363844");
 
   if (options.trends && Object.values(options.trends).some(Boolean)) {
     // The last visible candle may still be forming, including during replay.
@@ -287,12 +298,13 @@ export function drawChart(canvas, chart, frame, start, options) {
     line(pointsFor(normalized,y),"#f5d47d",1.8);
     label(options.compare.symbol + " · indexed at first shared bar",pad,bottom - 5,"#f5d47d");
   }
-  const last = shown.at(-1)[4];
   if (options.layers.price) {
     ctx.setLineDash([4,3]);
-    line([[0,y(last)],[w,y(last)]],"#aa648d");
+    line([[pad,y(last)],[width,y(last)]],"#83889688");
     ctx.setLineDash([]);
-    label(last.toFixed(2),width,Math.max(top,y(last)-3),"#f0f4ff");
+    ctx.fillStyle=last>=shown.at(-1)[1] ? gain : loss;
+    ctx.beginPath();ctx.roundRect(width+1,priceBadgeY-8,axisWidth-2,16,4);ctx.fill();
+    label(priceText(last),width+4,priceBadgeY+4,"#10151d");
   }
   for (const i of new Set([0,Math.floor(shown.length/2),shown.length-1])) {
     const stamp = shown[i][0] * 1000;
@@ -300,34 +312,55 @@ export function drawChart(canvas, chart, frame, start, options) {
       ["month","quarter"].includes(frame) ? new Date(stamp).toISOString().slice(0,7) : tickDate.format(stamp);
     label(time,x(i)-4,axis+14,"#a2abc1");
   }
-  if (lower) {
+  if (isRsi) {
+    const values = chart.strength.slice(start,end);
+    const current = values.at(-1);
+    const [floor,ceiling] = options.rsiLevels ?? lower.levels;
+    const actual = values.filter(Number.isFinite);
+    const low = Math.max(0,Math.floor((Math.min(floor,...actual)-8)/10)*10);
+    const high = Math.min(100,Math.ceil((Math.max(ceiling,...actual)+8)/10)*10);
+    const panelTop=axis+21, plotTop=panelTop+22, plotBottom=h-9;
+    const py=v=>plotBottom-(v-low)/(high-low)*(plotBottom-plotTop);
+    ctx.save();
+    ctx.fillStyle="#0b0c10"; ctx.fillRect(0,panelTop,w,h-panelTop);
+    line([[0,panelTop],[w,panelTop]],"#414147");
+    const legendWidth=label("RSI (14)",pad,panelTop+15,"#c6c6cd");
+    label(current?.toFixed(1) ?? "—",pad+legendWidth+7,panelTop+15,"#b59bff");
+    ctx.fillStyle="#211c2b";
+    ctx.fillRect(pad,py(ceiling),width-pad,py(floor)-py(ceiling));
+    for (let i=0;i<5;i++){
+      const px=pad+(width-pad)*i/4;
+      line([[px,plotTop],[px,plotBottom]],"#26252c");
+    }
+    for(const v of [high,low]) line([[pad,py(v)],[width,py(v)]],"#28272d");
+    line([[pad,py((floor+ceiling)/2)],[width,py((floor+ceiling)/2)]],"#39323f");
+    ctx.setLineDash([4,3]);
+    for(const v of [floor,ceiling])line([[pad,py(v)],[width,py(v)]],"#a29ba9",.85);
+    ctx.setLineDash([]);
+    ctx.lineJoin="round";ctx.lineCap="round";
+    line(pointsFor(values,py),"#ab83f5",1.45);
+    const badgeY=Number.isFinite(current) ? Math.max(plotTop+6,Math.min(plotBottom-5,py(current))) : null;
+    const occupied=badgeY===null ? [] : [badgeY];
+    for(const v of new Set([ceiling,floor,high,low])){
+      const y=py(v);
+      if(occupied.every(other=>Math.abs(y-other)>=12)){
+        label(String(v),width+6,Math.min(h-2,y+4),"#b8b7bf");occupied.push(y);
+      }
+    }
+    if(badgeY!==null){
+      ctx.fillStyle="#8152cd";
+      ctx.beginPath();ctx.roundRect(width+2,badgeY-7,35,14,3);ctx.fill();
+      label(current.toFixed(1),width+6,badgeY+4,"#fff");
+    }
+    ctx.restore();
+  } else if (lower) {
     const lines = (lower.lines || []).map(series => ({...series,values:series.values.slice(start,end)}));
     const histogram = lower.histogram?.slice(start,end) || [];
-    const levels = (isRsi ? options.rsiLevels ?? lower.levels : lower.levels) || [];
+    const levels = lower.levels || [];
     const values = [...lines.flatMap(series=>series.values), ...histogram, ...levels].filter(Number.isFinite);
     const [min,max] = lower.domain || [Math.min(...values),Math.max(...values)];
     const ly = value => h - 7 - (h - axis - 36) * (value - min)/(max-min || 1);
-    if(isRsi){
-      ctx.fillStyle="#a78af918";
-      ctx.fillRect(pad,ly(levels[1]),width-pad,ly(levels[0])-ly(levels[1]));
-    }
-    for (const level of levels) line([[pad,ly(level)],[width,ly(level)]],isRsi ? "#65758f" : "#465168");
-    if (isRsi) {
-      const current=lines[0]?.values.at(-1);
-      const badgeY=Number.isFinite(current) ? Math.min(h-12,Math.max(ly(100)+7,ly(current))) : null;
-      for(const level of levels){
-        let baseline=ly(level)+3;
-        if(badgeY!==null && Math.abs(baseline-3-badgeY)<14){
-          baseline=badgeY+(baseline-3<badgeY ? -10 : 18);
-        }
-        label(String(level),width+4,Math.max(ly(100),Math.min(h-2,baseline)),"#b9c5da");
-      }
-      if(badgeY!==null){
-        ctx.fillStyle="#7454ac";
-        ctx.beginPath();ctx.roundRect(width+1,badgeY-8,38,16,4);ctx.fill();
-        label(current.toFixed(1),width+5,badgeY+4,"#fff");
-      }
-    }
+    for (const level of levels) line([[pad,ly(level)],[width,ly(level)]],"#465168");
     histogram.forEach((value,i) => {
       if (value == null) return;
       ctx.fillStyle = value >= 0 ? "#5ebaac" : "#db6f94";
@@ -335,11 +368,9 @@ export function drawChart(canvas, chart, frame, start, options) {
     });
     let cursor = pad;
     for (const series of lines) {
-      const color=isRsi ? "#b29af6" : series.color;
-      line(pointsFor(series.values,ly),color,isRsi ? 1.7 : 1.3);
+      line(pointsFor(series.values,ly),series.color,1.3);
       const value = series.values.at(-1);
-      if(isRsi){cursor+=label("RSI (14)",cursor,axis+28,"#c9cbd4")+8;}
-      cursor += label((isRsi ? "" : series.label) + " " + (value?.toFixed(2) ?? "—"),cursor,axis+28,color) + 8;
+      cursor += label(series.label + " " + (value?.toFixed(2) ?? "—"),cursor,axis+28,series.color) + 8;
     }
     if (!lines.length) label("Volume",pad,axis+28,"#a2abc1");
   }
@@ -358,7 +389,16 @@ export function drawChart(canvas, chart, frame, start, options) {
   }
   let barIndex;
   return {
-    point, step,
+    point, step, width, pad,
+    inspect(clientX,clientY) {
+      const bounds=canvas.getBoundingClientRect();
+      const px=clientX-bounds.left, py=clientY-bounds.top;
+      if(px<pad || px>width || py<top || py>bottom)return null;
+      const i=Math.floor((px-pad)/step);
+      if(i>=shown.length)return null;
+      const unitPrice=low+spread*(bottom-py)/(bottom-top);
+      return {bar:shown[i],x:x(i),y:py,top,bottom,width,pad,price:priceText(logarithmic ? Math.exp(unitPrice):unitPrice)};
+    },
     executionPoint(index, price) {
       const py = y(price);
       return {x:x(index - start), y:py, top, bottom, width};

@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=87">
-<script type="module" src="./journal.js?v=87"></script>
+<link rel="stylesheet" href="./style.css?v=88">
+<script type="module" src="./journal.js?v=88"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header class="app-masthead"><div class="head">
@@ -44,7 +44,29 @@
 </section>
 <section id="tab-strategies" class="tab-panel" hidden>
 <form id="strategy-picker"><label for="strategy-symbol">종목별 전략 설정</label><div><input id="strategy-symbol" required pattern="[A-Za-z][A-Za-z0-9.\-]{0,11}" placeholder="Ticker" autocapitalize="characters" autocomplete="off"><button type="submit">설정 열기</button></div></form>
-<h2>저장한 전략</h2><div id="strategy-library"></div></section>
+<h2>저장한 전략</h2><div id="strategy-library"></div>
+<dialog id="strategy-sheet" class="order-sheet" aria-labelledby="strategy-title" lang="ko">
+<header class="order-sheet-head"><h3 id="strategy-title">자동매매 설정</h3><button type="button" class="sheet-icon" id="strategy-close" aria-label="닫기">×</button></header>
+<form id="strategy-form"><fieldset id="strategy-fields">
+<div class="strategy-pair"><label>기준 봉<select name="frame"><option value="day">일봉</option><option value="week">주봉</option><option value="month">월봉</option></select></label>
+<label>조건 조합<select name="join"><option value="all">모두 충족 (AND)</option><option value="any">하나 이상 (OR)</option></select></label></div>
+<div id="strategy-conditions"></div><button type="button" id="strategy-add">＋ 조건 추가</button>
+<div class="strategy-pair"><label>주문 방향<select name="side"><option value="buy">매수</option><option value="sell">매도</option></select></label><label id="strategy-quantity">수량 (주)<input name="quantity" type="number" min="1" max="999999" step="1" value="1" required></label></div>
+<label id="strategy-sizing">매수 방식<select name="sizing"><option value="fixed">고정 수량</option><option value="split">예산 분할 계획</option></select></label>
+<fieldset id="strategy-budget" hidden disabled>
+<legend>분할매수 예산</legend>
+<label>총예산 (USD)<input name="budget" type="number" min="0.01" step="0.01" inputmode="decimal" required></label>
+<div class="strategy-pair"><label>전체 분할 수<input name="units" type="number" min="1" step="1" value="10" required></label>
+<label>한 번에 쓸 분할 수<input name="perBuy" type="number" min="1" step="1" value="1" required></label></div>
+<output id="strategy-allocation" aria-live="polite"></output>
+</fieldset>
+<label>실행 방식<select name="mode"><option value="signal">신호만 확인</option><option value="live">키움 실계좌 지정가 주문</option></select></label>
+<label id="strategy-price" hidden>주문 지정가 (USD)<input name="price" type="number" min="0.0001" step="any"></label>
+</fieldset><p id="strategy-watch-note">이 창이 열려 있는 동안 1분마다 확인합니다. 조건 충족 시 한 번 실행하고 종료합니다. 차트 지표는 직전 완료 봉 기준입니다.</p>
+<p id="strategy-draft-note" hidden>백테스트 후보가 포함된 규칙은 초안으로 저장할 수 있습니다.</p>
+<button type="button" id="strategy-save">규칙 저장</button><button type="button" id="strategy-start">신호 감시 시작</button></form>
+<button type="button" id="strategy-stop" hidden>감시 중지</button><p id="strategy-state" role="status"></p></dialog>
+</section>
 <section id="tab-profit" class="tab-panel" hidden>
 <h2>US equity realized P&L</h2>
 <p id="profit-period"></p>
@@ -172,29 +194,9 @@
 <button type="button" id="chart-tab" data-panel="chart" aria-current="page" aria-controls="chart-panel">Chart</button><button type="button" data-panel="sigma" aria-controls="sigma-panel">Sigma</button><button type="button" data-panel="sentiment" aria-controls="sentiment-panel">Fear &amp; Greed</button>
 </nav>
 <section id="chart-panel">
-<button id="strategy-open" type="button" aria-haspopup="dialog">자동매매 설정</button>
-<dialog id="strategy-sheet" class="order-sheet" aria-labelledby="strategy-title" lang="ko">
-<header class="order-sheet-head"><h3 id="strategy-title">자동매매 설정</h3><button type="button" class="sheet-icon" id="strategy-close" aria-label="닫기">×</button></header>
-<form id="strategy-form"><fieldset id="strategy-fields">
-<div class="strategy-pair"><label>기준 봉<select name="frame"><option value="day">일봉</option><option value="week">주봉</option><option value="month">월봉</option></select></label>
-<label>조건 조합<select name="join"><option value="all">모두 충족 (AND)</option><option value="any">하나 이상 (OR)</option></select></label></div>
-<div id="strategy-conditions"></div><button type="button" id="strategy-add">＋ 조건 추가</button>
-<div class="strategy-pair"><label>주문 방향<select name="side"><option value="buy">매수</option><option value="sell">매도</option></select></label><label id="strategy-quantity">수량 (주)<input name="quantity" type="number" min="1" max="999999" step="1" value="1" required></label></div>
-<label id="strategy-sizing">매수 방식<select name="sizing"><option value="fixed">고정 수량</option><option value="split">예산 분할 계획</option></select></label>
-<fieldset id="strategy-budget" hidden disabled>
-<legend>분할매수 예산</legend>
-<label>총예산 (USD)<input name="budget" type="number" min="0.01" step="0.01" inputmode="decimal" required></label>
-<div class="strategy-pair"><label>전체 분할 수<input name="units" type="number" min="1" step="1" value="10" required></label>
-<label>한 번에 쓸 분할 수<input name="perBuy" type="number" min="1" step="1" value="1" required></label></div>
-<output id="strategy-allocation" aria-live="polite"></output>
-</fieldset>
-<label>실행 방식<select name="mode"><option value="signal">신호만 확인</option><option value="live">키움 실계좌 지정가 주문</option></select></label>
-<label id="strategy-price" hidden>주문 지정가 (USD)<input name="price" type="number" min="0.0001" step="any"></label>
-</fieldset><p id="strategy-watch-note">이 창이 열려 있는 동안 1분마다 확인합니다. 조건 충족 시 한 번 실행하고 종료합니다. 차트 지표는 직전 완료 봉 기준입니다.</p>
-<p id="strategy-draft-note" hidden>백테스트 후보가 포함된 규칙은 초안으로 저장할 수 있습니다.</p>
-<button type="button" id="strategy-save">규칙 저장</button><button type="button" id="strategy-start">신호 감시 시작</button></form>
-<button type="button" id="strategy-stop" hidden>감시 중지</button><p id="strategy-state" role="status"></p></dialog>
-<div id="trend-controls" role="group" aria-label="차트 분석선 표시" hidden></div>
+<details id="trend-menu" hidden>
+<summary><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M3 7h6m4 0h8M3 17h10m4 0h4"/><circle cx="11" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></svg>분석선<span class="trend-chevron" aria-hidden="true"></span></summary>
+<div id="trend-controls" role="group" aria-label="차트 분석선 표시"></div></details>
 <div id="chart-area"><div id="drawing-actions" hidden aria-label="Selected drawing">
 <button id="drawing-move" type="button" aria-label="Move drawing" title="Move drawing" aria-pressed="false">✥</button>
 <button id="drawing-color" type="button" aria-label="Drawing color" title="Drawing color" aria-expanded="false">●</button>
@@ -212,17 +214,18 @@
 <p id="drawing-move-hint" hidden>Drag to move the drawing</p>
 </div>
 <canvas id="market-chart" role="img" aria-label="Candlesticks, volume and RSI"></canvas>
+<div id="candle-inspector" hidden><i class="cross-v"></i><i class="cross-h"></i><b class="cross-price"></b><div class="candle-readout"><strong></strong><span></span></div></div>
 <div id="execution-flags" role="group" aria-label="내 체결 내역"></div>
 <div id="external-chart" hidden></div><p id="chart-status" role="status" hidden></p></div>
-<button type="button" id="execution-retry" hidden>체결 내역 다시 조회</button>
+
 <dialog id="execution-detail" class="order-sheet" aria-labelledby="execution-title" lang="ko">
 <header class="order-sheet-head"><h3 id="execution-title"></h3><button type="button" class="sheet-icon" id="execution-close" aria-label="체결 내역 닫기">×</button></header>
 <ul id="execution-list"></ul>
 </dialog>
 <figure id="dual-market-chart" hidden><figcaption id="dual-market-caption"></figcaption><canvas id="secondary-market-chart" role="img" aria-label="Second symbol chart"></canvas></figure>
 <div id="chart-history" hidden>
-<span id="chart-dates"></span><div class="chart-jumps"><button type="button" id="chart-first">First</button><button type="button" id="chart-all" aria-pressed="false">All</button><button type="button" id="chart-latest">Latest</button></div>
-<small id="chart-coverage"></small><button id="chart-history-retry" type="button" hidden>Retry history</button>
+<span id="chart-dates"></span>
+<small id="chart-coverage"></small>
 </div>
 <div class="frame-bar"><div id="stock-frames" aria-label="Chart interval">
 <button data-frame="minute">1 min</button><button data-frame="five">5 min</button><button data-frame="hour">1 hour</button><button data-frame="day" aria-pressed="true">Daily</button><button data-frame="week">Weekly</button><button data-frame="month">Monthly</button><button data-frame="quarter">Quarterly</button>

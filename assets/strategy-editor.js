@@ -15,7 +15,7 @@ const draftFactors = {
 };
 const isDraft=key=>Object.hasOwn(draftFactors,key);
 
-export function setupStrategy({getSymbol,loadChart,orders,canLoadChart}) {
+export function setupStrategy({loadChart,orders,canLoadChart}) {
   const sheet=get("sheet"), form=get("form"), fields=get("fields"), list=get("conditions"), state=get("state");
   const f=form.elements;
   let symbol, run, sending=false;
@@ -102,8 +102,8 @@ export function setupStrategy({getSymbol,loadChart,orders,canLoadChart}) {
     return {allocation,symbol,frame:f.frame.value,join:f.join.value,side:f.side.value,quantity:f.quantity.value,price:f.price.value,mode:f.mode.value,conditions};
   }
   const savedKey=()=>"jm-invest:strategy:v1:"+symbol;
-  get("open").onclick=()=>{
-    symbol=getSymbol(); form.reset(); list.replaceChildren(); state.textContent="";
+  function open(ticker){
+    symbol=ticker; form.reset(); list.replaceChildren(); state.textContent="";
     let saved;
     try { saved=JSON.parse(localStorage.getItem(savedKey())); } catch {}
     if(saved) for(const k of ["frame","join","side","quantity","price"]) f[k].value=saved[k];
@@ -115,7 +115,7 @@ export function setupStrategy({getSymbol,loadChart,orders,canLoadChart}) {
     }
     for(const c of saved?.conditions||[{key:"rsi",op:"lte",value:30}]) add(c);
     get("title").textContent=symbol+" 자동매매 설정"; sync(); sheet.showModal();
-  };
+  }
   get("save").onclick=()=>{
     const r=rule(); if(!r) return;
     try {localStorage.setItem(savedKey(),JSON.stringify(r));state.textContent=r.allocation || r.conditions.some(c=>isDraft(c.key)) ? "초안을 저장했습니다." : "규칙을 저장했습니다.";}
@@ -197,5 +197,5 @@ export function setupStrategy({getSymbol,loadChart,orders,canLoadChart}) {
       } else await watch(r,ctrl);
     }catch(error){if(run===ctrl)stop(error.message);}
   };
-  return {close};
+  return {open,close};
 }
