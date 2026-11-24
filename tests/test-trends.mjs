@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {chartTrends, beforeTime} from "../chart-trends.js";
+import {chartTrends, beforeTime} from "../assets/chart-trends.js";
 
 test("confirmed rising lows and falling highs produce both trend horizons and nearby zones", () => {
   const bars = Array.from({length:60}, (_, i) => {

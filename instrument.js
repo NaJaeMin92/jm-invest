@@ -1,4 +1,4 @@
-import {trendStyles} from "./chart-trends.js?v=81";
+import {trendStyles} from "./assets/chart-trends.js?v=81";
 import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=81";
 import {setupExecutionFlags} from "./chart-executions.js?v=77";
 import {showMarketPanel} from "./market-panels.js?v=68";

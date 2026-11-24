@@ -1,4 +1,4 @@
-import {beforeTime, chartTrends, trendStyles} from "./chart-trends.js?v=81";
+import {beforeTime, chartTrends, trendStyles} from "./assets/chart-trends.js?v=81";
 import {study} from "./technical-indicators.js?v=76";
 import {renderAnnotations} from "./chart-annotations.js?v=58";
 
