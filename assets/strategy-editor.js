@@ -1,0 +1,132 @@
+import {factors, metrics, matches} from "./strategy.js?v=83";
+
+const nyDate = new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
+const get=id=>document.getElementById("strategy-"+id);
+const option=(value,label)=>new Option(label,value);
+const shortName={day:"일봉",week:"주봉",month:"월봉"};
+
+export function setupStrategy({getSymbol,loadChart,orders,canLoadChart}) {
+  const sheet=get("sheet"), form=get("form"), fields=get("fields"), list=get("conditions"), state=get("state");
+  const f=form.elements;
+  let symbol, run, sending=false;
+  function add(c={key:"rsi",op:"lte",value:30}) {
+    const row=document.createElement("div"), factor=document.createElement("select"), op=document.createElement("select");
+    row.className="strategy-row";
+    for (const [key,[name]] of Object.entries(factors)) factor.add(option(key,name));
+    factor.value=c.key; factor.setAttribute("aria-label","판단 요소");
+    op.add(option("lte","이하 ≤")); op.add(option("gte","이상 ≥")); op.value=c.op; op.setAttribute("aria-label","비교");
+    const input=document.createElement("input"); input.type="number"; input.step="any"; input.required=true;
+    input.value=c.value; input.setAttribute("aria-label","기준값"); factor.onchange=()=>{input.value=factors[factor.value][1]};
+    const remove=document.createElement("button"); remove.type="button"; remove.textContent="×";
+    remove.setAttribute("aria-label","조건 삭제"); remove.onclick=()=>row.remove();
+    row.append(factor,op,input,remove); list.append(row);
+  }
+  function sync() {
+    const live=f.mode.value==="live";
+    get("price").hidden=!live; f.price.required=live;
+    get("start").textContent=live ? "실계좌 "+(f.side.value==="buy"?"매수":"매도")+" 1회 자동주문 시작" : "신호 감시 시작";
+    fields.disabled=Boolean(run); get("save").disabled=Boolean(run);
+    get("start").hidden=Boolean(run); get("stop").hidden=!run || sending;
+    get("close").disabled=sending;
+  }
+  function rule() {
+    if (!form.reportValidity()) return;
+    const conditions=Array.from(list.children,row=>{
+      const [factor,op,input]=row.children;
+      return {key:factor.value,op:op.value,value:input.valueAsNumber};
+    });
+    if (!conditions.length) {state.textContent="판단 조건을 하나 이상 추가하세요.";return;}
+    if(f.mode.value==="live" && !/^\d{1,7}(\.\d{1,4})?$/.test(f.price.value)) {state.textContent="지정가 자릿수를 확인하세요.";return;}
+    if(f.mode.value==="live" && Number(f.price.value)>=1 && (f.price.value.split(".")[1]||"").length>2) {state.textContent="$1 이상은 소수점 두 자리까지 입력하세요.";return;}
+    return {symbol,frame:f.frame.value,join:f.join.value,side:f.side.value,quantity:f.quantity.value,price:f.price.value,mode:f.mode.value,conditions};
+  }
+  const savedKey=()=>"jm-invest:strategy:v1:"+symbol;
+  get("open").onclick=()=>{
+    symbol=getSymbol(); form.reset(); list.replaceChildren(); state.textContent="";
+    let saved;
+    try { saved=JSON.parse(localStorage.getItem(savedKey())); } catch {}
+    if(saved) for(const k of ["frame","join","side","quantity","price"]) f[k].value=saved[k];
+    for(const c of saved?.conditions||[{key:"rsi",op:"lte",value:30}]) add(c);
+    get("title").textContent=symbol+" 자동매매 설정"; sync(); sheet.showModal();
+  };
+  get("save").onclick=()=>{
+    const r=rule(); if(!r) return;
+    try {localStorage.setItem(savedKey(),JSON.stringify(r));state.textContent="규칙을 저장했습니다.";}
+    catch {state.textContent="이 브라우저에 저장하지 못했습니다.";}
+  };
+  get("add").onclick=()=>add(); f.mode.onchange=sync; f.side.onchange=sync;
+  function stop(message) {
+    if(run){run.abort();run=null;}
+    if(message) state.textContent=message;
+    sync();
+  }
+  function close(){if(sheet.open && !sending){stop();sheet.close();}}
+  get("close").onclick=close; get("stop").onclick=()=>stop("감시를 중지했습니다.");
+  sheet.oncancel=e=>{if(sending)e.preventDefault();else stop();};
+  sheet.onclose=()=>stop();
+  document.addEventListener("visibilitychange",()=>{if(document.hidden && run && !sending)stop("화면을 벗어나 감시를 중지했습니다.");});
+  async function check(r,ctrl) {
+    const signal=ctrl.signal;
+    const q=await loadChart(r.symbol,"day",null,signal);
+    if(!q?.daily?.length || q.source) throw Error("키움 종목 일봉이 필요합니다.");
+    if(nyDate.format(q.daily.at(-1)[0]*1000)!==nyDate.format(Date.now())) return "오늘 거래일의 첫 봉을 기다립니다.";
+    const values=metrics(q.daily,r.frame);
+    if(r.conditions.some(c=>c.key==="vix")){
+      const v=await loadChart("VIX","day",null,signal);
+      const age=Date.now()/1000-v?.asOf;
+      if(age>=0 && age<=1800) values.vix=v.price;
+    }
+    if(r.conditions.some(c=>c.key==="fear")){
+      const res=await fetch("https://production.dataviz.cnn.io/index/fearandgreed/graphdata",{signal,cache:"no-store"});
+      if(!res.ok) throw Error("Fear & Greed 조회 실패");
+      const {fear_and_greed:v}=await res.json(), age=Date.now()-Date.parse(v.timestamp);
+      if(age>=0 && age<=86400000) values.fear=v.score;
+    }
+    signal.throwIfAborted();
+    const detail=r.conditions.map(c=>factors[c.key][0]+" "+(Number.isFinite(values[c.key])?values[c.key].toFixed(2):"자료 부족")).join(" · ");
+    if(!matches(r,values)) return detail;
+    if(r.mode==="signal"){stop("조건 충족 · "+detail);return;}
+    const ctx=await orders.stockContext(r.symbol);
+    signal.throwIfAborted();
+    if(!ctx?.enabled || ctx.symbol!==r.symbol)throw Error("종목과 실주문 연결을 확인하세요.");
+    const preview=await orders.preview({symbol:r.symbol,exchange:ctx.exchange,quantity:r.quantity,price:r.price,side:r.side,kind:"00"});
+    signal.throwIfAborted();
+    sending=true;sync();state.textContent="키움 주문 접수 확인 중";
+    try {
+      const receipt=await orders.submit(preview.id);
+      stop("주문 접수 · "+r.symbol+" · "+receipt.number);
+    } catch(error){stop(error.message+" · 키움 주문내역을 확인하세요.");}
+    finally{sending=false;sync();}
+  }
+  async function watch(r,ctrl) {
+    while(!ctrl.signal.aborted){
+      try{const message=await check(r,ctrl);if(message && !ctrl.signal.aborted)state.textContent=message;}
+      catch(error){if(!ctrl.signal.aborted)stop(error.message);return;}
+      if(ctrl.signal.aborted)return;
+      await new Promise(resolve=>{
+        const wake=()=>{clearTimeout(timer);ctrl.signal.removeEventListener("abort",wake);resolve();};
+        const timer=setTimeout(wake,60000);ctrl.signal.addEventListener("abort",wake,{once:true});
+      });
+    }
+  }
+  form.onsubmit=e=>e.preventDefault();
+  get("start").onclick=async ()=>{
+    if(run)return;
+    const r=rule();if(!r)return;
+    if(!canLoadChart()){state.textContent="시세 조회를 위해 계좌에 로그인하세요.";return;}
+    if(r.mode==="live" && !["127.0.0.1","localhost"].includes(location.hostname)){state.textContent="실주문은 비공개 로컬 주문 서버에서 실행하세요.";return;}
+    const ctrl=new AbortController();run=ctrl;sync();state.textContent=r.symbol+" · "+shortName[r.frame]+" · 조건 확인 중";
+    try {
+      if(r.mode==="live"){
+        const status=await orders.status();
+        if(run!==ctrl)return;
+        if(!status.enabled)throw Error("실주문 서버를 실행한 뒤 다시 시작하세요.");
+        await navigator.locks.request("jm-invest:auto-order",{ifAvailable:true},async lock=>{
+          if(!lock)throw Error("다른 창에서 자동주문을 감시하고 있습니다.");
+          await watch(r,ctrl);
+        });
+      } else await watch(r,ctrl);
+    }catch(error){if(run===ctrl)stop(error.message);}
+  };
+  return {close};
+}

@@ -29,6 +29,7 @@ export function setupOrders(readToken, quoteEndpoint) {
   }
   const pending = setupPendingOrders(call, () => !publicSite && Boolean(readToken()), orderKinds);
   return {
+    status: () => call("status"),
     stockPosition(symbol, signal) {
       if (!readToken()) return Promise.resolve(null);
       if (!quoteEndpoint) throw new Error("잔고 서버에 연결할 수 없습니다.");

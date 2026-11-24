@@ -1037,3 +1037,16 @@ body.instrument-open { overflow:hidden; }
 #trend-controls button[aria-pressed="true"] { color:#f4f6fa; background:#2a364a; border-color:#415168; box-shadow:0 1px 3px #0003 }
 #trend-controls button[aria-pressed="true"]::before { color:var(--guide); opacity:1 }
 #trend-controls button:focus-visible { outline:2px solid #a6ccff; outline-offset:1px }
+#strategy-open,#strategy-sheet button:not(.sheet-icon) { border:1px solid #425068; border-radius:12px; background:#243047; color:#e0e8f4; padding:9px 13px; font:600 .84rem system-ui; min-height:42px }
+#strategy-open {margin:6px 0}
+#strategy-sheet { max-height:85dvh; overflow:auto; color:#edf2fa; padding:0 16px 18px }
+#strategy-sheet form,#strategy-fields,#strategy-conditions {display:grid;gap:12px}
+#strategy-fields {margin:0;border:0;padding:0;min-width:0}
+#strategy-sheet label {display:grid;gap:5px;font-size:.8rem;color:#b9c7db}
+#strategy-sheet select,#strategy-sheet input {width:100%;min-width:0;box-sizing:border-box;color:#eef3fb;background:#172336;border:1px solid #37465b;border-radius:9px;min-height:42px;padding:6px}
+.strategy-pair,.strategy-row {display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.strategy-row {grid-template-columns:1fr 1fr auto;padding:10px;background:#1c283a;border-radius:13px}
+.strategy-row select:first-child {grid-column:1/-1}
+#strategy-sheet p {font-size:.83rem;color:#b4c2d6;line-height:1.5}
+#strategy-sheet [hidden] {display:none}
+#strategy-sheet #strategy-start {background:#bdd9ce;color:#142b24}

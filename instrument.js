@@ -1,10 +1,11 @@
+import {setupStrategy} from "./assets/strategy-editor.js?v=83";
 import {trendStyles} from "./assets/chart-trends.js?v=82";
 import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=82";
 import {setupExecutionFlags} from "./chart-executions.js?v=77";
 import {showMarketPanel} from "./market-panels.js?v=68";
 
 import {setupChartTools} from "./chart-tools.js?v=76";
-import {orderKinds, needsPrice, populateKinds} from "./orders.js?v=78";
+import {orderKinds, needsPrice, populateKinds} from "./orders.js?v=83";
 
 const get = id => document.getElementById(id);
 const savedQuotes = new Set("ANT SKHY SPCX MRVL BZMAIN CLMAIN AAL UAL DAL NVDA AMZN".split(" "));
@@ -57,6 +58,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
   const dialog=get("stock-detail"), canvas=get("market-chart");
   const executions = setupExecutionFlags(loadExecutions);
   let current="", quote=null, frame="day", afterClose=null, quoteRequest=0;
+  const strategy = setupStrategy({getSymbol:()=>current, loadChart, orders, canLoadChart});
   const fullHistory = new Map();
   let historyAbort, historyState = "", rangeMode = "";
   const trade = get("trade-preview");
@@ -870,6 +872,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
   }
   async function open(symbol) {
     executions.reset();
+    strategy.close();
     if (trade.open) trade.close();
     current=symbol;quote=null;historyState="";sessionDate.value="";
     selectPanel("chart");
@@ -900,6 +903,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
     requestId += 1;
     quoteRequest += 1;
     historyAbort?.abort();
+    strategy.close();
     if (trade.open) trade.close();
     executions.reset();
     current="";quote=null;chart=null;endDrag();
