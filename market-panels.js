@@ -110,50 +110,6 @@ function showSigmaCalculator(symbol, name) {
   };
 }
 
-const components = [
-  ["market_momentum_sp500", "Market momentum"],
-  ["stock_price_strength", "Stock price strength"],
-  ["stock_price_breadth", "Stock price breadth"],
-  ["put_call_options", "Put and call options"],
-  ["market_volatility_vix", "Market volatility"],
-  ["safe_haven_demand", "Safe haven demand"],
-  ["junk_bond_demand", "Junk bond demand"],
-];
-function renderSentiment(container, data, saved) {
-  const index = data.fear_and_greed;
-  const block = node("article", "", "sentiment-overview");
-  const scale = node("div", "", "sentiment-gauge");
-  const ring = node("div", "", "sentiment-arc");
-  ring.setAttribute("aria-hidden", "true");
-  const marker = node("span", "", "sentiment-marker");
-  marker.style.setProperty("--angle", (1.8 * Math.min(100, Math.max(0, index.score)) - 90) + "deg");
-  ring.append(marker);
-  const reading = node("div", "", "sentiment-reading");
-  const rating = node("p", titleCase(index.rating), "sentiment-rating");
-  rating.dataset.rating = index.rating;
-  reading.append(node("strong", String(Math.round(index.score)), "market-number"), rating);
-  scale.append(ring, reading);
-  const endpoints = node("div", "", "sentiment-endpoints");
-  endpoints.append(node("span", "0 · Extreme fear"), node("span", "Extreme greed · 100"));
-  block.append(
-    node("p", "US Market Sentiment", "market-date"),
-    scale, endpoints,
-    facts([
-      ["Previous close", index.previous_close], ["1 week ago", index.previous_1_week],
-      ["1 month ago", index.previous_1_month], ["1 year ago", index.previous_1_year]
-    ].map(([name, value]) => [name, Number.isFinite(value) ? String(Math.round(value)) : "—"]), "sentiment-history"),
-    node("p", (saved ? "Saved reading · " : "Observed · ") + inTimeZone.format(new Date(index.timestamp)) + " ET", "market-date")
-  );
-  const drivers = components.filter(([key]) => data[key]?.rating)
-    .map(([key, label]) => [label, titleCase(data[key].rating)]);
-  container.replaceChildren(block);
-  if (drivers.length) {
-    const list = facts(drivers, "market-drivers");
-    for (const item of list.children) item.lastElementChild.dataset.rating = item.lastElementChild.textContent.toLowerCase();
-    container.append(node("h4", "Index components"), list);
-  }
-}
-
 function cachedFeed(fallback, remote, isValid, timestamp, refreshAfter) {
   let cache, lastFetch = 0, pending;
   return render => {
@@ -192,21 +148,15 @@ export function loadWatchSentiment(render) {
   });
 }
 
-export function showMarketPanel(panel, symbol, name) {
-  const target = document.querySelector("#" + panel + "-content");
-  if (panel === "sigma") showSigmaCalculator(symbol, name);
+export function showSigmaPanel(symbol, name) {
+  const target = document.getElementById("sigma-content");
+  showSigmaCalculator(symbol, name);
   const request = {};
   target.dataset.symbol = symbol;
   target.marketRequest = request;
   target.textContent = "Loading market data…";
-  const render = (data, saved) => {
-    if (target.marketRequest !== request) return;
-    if (panel === "sigma") renderSigma(target, data, symbol, name);
-    else renderSentiment(target, data, saved);
+  const render = data => {
+    if (target.marketRequest === request) renderSigma(target, data, symbol, name);
   };
-  (panel === "sigma" ? loadSigma : loadSentiment)(render).catch(() => {
-    if (target.marketRequest !== request) return;
-    if (panel === "sigma") renderSigma(target, null, symbol, name);
-    else target.textContent = "Market data is temporarily unavailable.";
-  });
+  loadSigma(render).catch(() => render(null));
 }

@@ -1,7 +1,7 @@
 import {trendStyles} from "./assets/chart-trends.js?v=82";
 import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=88";
 import {setupExecutionFlags} from "./chart-executions.js?v=88";
-import {showMarketPanel} from "./market-panels.js?v=68";
+import {showSigmaPanel} from "./market-panels.js?v=89";
 
 import {setupChartTools} from "./chart-tools.js?v=76";
 import {orderKinds, needsPrice, populateKinds} from "./orders.js?v=83";
@@ -581,7 +581,7 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
       if (selected) tab.setAttribute("aria-current", "page");
       else tab.removeAttribute("aria-current");
     }
-    if (panel !== "chart") showMarketPanel(panel, current, nameFor(current));
+    if (panel === "sigma") showSigmaPanel(current, nameFor(current));
   }
   for (const tab of tabs) tab.addEventListener("click", () => selectPanel(tab.dataset.panel));
 
