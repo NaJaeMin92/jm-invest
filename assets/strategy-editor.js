@@ -1,4 +1,4 @@
-import {factors, metrics, matches} from "./strategy.js?v=83";
+import {factors, metrics, matches} from "./strategy.js?v=84";
 
 const nyDate = new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
 const get=id=>document.getElementById("strategy-"+id);
@@ -13,7 +13,14 @@ export function setupStrategy({getSymbol,loadChart,orders,canLoadChart}) {
     const row=document.createElement("div"), factor=document.createElement("select"), op=document.createElement("select");
     row.className="strategy-row";
     for (const [key,[name]] of Object.entries(factors)) factor.add(option(key,name));
-    factor.value=c.key; factor.setAttribute("aria-label","판단 요소");
+    factor.required=true;
+    if (!Object.hasOwn(factors,c.key)) {
+      const missing=option("","대체 조건 선택");
+      missing.disabled=true;
+      factor.prepend(missing);
+      state.textContent="사용이 종료된 조건을 교체하거나 삭제하세요.";
+    }
+    factor.value=Object.hasOwn(factors,c.key) ? c.key : ""; factor.setAttribute("aria-label","판단 요소");
     op.add(option("lte","이하 ≤")); op.add(option("gte","이상 ≥")); op.value=c.op; op.setAttribute("aria-label","비교");
     const input=document.createElement("input"); input.type="number"; input.step="any"; input.required=true;
     input.value=c.value; input.setAttribute("aria-label","기준값"); factor.onchange=()=>{input.value=factors[factor.value][1]};

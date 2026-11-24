@@ -5,7 +5,6 @@ import {chartTrends} from "./chart-trends.js?v=82";
 // Prices relative to a chart level are expressed as a signed percentage.
 export const factors = {
   rsi:["RSI · 14",30], vix:["VIX · 최근 지수",20], fear:["Fear & Greed · 최근 점수",25],
-  volume:["상대거래량 · 직전 20봉 평균 대비 배수",1.5], atr:["ATR · 14봉 / 종가 (%)",3],
   band:["볼린저 %B · 하단 0 / 상단 100",20], ma:["20봉 이동평균 대비 (%)",0],
   long:["장기 상승 추세선 대비 (%)",0], longDown:["장기 하락 추세선 대비 (%)",0],
   shortUp:["단기 상승 추세선 대비 (%)",0], short:["단기 하락 추세선 대비 (%)",0],
@@ -22,18 +21,6 @@ export function metrics(daily, frame) {
   const result = {rsi:chart.strength[i], ma:distance(study(chart,"MA").lines[0].values[i])};
   const [upper,,lower] = study(chart,"BOLL").lines.map(line=>line.values[i]);
   if (upper > lower) result.band = 100*(close-lower)/(upper-lower);
-  if (i >= 20) {
-    const mean = bars.slice(i-20,i).reduce((sum,b)=>sum+b[5],0)/20;
-    if (mean>0) result.volume = bars[i][5]/mean;
-  }
-  if (i>=14) {
-    let atr=0;
-    for (let j=1;j<=i;j++) {
-      const range=Math.max(bars[j][2],bars[j-1][4])-Math.min(bars[j][3],bars[j-1][4]);
-      atr=j<=14 ? atr+range/14 : (atr*13+range)/14;
-    }
-    result.atr=100*atr/close;
-  }
   // The tested candle must not participate in constructing its reference lines.
   for (const g of chartTrends(bars,frame,i)) {
     if (g.key==="fibonacci" && g.label!=="61.8%") continue;
@@ -46,7 +33,7 @@ export function metrics(daily, frame) {
 }
 
 export function matches(rule, values) {
-  if (!rule.conditions.length || rule.conditions.some(c=>!Number.isFinite(values[c.key]) || !Number.isFinite(c.value))) return false;
+  if (!rule.conditions.length || rule.conditions.some(c=>!Object.hasOwn(factors,c.key) || !Number.isFinite(values[c.key]) || !Number.isFinite(c.value))) return false;
   const tests=rule.conditions.map(c=>c.op==="gte" ? values[c.key]>=c.value : values[c.key]<=c.value);
   return rule.join==="all" ? tests.every(Boolean) : tests.some(Boolean);
 }
