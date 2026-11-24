@@ -24,10 +24,29 @@ export function readStrategy(symbol) {
   } catch { return null; }
 }
 
-export function strategySummary(rule) {
+function strategySummary(rule) {
   return [shortName[rule.frame], rule.side==="sell" ? "매도" : "매수",
     rule.allocation ? `$${rule.allocation.amount} · ${rule.allocation.units}분할` : `${rule.quantity}주`,
     "조건 "+rule.conditions.length+"개"].join(" · ");
+}
+
+function conditionLabel(c) {
+  if(isDraft(c.key))return draftFactors[c.key];
+  const name=factors[c.key]?.[0];
+  if(!name)return "종료된 조건";
+  return name.split(" · ")[0]+" "+(c.op==="gte" ? "≥" : "≤")+" "+c.value;
+}
+
+export function libraryDetails(rule) {
+  const draft=rule.allocation || rule.conditions.some(c=>isDraft(c.key));
+  const size=rule.allocation
+    ? `$${Number(rule.allocation.amount).toLocaleString("en-US",{maximumFractionDigits:2})} · ${rule.allocation.units}분할`
+    : `${rule.quantity}주`;
+  const mode=draft ? "초안" : rule.mode==="live" ? "실계좌 지정가" : "신호 확인";
+  return {
+    conditions:rule.conditions.map(conditionLabel).join(rule.join==="any" ? " 또는 " : " 그리고 "),
+    meta:[shortName[rule.frame],size,mode].join(" · ")
+  };
 }
 
 export function setupStrategy({loadChart,orders,canLoadChart}) {
