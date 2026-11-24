@@ -1,4 +1,4 @@
-import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=92";
+import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=94";
 import {setupWatchEditor} from "./watch-editor.js?v=49";
 import {setupOrders} from "./orders.js?v=83";
 import { setupInstrument, sparkline } from "./instrument.js?v=90";
@@ -121,10 +121,16 @@ function renderStrategies() {
     const suggestions=document.getElementById("strategy-suggestions");
     suggestions.replaceChildren();
     const tickers=readWatchlist().filter(symbol=>!marketSymbols.some(m=>m.symbol===symbol)).slice(0,4);
+    document.getElementById("strategy-suggested").hidden=!tickers.length;
     for(const symbol of tickers){
       const pick=document.createElement("button");
       pick.type="button";
-      pick.textContent=symbol;
+      const identity=document.createElement("span"), ticker=document.createElement("b"), company=document.createElement("small");
+      ticker.textContent=symbol;
+      const name=nameFor(symbol);
+      company.textContent=name===symbol ? "" : name;
+      identity.append(ticker,company);
+      pick.append(tickerIcon(symbol),identity);
       pick.onclick=()=>openLibraryStrategy(symbol);
       suggestions.append(pick);
     }
@@ -159,6 +165,7 @@ function renderStrategies() {
         || document.querySelector('#strategy-filter [aria-pressed="true"]');
       focusTarget.focus({preventScroll:true});
     };
+    card.prepend(tickerIcon(symbol));
     card.querySelector("strong").textContent=symbol;
     side.hidden=!rule;
     if(rule){
@@ -166,7 +173,9 @@ function renderStrategies() {
       side.textContent=rule.side==="sell" ? "매도" : "매수";
       const details=libraryDetails(rule);
       card.querySelector(".rule-conditions").textContent=details.conditions;
-      card.querySelector(".rule-meta").textContent=details.meta;
+      card.querySelector(".rule-frame").textContent=details.frame;
+      card.querySelector(".rule-size").textContent=details.size;
+      card.querySelector(".rule-mode").textContent=details.mode;
     }else card.querySelector(".rule-conditions").textContent="설정 확인";
     card.onclick=()=>openLibraryStrategy(symbol);
     const remove=row.querySelector(".strategy-delete");
@@ -827,15 +836,14 @@ function renderWatchlist(changed) {
   for (const row of existing.values()) row.remove();
 }
 
-function makeWatchRow(symbol) {
-  const row = document.createElement("li");
-  row.dataset.symbol = symbol;
+function tickerIcon(symbol) {
   const badge = document.createElement("span");
   badge.className = "watch-ticker-icon";
+  badge.setAttribute("aria-hidden","true");
   const logoFiles = {NVDA:"nvda", GOOGL:"goog", GOOG:"goog", AMZN:"amzn", AVGO:"avgo", NBIS:"nbis", AMZU:"amzu", SOXX:"soxx", SOXL:"soxl"};
   const snapshot = snapshots.get(symbol);
   if (snapshot) {
-    row.style.setProperty("--sprite-position", (snapshot.index * 12.5) + "%");
+    badge.style.setProperty("--sprite-position", (snapshot.index * 12.5) + "%");
     badge.classList.add("reference-logo");
   } else {
     badge.textContent = symbol === "VIX" ? symbol : symbol.slice(0, 2);
@@ -847,6 +855,13 @@ function makeWatchRow(symbol) {
       badge.append(image);
     }
   }
+  return badge;
+}
+
+function makeWatchRow(symbol) {
+  const row = document.createElement("li");
+  row.dataset.symbol = symbol;
+  const badge=tickerIcon(symbol);
   const identity = document.createElement("div"), name = document.createElement("strong");
   identity.className = "watch-identity";
   const link = document.createElement("a");

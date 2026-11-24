@@ -273,7 +273,7 @@ button.broker-row:hover { background:#2a2c31; }
 .allocation-bar { background:linear-gradient(90deg,#83b3ff 0 var(--stock-share,100%),#8791a0 var(--stock-share,100%) var(--cash-end,100%),#ac82ff var(--cash-end,100%) 100%); }
 
 .ui-icon { width:24px; height:24px; flex:none; display:block; }
-.trade-page[data-view="home"] { --bg:#101720; --text:#f0f3f6; --down:#74d8bb; --up:#ff9eae; background:var(--bg); }
+.trade-page:is([data-view="home"],[data-view="strategies"]) { --bg:#101720; --text:#f0f3f6; --down:#74d8bb; --up:#ff9eae; background:var(--bg); }
 .trade-page:is([data-view="home"],[data-view="account"],[data-view="strategies"]) .page-title { display:none; }
 .trade-page .app-masthead { background:transparent; padding-top:env(safe-area-inset-top); }
 .trade-page .app-masthead .head { max-width:680px; min-height:60px; padding-inline:max(18px,env(safe-area-inset-left)) max(16px,env(safe-area-inset-right)); }
@@ -290,8 +290,8 @@ button.broker-row:hover { background:#2a2c31; }
 .watch-heading,.watch-toolbar,.watch-toolbar button,.watch-caption { display:flex; align-items:center; }
 .watch-heading { justify-content:space-between; gap:8px; margin:8px 0 16px; }
 .watch-title-group { min-width:0; }
-#watch-title { margin:0; font-size:clamp(29px,7vw,42px); line-height:1.1; font-weight:690; letter-spacing:-.055em; overflow-wrap:anywhere; }
-#watch-summary { margin:5px 0 0; color:#a4b3c6; font-size:13px; font-variant-numeric:tabular-nums; }
+#watch-title,#library-title { margin:0; font-size:clamp(29px,7vw,42px); line-height:1.1; font-weight:690; letter-spacing:-.055em; overflow-wrap:anywhere; }
+#watch-summary,#strategy-count { margin:5px 0 0; color:#a4b3c6; font-size:13px; font-variant-numeric:tabular-nums; }
 .watch-heading button,.watch-toolbar button { border:0; background:transparent; padding:0; border-radius:6px; color:inherit; }
 .watch-heading button { display:grid; place-items:center; width:40px; }
 .watch-toolbar { min-height:44px; justify-content:space-between; border-top:1px solid #2c3745; }
@@ -427,7 +427,7 @@ body.instrument-open { overflow:hidden; }
   --bg:#101720; --panel:#1b2633; --text:#f1f4f6; --muted:#aab8c9; --line:#2b3745; --accent:#afdcca;
   background:var(--bg); font-family:-apple-system,BlinkMacSystemFont,"Geist",sans-serif;
 }
-.trade-page:not([data-view="home"]) > header { display:none; }
+.trade-page:not([data-view="home"],[data-view="strategies"]) > header { display:none; }
 .trade-page:not([data-view="home"]) main { max-width:680px; padding-inline:16px; padding-top:env(safe-area-inset-top); }
 .trade-page:not([data-view="home"]) .panel { background:transparent; border:0; border-radius:0; overflow:visible; }
 .trade-page:not([data-view="home"]) .page-title { margin:12px 0 15px; min-height:48px; gap:11px; }
@@ -1064,44 +1064,49 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 #stock-frames [aria-pressed=false] {color:#b2bac8}
 .mini-chart {max-width:88px;aspect-ratio:100/36}
 .mini-chart svg {overflow:visible}
-#tab-strategies { padding:18px 0 24px; font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif }
-.library-heading,#strategy-toolbar,.rule-head,.ticker-input { display:flex; align-items:center; justify-content:space-between; gap:12px }
-.library-heading { margin-bottom:24px }
-#library-title { margin:0; font-size:clamp(30px,7vw,40px); line-height:1.1; letter-spacing:-.055em }
-#strategy-count { margin:6px 0 0; color:#a4b2c3; font-size:13px }
-#strategy-new,#strategy-picker button,#strategy-toolbar button,.strategy-delete { border:0; cursor:pointer; font:600 13px system-ui }
-#strategy-new { min-height:44px; padding:0 14px; border-radius:22px; color:#d8eee5; background:#243934 }
-#strategy-new span { margin-right:2px }
-#strategy-picker { margin-bottom:18px; padding:18px; border:1px solid #34404e; border-radius:18px; background:#19222e }
-#strategy-picker label { font-weight:600; font-size:16px }
-.ticker-input { gap:8px; margin-top:14px }
-#strategy-symbol { min-width:0; flex:1; height:44px; padding-inline:12px; border:1px solid #465364; border-radius:10px; background:#111922; font-size:16px; color:#eff3f7 }
-.ticker-input button { min-height:44px; padding:0 12px; border-radius:10px; background:#b9dacf; color:#152c25 }
-#strategy-suggestions { display:flex; flex-wrap:wrap; gap:6px }
-#strategy-suggestions:not(:empty) { margin-top:8px }
-#strategy-suggestions button { color:#c4d0de; background:transparent; min-height:36px; padding:0 8px; border-bottom:1px solid #3d4a58; border-radius:0 }
-#strategy-toolbar { margin-bottom:14px; gap:4px; flex-wrap:wrap }
-#strategy-filter { display:flex; padding:3px; background:#161f2b; border:1px solid #2e3947; border-radius:12px }
-#strategy-filter button { min-height:36px; min-width:44px; padding:0 8px; color:#a6b3c3; background:transparent; border-radius:9px }
-#strategy-filter [aria-pressed=true] { background:#334050; color:#f6f8fb }
-#strategy-manage,.strategy-delete { min-height:44px; background:transparent; padding:0 10px; color:#c0cece }
-#strategy-library { display:grid; gap:10px }
-.strategy-entry { min-width:0; display:flex; align-items:center; border-radius:16px; border:1px solid #303c4b; background:#19232f }
-.strategy-card { flex:1; min-width:0; display:grid; gap:9px; padding:16px; background:transparent; border:0; border-radius:inherit; color:#eff3f7; text-align:left; cursor:pointer }
-.rule-select { flex:0 0 44px; align-self:stretch; display:grid; place-items:center; cursor:pointer }
-.rule-select input[type=checkbox] { width:20px; height:20px; margin:0; padding:0; accent-color:#aad8c7; cursor:pointer }
-.strategy-entry:has(.rule-select :checked) { border-color:#516e64 }
-.strategy-entry .strategy-card { padding-left:2px }
+#tab-strategies { padding:0 0 24px; font-family:-apple-system,BlinkMacSystemFont,"Geist",sans-serif }
+.library-heading #strategy-new { display:flex; align-items:center; gap:5px; width:auto; min-height:44px; padding:0 8px; font-size:14px; color:#b9ddcf }
+#strategy-new span { font-size:19px }
+#strategy-toolbar,.ticker-input,#strategy-filter { display:flex; align-items:center }
+#strategy-toolbar { justify-content:space-between; gap:4px; border-block:1px solid #2c3745 }
+#strategy-toolbar button,#strategy-picker button,.strategy-delete { border:0; cursor:pointer; color:#aebccc; background:transparent; font:550 13px system-ui }
+#strategy-filter { gap:2px }
+#strategy-toolbar button { min-height:44px; padding:0 10px }
+#strategy-filter button { position:relative }
+#strategy-filter [aria-pressed=true] { color:#f0f3f6 }
+#strategy-filter [aria-pressed=true]::after { content:""; position:absolute; bottom:-1px; left:9px; right:9px; height:2px; background:#b593fa; border-radius:2px }
 #strategy-selected-count { font-variant-numeric:tabular-nums }
-.strategy-card:active { background:#202d3a }
-.rule-head strong { font:660 20px/1.1 system-ui; letter-spacing:-.035em }
-.rule-side { padding:4px 8px; border-radius:7px; font:600 12px/1.25 system-ui; color:#c0e1d4; background:#233931 }
-.rule-side[data-side=sell] { color:#e7cbc6; background:#3b2e32 }
-.rule-conditions { font:500 15px/1.45 system-ui; overflow-wrap:anywhere }
-.rule-meta,#strategy-library .rule-empty { color:#acb9c8; font:400 13px/1.45 system-ui; font-variant-numeric:tabular-nums }
-.rule-empty { padding:16px 0 }
-.strategy-delete { color:#efb9b5; margin-right:6px }
-#tab-strategies :is(button,input):focus-visible { outline:2px solid #bedcce; outline-offset:1px }
+#strategy-picker { border-top:1px solid #2c3745; padding:16px 0 8px }
+#strategy-picker label,#private #strategy-suggested-title { display:block; margin:0 0 7px; font:600 13px system-ui; color:#bcc8d6 }
+.ticker-input { gap:8px; margin:0 0 16px }
+#strategy-symbol { min-width:0; flex:1; height:44px; border:1px solid #394655; border-radius:10px; padding:0 12px; background:#17212d; font-size:16px; color:#eff3f7 }
+#strategy-picker .ticker-input button { min-height:44px; padding:0 14px; border-radius:10px; background:#203831; color:#c6e6d8 }
+#strategy-suggestions button { width:100%; display:flex; align-items:center; gap:11px; min-height:58px; padding:6px 3px; text-align:left; border-bottom:1px solid #293541; border-radius:0 }
+#strategy-suggestions button::after { content:""; margin:0 8px 0 auto; width:6px; height:6px; border:solid #8293a6; border-width:1.5px 1.5px 0 0; transform:rotate(45deg) }
+#strategy-suggestions b,#strategy-suggestions small { display:block }
+#strategy-suggestions b,.rule-instrument strong { color:#eff3f7; font:650 17px/1.3 system-ui; letter-spacing:-.025em }
+#strategy-suggestions small,.rule-mode,.rule-size { color:#aab8c9; font:400 12px/1.4 system-ui }
+.strategy-entry { display:flex; align-items:center; min-width:0; border-bottom:1px solid #293541 }
+.strategy-entry:has(.rule-select :checked) { background:#17272b }
+.rule-select { flex:0 0 44px; align-self:stretch; display:grid; place-items:center; cursor:pointer }
+.rule-select input[type=checkbox] { width:18px; height:18px; margin:0; padding:0; accent-color:#a6d9c5; cursor:pointer }
+.strategy-card { flex:1; min-width:0; display:grid; grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:"icon title order" "icon conditions order" "icon mode order"; align-items:center; column-gap:9px; row-gap:2px; min-height:80px; padding:9px 3px 9px 0; background:transparent; border:0; color:#eff3f7; text-align:left; cursor:pointer }
+.strategy-card .watch-ticker-icon { grid-area:icon }
+.rule-instrument { grid-area:title; display:flex; flex-wrap:wrap; align-items:baseline; gap:5px; overflow-wrap:anywhere }
+.rule-frame { color:#a5b2c4; font:500 11px system-ui }
+.rule-conditions { grid-area:conditions; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; color:#dae2ed; font:500 13px/1.4 system-ui }
+.rule-order { grid-area:order; align-self:center; display:grid; justify-items:end; gap:4px; max-width:96px; text-align:right; overflow-wrap:anywhere }
+.rule-side { min-width:44px; padding:4px 8px; text-align:center; border-radius:7px; font:600 13px/1.4 system-ui; color:#bddfce; background:#203732 }
+.rule-side[data-side=sell] { color:#e5c9c3; background:#372f33 }
+.rule-mode { grid-area:mode; font-size:11px }
+.rule-empty { padding:16px 0; color:#acb9c8; font-size:14px }
+.strategy-delete { min-height:44px; padding:0 9px; color:#efb9b5 }
+@media (max-width:390px) {
+  .strategy-entry:has(.strategy-delete:not([hidden])) .watch-ticker-icon { display:none }
+  .strategy-entry:has(.strategy-delete:not([hidden])) .strategy-card { grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"title order" "conditions order" "mode order" }
+}
+#tab-strategies :is(button,input):focus-visible { outline:2px solid #bedcce; outline-offset:-2px }
+.strategy-section-title { margin:5px 0 0; padding-top:12px; border-top:1px solid var(--separator); font:600 14px system-ui; color:var(--ink) }
 
 #trend-menu {margin:0 12px 8px;color:#ecedf4}
 #trend-menu[hidden] {display:none}

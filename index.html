@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=93">
-<script type="module" src="./journal.js?v=93"></script>
+<link rel="stylesheet" href="./style.css?v=94">
+<script type="module" src="./journal.js?v=94"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header class="app-masthead"><div class="head">
@@ -43,12 +43,12 @@
 <ul id="home-holdings" class="watch-list"></ul>
 </section>
 <section id="tab-strategies" class="tab-panel" lang="ko" aria-labelledby="library-title" hidden>
-<div class="library-heading"><div><h1 id="library-title" lang="en">Strategies</h1><p id="strategy-count"></p></div>
+<div class="watch-heading library-heading"><div class="watch-title-group"><h1 id="library-title" lang="en">Strategies</h1><p id="strategy-count"></p></div>
 <button id="strategy-new" type="button" aria-controls="strategy-picker" aria-expanded="false"><span aria-hidden="true">＋</span> 새 전략</button></div>
 <form id="strategy-picker" hidden>
-<label for="strategy-symbol">어떤 종목의 전략을 만들까요?</label>
+<label for="strategy-symbol">종목 선택</label>
 <div class="ticker-input"><input id="strategy-symbol" required maxlength="12" pattern="[A-Za-z][A-Za-z0-9.\-]{0,11}" placeholder="종목 티커 입력" autocapitalize="characters" spellcheck="false" autocomplete="off"><button type="submit">전략 열기</button></div>
-<div id="strategy-suggestions" role="group" aria-label="관심종목에서 선택"></div>
+<section id="strategy-suggested" aria-labelledby="strategy-suggested-title" hidden><h2 id="strategy-suggested-title">내 관심종목</h2><div id="strategy-suggestions"></div></section>
 </form>
 <div id="strategy-toolbar" hidden>
 <div id="strategy-filter" role="group" aria-label="전략 목록 필터"><button type="button" data-side="all" aria-pressed="true">전체</button><button type="button" data-side="buy" aria-pressed="false">매수</button><button type="button" data-side="sell" aria-pressed="false">매도</button><button type="button" data-side="selected" aria-pressed="false">선택됨 <span id="strategy-selected-count">0</span></button></div>
@@ -57,16 +57,18 @@
 <template id="strategy-entry-template"><div class="strategy-entry">
 <label class="rule-select"><input type="checkbox"></label>
 <button type="button" class="strategy-card" aria-haspopup="dialog" aria-controls="strategy-sheet">
-<span class="rule-head"><strong></strong><span class="rule-side"></span></span>
-<span class="rule-conditions"></span><span class="rule-meta"></span>
+<span class="rule-instrument"><strong></strong><small class="rule-frame"></small></span>
+<span class="rule-conditions"></span>
+<span class="rule-order"><span class="rule-side"></span><small class="rule-size"></small></span>
+<small class="rule-mode"></small>
 </button><button type="button" class="strategy-delete" hidden>삭제</button></div></template>
 <dialog id="strategy-sheet" class="order-sheet" aria-labelledby="strategy-title" lang="ko">
 <header class="order-sheet-head"><h3 id="strategy-title">자동매매 설정</h3><button type="button" class="sheet-icon" id="strategy-close" aria-label="닫기">×</button></header>
 <form id="strategy-form"><fieldset id="strategy-fields">
 <div class="strategy-pair"><label>기준 봉<select name="frame"><option value="day">일봉</option><option value="week">주봉</option><option value="month">월봉</option></select></label>
 <label>조건 조합<select name="join"><option value="all">모두 충족 (AND)</option><option value="any">하나 이상 (OR)</option></select></label></div>
-<div id="strategy-conditions"></div><button type="button" id="strategy-add">＋ 조건 추가</button>
-<div class="strategy-pair"><label>주문 방향<select name="side"><option value="buy">매수</option><option value="sell">매도</option></select></label><label id="strategy-quantity">수량 (주)<input name="quantity" type="number" min="1" max="999999" step="1" value="1" required></label></div>
+<h4 class="strategy-section-title">판단 조건</h4><div id="strategy-conditions"></div><button type="button" id="strategy-add">＋ 조건 추가</button>
+<h4 class="strategy-section-title">주문 설정</h4><div class="strategy-pair"><label>주문 방향<select name="side"><option value="buy">매수</option><option value="sell">매도</option></select></label><label id="strategy-quantity">수량 (주)<input name="quantity" type="number" min="1" max="999999" step="1" value="1" required></label></div>
 <label id="strategy-sizing">매수 방식<select name="sizing"><option value="fixed">고정 수량</option><option value="split">예산 분할 계획</option></select></label>
 <fieldset id="strategy-budget" hidden disabled>
 <legend>분할매수 예산</legend>

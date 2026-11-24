@@ -45,7 +45,7 @@ export function libraryDetails(rule) {
   const mode=draft ? "초안" : rule.mode==="live" ? "실계좌 지정가" : "신호 확인";
   return {
     conditions:rule.conditions.map(conditionLabel).join(rule.join==="any" ? " 또는 " : " 그리고 "),
-    meta:[shortName[rule.frame],size,mode].join(" · ")
+    frame:shortName[rule.frame],size,mode
   };
 }
 
