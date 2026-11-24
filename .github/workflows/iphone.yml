@@ -1,0 +1,24 @@
+name: iPhone build and trading checks
+
+on:
+  push:
+    paths: ['ios/**', '.github/workflows/iphone.yml']
+  pull_request:
+    paths: ['ios/**', '.github/workflows/iphone.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the quote protocol and order boundary with fixtures
+        run: ios/test.sh
+      - name: Build the iPhone app for simulator
+        run: >-
+          xcodebuild -project ios/JMInvest.xcodeproj -scheme JMInvest
+          -configuration Debug -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO build

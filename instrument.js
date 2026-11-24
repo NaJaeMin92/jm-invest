@@ -87,7 +87,10 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
   });
   const won = new Intl.NumberFormat("ko-KR", {style: "currency", currency: "KRW"});
   const sideName = {buy: "매수", sell: "매도"};
-  const previewOnly = "미리보기 모드입니다. 실계좌 주문은 이 Mac의 비공개 서버에서 할 수 있습니다.";
+  const nativeLink = get("trade-open-iphone");
+  const onPhonePages = location.hostname === "najaemin92.github.io" && /iPhone/i.test(navigator.userAgent);
+  const previewOnly = onPhonePages ? "실주문은 설치된 JM Invest 앱에서 확인하세요."
+    : "미리보기 모드입니다. 실계좌 주문은 이 Mac의 비공개 서버에서 할 수 있습니다.";
   let tradeSide, orderContext, reviewId, tradeBusy = false, tradeVersion = 0;
   let unsubscribeBook, pendingBook, bookPaint, bookRevision = 0, liveTradePrice, displayedBook;
   let position, positionRequest;
@@ -152,7 +155,9 @@ export function setupInstrument({search,nameFor,readList,saveList,orders,readPos
     tradeSide = side;
     positionPanel.hidden = side !== "sell";
     trade.dataset.side = side;
-    tradeNext.textContent = sideName[side] + " 주문 확인";
+    tradeNext.textContent = sideName[side] + (onPhonePages ? " 미리보기" : " 주문 확인");
+    nativeLink.hidden = !onPhonePages;
+    if (onPhonePages) nativeLink.href = "jminvest://stock/" + encodeURIComponent(current) + "?side=" + side;
     for (const button of ticketSides) {
       button.setAttribute("aria-pressed", String(button.dataset.ticketSide === side));
     }

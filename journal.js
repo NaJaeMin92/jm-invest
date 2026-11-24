@@ -1,6 +1,6 @@
 import {setupWatchEditor} from "./watch-editor.js?v=49";
 import {setupOrders} from "./orders.js?v=78";
-import { setupInstrument, sparkline } from "./instrument.js?v=79";
+import { setupInstrument, sparkline } from "./instrument.js?v=80";
 import {loadWatchSentiment} from "./market-panels.js?v=68";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 

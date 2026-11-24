@@ -1,0 +1,229 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+		0F3921FC32E7714F97090F0B /* AccountStore.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = AccountStore.swift;
+			sourceTree = "<group>";
+		};
+		AA0C0E76F3D3C884E343B740 /* Build AccountStore.swift */ = {
+			isa = PBXBuildFile;
+			fileRef = 0F3921FC32E7714F97090F0B /* AccountStore.swift */;
+		};
+		EF82F643DE779B2E4E2C977B /* JMInvestApp.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = JMInvestApp.swift;
+			sourceTree = "<group>";
+		};
+		823E70DF460896987470AB29 /* Build JMInvestApp.swift */ = {
+			isa = PBXBuildFile;
+			fileRef = EF82F643DE779B2E4E2C977B /* JMInvestApp.swift */;
+		};
+		7D13F55FD25F192BB3B5FAF4 /* Kiwoom.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = Kiwoom.swift;
+			sourceTree = "<group>";
+		};
+		32A005E911CFCB7475B042D4 /* Build Kiwoom.swift */ = {
+			isa = PBXBuildFile;
+			fileRef = 7D13F55FD25F192BB3B5FAF4 /* Kiwoom.swift */;
+		};
+		5D8D473F7730AD5A776BC4D0 /* TradeDesk.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = TradeDesk.swift;
+			sourceTree = "<group>";
+		};
+		65FD507B0ED20BC887631CB5 /* Build TradeDesk.swift */ = {
+			isa = PBXBuildFile;
+			fileRef = 5D8D473F7730AD5A776BC4D0 /* TradeDesk.swift */;
+		};
+		6F35AB49236D0AB0AB56E2D9 /* TradeScreen.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = TradeScreen.swift;
+			sourceTree = "<group>";
+		};
+		71BCEB709FBDE0D307065299 /* Build TradeScreen.swift */ = {
+			isa = PBXBuildFile;
+			fileRef = 6F35AB49236D0AB0AB56E2D9 /* TradeScreen.swift */;
+		};
+		0B0938A6C27ED5095E0A7869 /* Trading.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = Trading.swift;
+			sourceTree = "<group>";
+		};
+		E9EB41700EDBC45555F8BA97 /* Build Trading.swift */ = {
+			isa = PBXBuildFile;
+			fileRef = 0B0938A6C27ED5095E0A7869 /* Trading.swift */;
+		};
+		FA549F619F2B71A5AED065E4 /* Assets.xcassets */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.assetcatalog;
+			path = Assets.xcassets;
+			sourceTree = "<group>";
+		};
+		D4F5D785CC8EA69F38E13CEB /* Build Assets.xcassets */ = {
+			isa = PBXBuildFile;
+			fileRef = FA549F619F2B71A5AED065E4 /* Assets.xcassets */;
+		};
+		B5D32B9A8AB7539F15BBF105 /* JMInvest.app */ = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			path = JMInvest.app;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		A57BB48F6B7382674C9EB22C /* Root */ = {
+			isa = PBXGroup;
+			children = (85EB1A93B34DD39D22D402F0 /* App Files */, 2D831F38663493944771887E /* Products */);
+			sourceTree = "<group>";
+		};
+		85EB1A93B34DD39D22D402F0 /* App Files */ = {
+			isa = PBXGroup;
+			children = (0F3921FC32E7714F97090F0B /* AccountStore.swift */, EF82F643DE779B2E4E2C977B /* JMInvestApp.swift */, 7D13F55FD25F192BB3B5FAF4 /* Kiwoom.swift */, 5D8D473F7730AD5A776BC4D0 /* TradeDesk.swift */, 6F35AB49236D0AB0AB56E2D9 /* TradeScreen.swift */, 0B0938A6C27ED5095E0A7869 /* Trading.swift */, FA549F619F2B71A5AED065E4 /* Assets.xcassets */);
+			path = JMInvest;
+			sourceTree = "<group>";
+		};
+		2D831F38663493944771887E /* Products */ = {
+			isa = PBXGroup;
+			children = (B5D32B9A8AB7539F15BBF105 /* JMInvest.app */);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D36610CFAABDB24DEF0E9B91 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (AA0C0E76F3D3C884E343B740 /* Build AccountStore.swift */, 823E70DF460896987470AB29 /* Build JMInvestApp.swift */, 32A005E911CFCB7475B042D4 /* Build Kiwoom.swift */, 65FD507B0ED20BC887631CB5 /* Build TradeDesk.swift */, 71BCEB709FBDE0D307065299 /* Build TradeScreen.swift */, E9EB41700EDBC45555F8BA97 /* Build Trading.swift */);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		60F06588E0F72B48B8AF30BB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (D4F5D785CC8EA69F38E13CEB /* Build Assets.xcassets */);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		873E837570E6A7E81D52EA7D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		733411E04CA4CA5A683EFE1C /* JMInvest */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 86D6D781662E6C3760AFF246 /* App configs */;
+			buildPhases = (D36610CFAABDB24DEF0E9B91 /* Sources */, 873E837570E6A7E81D52EA7D /* Frameworks */, 60F06588E0F72B48B8AF30BB /* Resources */);
+			buildRules = ();
+			dependencies = ();
+			name = JMInvest;
+			productName = JMInvest;
+			productReference = B5D32B9A8AB7539F15BBF105 /* JMInvest.app */;
+			productType = "com.apple.product-type.application";
+		};
+		1EC2E4FA1430E1C147A9B2A0 /* Project */ = {
+			isa = PBXProject;
+			attributes = { LastUpgradeCheck = 1600; };
+			buildConfigurationList = 5684707FB2343ABE931D8953 /* Project configs */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = ko;
+			knownRegions = (ko, en, Base);
+			mainGroup = A57BB48F6B7382674C9EB22C /* Root */;
+			productRefGroup = 2D831F38663493944771887E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (733411E04CA4CA5A683EFE1C /* JMInvest */);
+		};
+		F471417191C919A65513B540 /* App Debug */ = {
+			isa = XCBuildConfiguration;
+			name = Debug;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.najaemin92.JMInvest;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = JMInvest/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "JM Invest";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Confirm your Kiwoom stock order.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+				MARKETING_VERSION = 1.0;
+				CURRENT_PROJECT_VERSION = 1;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+			};
+		};
+		9AF6A0666A73D46139E15D86 /* App Release */ = {
+			isa = XCBuildConfiguration;
+			name = Release;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.najaemin92.JMInvest;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = JMInvest/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "JM Invest";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Confirm your Kiwoom stock order.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+				MARKETING_VERSION = 1.0;
+				CURRENT_PROJECT_VERSION = 1;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+			};
+		};
+		86D6D781662E6C3760AFF246 /* App configs */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (F471417191C919A65513B540 /* App Debug */, 9AF6A0666A73D46139E15D86 /* App Release */);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		98C60D66CD9CD61456028946 /* Project Debug */ = {
+			isa = XCBuildConfiguration;
+			name = Debug;
+			buildSettings = {
+				SDKROOT = iphoneos;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				CLANG_ENABLE_MODULES = YES;
+				SWIFT_VERSION = 5.0;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				ONLY_ACTIVE_ARCH = YES;
+			};
+		};
+		906C8725485F08737B637068 /* Project Release */ = {
+			isa = XCBuildConfiguration;
+			name = Release;
+			buildSettings = {
+				SDKROOT = iphoneos;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				CLANG_ENABLE_MODULES = YES;
+				SWIFT_VERSION = 5.0;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+			};
+		};
+		5684707FB2343ABE931D8953 /* Project configs */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (98C60D66CD9CD61456028946 /* Project Debug */, 906C8725485F08737B637068 /* Project Release */);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+	};
+	rootObject = 1EC2E4FA1430E1C147A9B2A0 /* Project */;
+}

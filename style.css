@@ -789,6 +789,9 @@ body.instrument-open { overflow:hidden; }
 .quantity-stepper input { padding-inline:0; text-align:center; background:transparent; }
 #trade-use-quote { margin-right:auto; min-width:0; padding:0 4px; font-size:12px; font-weight:600; color:var(--side-ink); }
 .trade-ticket-footer { display:grid; margin-top:14px; border-top:1px solid #303a49; padding:14px 22px; }
+.trade-ticket-footer:has(#trade-open-iphone:not([hidden])) { grid-template-columns:minmax(0,1fr) minmax(0,1.3fr); gap:8px; }
+.trade-ticket-footer:has(#trade-open-iphone:not([hidden])) #trade-preview-next { background:var(--inner); color:var(--secondary); }
+#trade-open-iphone { display:grid; place-items:center; min-height:46px; border-radius:12px; background:var(--side-ink); color:#162123; font-size:15px; font-weight:650; text-decoration:none; }
 .trade-ticket-total { display:grid; padding-top:12px; gap:3px; }
 .trade-ticket-total label,.trade-ticket-total small { color:var(--secondary); font-size:12px; }
 .trade-ticket-total output { font-size:23px; font-weight:650; letter-spacing:-.035em; line-height:1.2; overflow-wrap:anywhere; }

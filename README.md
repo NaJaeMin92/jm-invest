@@ -13,9 +13,13 @@ python3 scripts/publish-site.py publish
 
 배포 명령은 대상 커밋을 기록하고 일반 푸시를 수행합니다. Pages의 HTML, CSS, JavaScript, 공개 자산이 커밋과 일치하면 대기를 해제합니다. 연결이 끊기면 `python3 scripts/publish-site.py retry`로 같은 커밋을 재개할 수 있습니다. 이 Mac의 LaunchAgent가 로그인 세션에서 대기 중인 배포를 재시도합니다.
 
-## Private US stock orders
+## 아이폰 앱에서 직접 주문하기
 
-The GitHub Pages frontend offers signed-in quotes through the Mac gateway and order previews. Live submissions use the local order server. Keep the backend host awake and connected on its Kiwoom-registered IP while using its services.
+JM Invest iPhone 앱은 키움에 직접 연결해 미국주식 10단계 호가를 수신하고, 기기 인증을 거쳐 매수·매도 주문을 전송합니다. 설치 후에는 Mac을 꺼도 사용할 수 있습니다. 외출 중 집의 등록 IP를 사용하려면 아이폰을 집 공유기의 VPN에 연결하세요. [아이폰 앱 설치와 첫 연결](ios/README.md)
+
+## Private US stock orders on the web
+
+The GitHub Pages frontend offers signed-in quotes through the Mac gateway and order previews. On iPhone, a stock ticket can also open the installed native app. Web orders use the local order server. Keep the backend host awake and connected on its Kiwoom-registered IP while using the web gateway or local server.
 
 ```sh
 python3 scripts/order-server.py --live
