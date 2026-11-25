@@ -898,12 +898,6 @@ body.instrument-open { overflow:hidden; }
 .holdings-heading { display:flex; justify-content:space-between; align-items:center; min-height:44px; gap:8px; }
 .holdings-heading h3 { margin:0; letter-spacing:-.035em; }
 .holdings-heading:has(#open-kiwoom[aria-expanded="false"]) #holding-sort { display:none }
-#holding-distribution { margin:3px 0 13px; }
-.distribution-bar { display:flex; height:8px; border-radius:8px; overflow:hidden; }
-.distribution-bar i { flex-basis:0; min-width:0; }
-.distribution-legend { display:flex; flex-wrap:wrap; gap:5px 14px; margin:8px 0 0; padding:0; list-style:none; }
-.distribution-legend li { display:flex; align-items:center; gap:5px; font-size:12px; color:#c0cada; font-variant-numeric:tabular-nums; }
-.distribution-legend li::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--holding-color); }
 @media (min-width:1000px) {
   .trade-page { --workspace-left:max(32px,calc((100vw - 940px) / 2)); }
   .trade-page #account,.trade-page .app-masthead .head {

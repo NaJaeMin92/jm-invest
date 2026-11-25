@@ -324,36 +324,6 @@ holdingSort.onchange = sortHoldings;
 
 const weightPercent = new Intl.NumberFormat("ko-KR",{style:"percent",maximumFractionDigits:2});
 
-function renderHoldingWeights(holdings) {
-  const distribution=document.getElementById("holding-distribution");
-  const bar=distribution.querySelector(".distribution-bar"), legend=distribution.querySelector("ul");
-  bar.replaceChildren();
-  legend.replaceChildren();
-  distribution.hidden=true;
-  if(!holdings.every(h=>numeric(h.value_krw) && Number(h.value_krw)>=0))return 0;
-  const values=new Map();
-  for(const holding of holdings){
-    const symbol=holding.symbol || holding.name || "—";
-    values.set(symbol,(values.get(symbol) || 0)+Number(holding.value_krw));
-  }
-  const total=[...values.values()].reduce((sum,value)=>sum+value,0);
-  if(!total)return 0;
-  const sorted=[...values].sort((a,b)=>b[1]-a[1] || a[0].localeCompare(b[0]));
-  for(const [index,[symbol,value]] of sorted.entries()){
-    const segment=document.createElement("i"), label=document.createElement("li");
-    const color=`hsl(${(215+index*137.5)%360} 62% 69%)`;
-    segment.style.backgroundColor=color;
-    segment.style.flexGrow=value/total;
-    label.style.setProperty("--holding-color",color);
-    label.textContent=symbol+" "+weightPercent.format(value/total);
-    segment.title=label.textContent;
-    bar.append(segment);
-    legend.append(label);
-  }
-  distribution.hidden=false;
-  return total;
-}
-
 function showHoldings(balance) {
   holdingsList.replaceChildren();
   const holdings = balance?.holdings;
@@ -370,13 +340,14 @@ function showHoldings(balance) {
   document.getElementById("holding-count").textContent = Array.isArray(holdings) ? holdings.length : "";
   document.getElementById("holding-columns").hidden = !hasRows;
   holdingSort.hidden = !hasRows || holdings.length < 2;
-  const totalHoldingsValue=renderHoldingWeights(hasRows ? holdings : []);
   if (!hasRows) {
     const item = document.createElement("li");
     item.textContent = Array.isArray(holdings) ? "보유 중인 미국주식이 없습니다." : "잔고 동기화 대기";
     holdingsList.append(item);
     return;
   }
+  const totalHoldingsValue = holdings.every(h => numeric(h.value_krw) && Number(h.value_krw) >= 0)
+    ? holdings.reduce((sum, h) => sum + Number(h.value_krw), 0) : 0;
   for (const holding of holdings) {
     const item = document.createElement("li"), details = document.createElement("details");
     const head = document.createElement("summary");
