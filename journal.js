@@ -329,7 +329,11 @@ function showHoldings(balance) {
       averageReturn=holdings.reduce((sum,h)=>sum+Number(h.return_pct),0)/holdings.length;
     }
   }
-  showPerformance(document.getElementById("kiwoom-holdings-profit"),totalProfit,signedWon.format);
+  const profitAmount = document.getElementById("kiwoom-holdings-profit");
+  showPerformance(profitAmount, totalProfit, signedWon.format);
+  if (numeric(totalProfit) && numeric(balance?.return_pct)) {
+    profitAmount.append(" (" + signedWatchPercent(Number(balance.return_pct)) + ")");
+  }
   showPerformance(document.getElementById("kiwoom-holdings-average"),averageReturn,signedWatchPercent);
   const hasRows = Array.isArray(holdings) && holdings.length > 0;
   document.getElementById("holding-count").textContent = Array.isArray(holdings) ? holdings.length : "";
@@ -754,7 +758,6 @@ const instrument = setupInstrument({
   saveList: watchEditor.saveList,
 });
 const watchRows = new Map();
-const watchDate = new Intl.DateTimeFormat("en-US", {month:"short", day:"numeric", timeZone:"America/New_York"});
 function watchMarket(symbol, session) {
   if (!token) return null;
   const date = session.date.replaceAll("-", "");
@@ -806,13 +809,6 @@ function renderWatchlist(changed) {
   }
   watchEditor.renameHeading();
   const symbols = readWatchlist();
-  const summary = document.getElementById("watch-summary");
-  const summaryKey = session.date + "/" + symbols.length;
-  if (summary.dataset.key !== summaryKey) {
-    summary.dataset.key = summaryKey;
-    summary.textContent = watchDate.format(new Date(session.date + "T12:00:00Z")) + " ET · " +
-      symbols.length + (symbols.length === 1 ? " symbol" : " symbols");
-  }
   const quotes = new Map(symbols.map(symbol => [symbol, watchMarket(symbol, session)]));
   symbols.sort((a, b) => {
     const vixFirst = Number(b === "VIX") - Number(a === "VIX");

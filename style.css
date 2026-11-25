@@ -292,7 +292,9 @@ button.broker-row:hover { background:#2a2c31; }
 .watch-heading { justify-content:space-between; gap:8px; margin:8px 0 16px; }
 .watch-title-group { min-width:0; }
 #watch-title,#library-title { margin:0; font-size:clamp(29px,7vw,42px); line-height:1.1; font-weight:690; letter-spacing:-.055em; overflow-wrap:anywhere; }
-#watch-summary,#strategy-count { margin:5px 0 0; color:#a4b3c6; font-size:13px; font-variant-numeric:tabular-nums; }
+#watch-title { font-size:clamp(21px,5.3vw,26px); letter-spacing:-.04em; }
+#tab-home .watch-heading { min-height:44px; margin-bottom:8px; }
+#strategy-count { margin:5px 0 0; color:#a4b3c6; font-size:13px; font-variant-numeric:tabular-nums; }
 .watch-heading button,.watch-toolbar button { border:0; background:transparent; padding:0; border-radius:6px; color:inherit; }
 .watch-heading button { display:grid; place-items:center; width:40px; }
 .watch-toolbar { min-height:44px; justify-content:space-between; border-top:1px solid #2c3745; }
