@@ -51,8 +51,7 @@ export function prepareChart(source, frame) {
   return { bars, closes, strength: rsi(closes), studies: new Map() };
 }
 
-const tickDate = new Intl.DateTimeFormat("en-US", { timeZone:"America/New_York", month:"numeric", day:"numeric" });
-const tickHour = new Intl.DateTimeFormat("en-US", { timeZone:"America/New_York", hour:"2-digit", minute:"2-digit", hour12:false });
+const tickHour = new Intl.DateTimeFormat("en-US", { timeZone:"America/New_York", hour:"2-digit", minute:"2-digit", hourCycle:"h23" });
 const sessionDate = new Intl.DateTimeFormat("en-CA", { timeZone:"America/New_York" });
 
 function matchingCloses(shown, comparison, frame) {
@@ -306,11 +305,28 @@ export function drawChart(canvas, chart, frame, start, options) {
     ctx.beginPath();ctx.roundRect(width+1,priceBadgeY-8,axisWidth-2,16,4);ctx.fill();
     label(priceText(last),width+4,priceBadgeY+4,"#10151d");
   }
-  for (const i of new Set([0,Math.floor(shown.length/2),shown.length-1])) {
+  const intraday = isIntraday(frame);
+  const firstDate = intraday ? sessionDate.format(shown[0][0] * 1000) : null;
+  const tickBounds = [];
+  ctx.font = "11px system-ui";
+  // Reserve space for the visible range endpoints before adding a middle tick.
+  for (const i of new Set([0, shown.length - 1, Math.floor(shown.length / 2)])) {
     const stamp = shown[i][0] * 1000;
-    const time = isIntraday(frame) ? tickHour.format(stamp) :
-      ["month","quarter"].includes(frame) ? new Date(stamp).toISOString().slice(0,7) : tickDate.format(stamp);
-    label(time,x(i)-4,axis+14,"#a2abc1");
+    let text;
+    if (intraday) {
+      const date = sessionDate.format(stamp);
+      const time = tickHour.format(stamp);
+      text = i === 0 || date !== firstDate ? date + " " + time : time;
+    } else {
+      const length = frame === "month" || frame === "quarter" ? 7 : 10;
+      text = new Date(stamp).toISOString().slice(0, length);
+    }
+    const size = ctx.measureText(text).width;
+    const left = Math.max(pad, Math.min(x(i) - size / 2, width - size));
+    const right = left + size;
+    if (tickBounds.some(box => left < box.right + 6 && right > box.left - 6)) continue;
+    label(text, left, axis + 14, "#a2abc1");
+    tickBounds.push({left, right});
   }
   if (isRsi) {
     const values = chart.strength.slice(start,end);

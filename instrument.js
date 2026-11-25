@@ -1,5 +1,5 @@
 import {trendStyles} from "./assets/chart-trends.js?v=82";
-import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=88";
+import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=102";
 import {setupExecutionFlags} from "./chart-executions.js?v=101";
 import {showSigmaPanel} from "./market-panels.js?v=89";
 
