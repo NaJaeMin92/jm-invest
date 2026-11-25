@@ -104,7 +104,8 @@ export function drawChart(canvas, chart, frame, start, options) {
   const axisWidth=Math.max(45,Math.ceil(ctx.measureText(priceText(shown.reduce((v,b)=>Math.max(v,b[2]),0))).width)+12);
   const pad = 8, top = 35, width = w-axisWidth;
   const isRsi = options.lower === "RSI";
-  const axis = isRsi ? h - Math.max(120, Math.min(165, w * .28)) : lower ? h * .73 : h - 19;
+  const indicatorAxis = isRsi ? h - Math.max(120, Math.min(165, w * .28)) : lower ? h * .73 : h - 19;
+  const axis = indicatorAxis - 14;
   const bottom = options.layers.volume ? axis - 29 : axis - 4;
   const comparison = matchingCloses(shown, options.compare, frame);
   const firstMatch = comparison.findIndex(Number.isFinite);
@@ -306,26 +307,26 @@ export function drawChart(canvas, chart, frame, start, options) {
     label(priceText(last),width+4,priceBadgeY+4,"#10151d");
   }
   const intraday = isIntraday(frame);
-  const firstDate = intraday ? sessionDate.format(shown[0][0] * 1000) : null;
   const tickBounds = [];
   ctx.font = "11px system-ui";
   // Reserve space for the visible range endpoints before adding a middle tick.
   for (const i of new Set([0, shown.length - 1, Math.floor(shown.length / 2)])) {
     const stamp = shown[i][0] * 1000;
-    let text;
-    if (intraday) {
-      const date = sessionDate.format(stamp);
-      const time = tickHour.format(stamp);
-      text = i === 0 || date !== firstDate ? date + " " + time : time;
-    } else {
-      const length = frame === "month" || frame === "quarter" ? 7 : 10;
-      text = new Date(stamp).toISOString().slice(0, length);
-    }
-    const size = ctx.measureText(text).width;
+    const date = intraday ? sessionDate.format(stamp) : new Date(stamp).toISOString().slice(0, 10);
+    const month = date.slice(5, 7);
+    const monthDay = month + "/" + date.slice(8, 10);
+    let text = monthDay;
+    if (intraday) text += " " + tickHour.format(stamp);
+    if (frame === "month" || frame === "quarter") text = month + "월";
+    const year = date.slice(0, 4);
+    const textWidth = ctx.measureText(text).width;
+    const yearWidth = ctx.measureText(year).width;
+    const size = Math.max(textWidth, yearWidth);
     const left = Math.max(pad, Math.min(x(i) - size / 2, width - size));
     const right = left + size;
     if (tickBounds.some(box => left < box.right + 6 && right > box.left - 6)) continue;
-    label(text, left, axis + 14, "#a2abc1");
+    label(text, left + (size - textWidth) / 2, axis + 14, "#a2abc1");
+    label(year, left + (size - yearWidth) / 2, axis + 28, "#949fb5");
     tickBounds.push({left, right});
   }
   if (isRsi) {
@@ -335,7 +336,7 @@ export function drawChart(canvas, chart, frame, start, options) {
     const actual = values.filter(Number.isFinite);
     const low = Math.max(0,Math.floor((Math.min(floor,...actual)-8)/10)*10);
     const high = Math.min(100,Math.ceil((Math.max(ceiling,...actual)+8)/10)*10);
-    const panelTop=axis+21, plotTop=panelTop+22, plotBottom=h-9;
+    const panelTop=indicatorAxis+21, plotTop=panelTop+22, plotBottom=h-9;
     const py=v=>plotBottom-(v-low)/(high-low)*(plotBottom-plotTop);
     ctx.save();
     ctx.fillStyle="#0b0c10"; ctx.fillRect(0,panelTop,w,h-panelTop);
@@ -375,7 +376,7 @@ export function drawChart(canvas, chart, frame, start, options) {
     const levels = lower.levels || [];
     const values = [...lines.flatMap(series=>series.values), ...histogram, ...levels].filter(Number.isFinite);
     const [min,max] = lower.domain || [Math.min(...values),Math.max(...values)];
-    const ly = value => h - 7 - (h - axis - 36) * (value - min)/(max-min || 1);
+    const ly = value => h - 7 - (h - indicatorAxis - 36) * (value - min)/(max-min || 1);
     for (const level of levels) line([[pad,ly(level)],[width,ly(level)]],"#465168");
     histogram.forEach((value,i) => {
       if (value == null) return;
@@ -386,9 +387,9 @@ export function drawChart(canvas, chart, frame, start, options) {
     for (const series of lines) {
       line(pointsFor(series.values,ly),series.color,1.3);
       const value = series.values.at(-1);
-      cursor += label(series.label + " " + (value?.toFixed(2) ?? "—"),cursor,axis+28,series.color) + 8;
+      cursor += label(series.label + " " + (value?.toFixed(2) ?? "—"),cursor,indicatorAxis+28,series.color) + 8;
     }
-    if (!lines.length) label("Volume",pad,axis+28,"#a2abc1");
+    if (!lines.length) label("Volume",pad,indicatorAxis+28,"#a2abc1");
   }
   let drawingAt;
   if (options.layers.drawings && options.drawings.length) {

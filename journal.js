@@ -1,7 +1,7 @@
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=100";
 import {setupWatchEditor} from "./watch-editor.js?v=95";
 import {setupOrders} from "./orders.js?v=83";
-import { setupInstrument, sparkline } from "./instrument.js?v=102";
+import { setupInstrument, sparkline } from "./instrument.js?v=103";
 import {loadWatchSentiment} from "./market-panels.js?v=89";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
