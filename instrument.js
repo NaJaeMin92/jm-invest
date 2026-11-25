@@ -838,7 +838,7 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
   const tradingDate = new Intl.DateTimeFormat("en-CA", {
     timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit"
   });
-  function renderStockMetrics() {
+  function renderQuoteSigma() {
     if (!quote) return;
     const bars = quote.daily ?? [];
     const closes = bars.slice(-20).map(bar => bar[4]);
@@ -846,11 +846,6 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     const price = hasPrice ? quote.price : closes.at(-1);
     const mean = closes.length === 20 && closes.every(value => Number.isFinite(value) && value > 0)
       ? closes.reduce((sum, close) => sum + close, 0) / 20 : null;
-    const gap = mean && price > 0 ? (price / mean - 1) * 100 : null;
-    const rsi = prepareChart(bars, "day").strength.at(-1);
-    get("stock-rsi").textContent = Number.isFinite(rsi) ? rsi.toFixed(1) : "—";
-    get("stock-sma-gap").textContent = Number.isFinite(gap) ? signed(gap) + "%" : "—";
-
     let sigma = null, label = "20D Sigma";
     const stamp = hasPrice && quote.fromKiwoom ? Date.now() / 1000
       : (hasPrice ? quote.asOf : null) ?? bars.at(-1)?.[0];
@@ -865,8 +860,11 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
       const deviation = Math.sqrt(closes.reduce((sum, close) => sum + (close - mean) ** 2, 0) / 20);
       if (deviation > 0 && !closes.every(close => close === closes[0])) sigma = (price - mean) / deviation;
     }
-    get("stock-sigma-label").textContent = label;
-    get("stock-sigma").textContent = Number.isFinite(sigma) ? signed(sigma) + "σ" : "—";
+    const badge = get("stock-sigma");
+    const visible = Number.isFinite(sigma) && Boolean(get("stock-change").textContent);
+    badge.hidden = !visible;
+    badge.textContent = visible ? "(" + signed(sigma) + "σ)" : "";
+    badge.title = visible ? label : "";
   }
   function renderQuote(preserve = false) {
     const pct = quote.percent, price = quote.price;
@@ -875,14 +873,12 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     get("stock-change").textContent = hasChange
       ? (pct < 0 ? "▼ " : "▲ ") + signed(price - price / (1 + pct / 100)) + "  " + signed(pct) + "%" : "";
     if (hasChange) get("stock-price").parentElement.dataset.direction = pct < 0 ? "down" : "up";
-    renderStockMetrics();
+    renderQuoteSigma();
     get("stock-name").textContent = [quote.name || nameFor(current), quote.exchange === "NasdaqGS" ? "NASDAQ" : quote.exchange].filter(Boolean).join("  ");
-    get("stock-quote-source").hidden = false;
-    get("stock-quote-source").textContent = quote.source || (quote.fromKiwoom ? "Kiwoom" : "Snapshot");
     get("stock-chart-sign-in").hidden = isSignedIn();
-    const when = Number.isFinite(quote.asOf) ? dateFormat.format(quote.asOf * 1000) : "";
-    get("stock-time").textContent = quote.fromKiwoom ? "Latest quote"
-      : current === "SKHY" ? "Closed 19:59 11/20 ET" : "Closed · " + when + " ET";
+    get("stock-time").textContent = "";
+    const when = !quote.fromKiwoom && Number.isFinite(quote.asOf) ? dateFormat.format(quote.asOf * 1000) + " ET" : "";
+    get("stock-price").title = [quote.fromKiwoom ? "Kiwoom" : quote.source || "Snapshot", when].filter(Boolean).join(" · ");
     get("stock-frames").hidden=false;
     if (!preserve || !chart) setFrame(frame);
     else if (!isIntraday(frame)) finishFrame(quote.daily, true);
@@ -918,7 +914,7 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
           before = part.before;
           bars = mergeDaily(bars, part.bars);
           quote.daily = bars;
-          renderStockMetrics();
+          renderQuoteSigma();
           historyState = before ? "Loading earlier history…" : "";
           if (!isIntraday(frame)) finishFrame(bars, Boolean(chart));
         }
@@ -937,7 +933,6 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     }
     if (id !== quoteRequest) return;
     get("stock-time").textContent = isSignedIn() ? message : "Sign in to load the chart.";
-    get("stock-quote-source").hidden = true;
     get("stock-chart-sign-in").hidden = isSignedIn();
     get("stock-quote-retry").hidden = !canLoadChart();
     get("stock-frames").hidden = true;
@@ -958,17 +953,18 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     get("stock-symbol").textContent=displaySymbol(symbol);
     document.title=displaySymbol(symbol)+" · TradeInSight";
     get("stock-name").textContent=nameFor(symbol);
-    for (const id of ["stock-price","stock-sigma","stock-rsi","stock-sma-gap"]) get(id).textContent="—";
+    get("stock-price").textContent = "—";
+    get("stock-price").title = "";
+    get("stock-sigma").hidden = true;
+    get("stock-sigma").textContent = "";
     get("stock-change").textContent="";get("stock-time").textContent="Loading quote…";
-    get("stock-quote-source").hidden = true;
     get("stock-chart-sign-in").hidden = isSignedIn();
     get("external-chart").replaceChildren();get("external-chart").hidden=true;
     canvas.hidden=true;get("stock-frames").hidden=true;
-    get("stock-sigma-label").textContent = "Sigma";
     loadWeeklyBand(symbol, band => {
       if (current !== symbol) return;
       weeklyBand = band;
-      renderStockMetrics();
+      renderQuoteSigma();
     }).catch(() => {});
     setFavorite();setFrame("day");
     await loadInstrumentQuote(symbol);
