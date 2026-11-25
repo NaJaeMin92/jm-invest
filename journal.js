@@ -1,4 +1,4 @@
-import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=95";
+import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=98";
 import {setupWatchEditor} from "./watch-editor.js?v=95";
 import {setupOrders} from "./orders.js?v=83";
 import { setupInstrument, sparkline } from "./instrument.js?v=96";
@@ -58,8 +58,7 @@ function selectView(view) {
   if (!token && view !== "account") returnToStock = null;
   const needsLogin = !["home","strategies"].includes(view) && !token;
   document.getElementById("watch-login").hidden = Boolean(token);
-  accountNavLabel.textContent=token ? "Account" : "로그인";
-  accountNavLabel.lang=token ? "en" : "ko";
+  accountNavLabel.textContent=token ? "Account" : "Sign in";
   document.body.dataset.view = view;
   setDetail(view === "account" && !needsLogin);
   login.hidden = !needsLogin;
@@ -77,16 +76,7 @@ function selectView(view) {
   document.querySelector("#page-heading").textContent = {
     strategies:"Strategies", home:"My Watchlist", account:"계좌", profit:"Realized P&L", more:"Menu"
   }[view];
-  const korean = view === "account";
-  document.querySelector("#page-heading").lang = korean ? "ko" : "en";
-  login.lang = korean ? "ko" : "en";
-  for (const [id, english, translated] of [
-    ["login-heading","Sign in to your account","계좌에 로그인"],
-    ["login-email-label","Email","이메일"],
-    ["login-password-label","Password","비밀번호"],
-    ["login-remember-label","Keep me signed in on this device","이 기기에서 로그인 유지"],
-    ["login-submit","Sign in","로그인"],
-  ]) document.getElementById(id).textContent = korean ? translated : english;
+  document.querySelector("#page-heading").lang = view === "account" ? "ko" : "en";
   if(view==="strategies") renderStrategies();
   window.scrollTo(0, 0);
   if (view === "home") refreshWatchlistQuotes();
@@ -1072,7 +1062,7 @@ async function restoreSession() {
   if (!storedSession()) return;
   if(!login.hidden){
     login.hidden=true;
-    message.textContent="저장된 로그인 정보를 확인하고 있습니다.";
+    message.textContent="Restoring your session…";
   }
   try {
     const resume = async () => {

@@ -13,7 +13,12 @@ const draftFactors = {
   volumeProfile: "Volume Profile · 매물대",
   marketBreadth: "Market Breadth · 시장 폭"
 };
-const isDraft=key=>Object.hasOwn(draftFactors,key);
+const macroFactors = {
+  cpiYoY: {label:"미국 CPI 전년 동월비",unit:"%"},
+  pceYoY: {label:"미국 PCE 물가지수 전년 동월비",unit:"%"},
+  fedTargetChangeBp: {label:"연준 목표금리 상단 변동 (직전 결정 대비)",unit:"bp"}
+};
+const isDraft=key=>Object.hasOwn(draftFactors,key) || Object.hasOwn(macroFactors,key);
 
 export const strategyPrefix="jm-invest:strategy:v1:";
 
@@ -31,7 +36,9 @@ function strategySummary(rule) {
 }
 
 function conditionLabel(c) {
-  if(isDraft(c.key))return draftFactors[c.key];
+  const macro=macroFactors[c.key];
+  if(macro)return `${macro.label} ${c.op==="gte" ? "≥" : "≤"} ${c.value}${macro.unit}`;
+  if(Object.hasOwn(draftFactors,c.key))return draftFactors[c.key];
   const name=factors[c.key]?.[0];
   if(!name)return "종료된 조건";
   return name.split(" · ")[0]+" "+(c.op==="gte" ? "≥" : "≤")+" "+c.value;
@@ -73,6 +80,10 @@ export function setupStrategy({loadChart,orders,canLoadChart,tickerIcon}) {
     group.label="백테스트 후보";
     for (const [key,name] of Object.entries(draftFactors)) group.append(option(key,name));
     factor.append(group);
+    const macroGroup=document.createElement("optgroup");
+    macroGroup.label="미국 경제지표 · 백테스트 후보";
+    for(const [key,{label,unit}] of Object.entries(macroFactors))macroGroup.append(option(key,label+" ("+unit+")"));
+    factor.append(macroGroup);
     factor.required=true;
     if (!Object.hasOwn(factors,c.key) && !isDraft(c.key)) {
       const missing=option("","대체 조건 선택");
@@ -84,8 +95,10 @@ export function setupStrategy({loadChart,orders,canLoadChart,tickerIcon}) {
     op.value=c.op || "lte";
     input.value=c.value ?? "";
     function updateRow() {
-      const draft=isDraft(factor.value);
-      op.parentElement.hidden=op.disabled=input.parentElement.hidden=input.disabled=draft;
+      const numeric=!Object.hasOwn(draftFactors,factor.value);
+      op.parentElement.hidden=op.disabled=input.parentElement.hidden=input.disabled=!numeric;
+      const unit=macroFactors[factor.value]?.unit;
+      row.querySelector(".condition-limit span").textContent=unit ? `기준값 (${unit})` : "기준값";
     }
     updateRow();
     factor.onchange=()=>{
@@ -141,7 +154,7 @@ export function setupStrategy({loadChart,orders,canLoadChart,tickerIcon}) {
     const conditions=Array.from(list.children,row=>{
       const [factor,op]=row.querySelectorAll("select");
       const input=row.querySelector("input");
-      return isDraft(factor.value) ? {key:factor.value} : {key:factor.value,op:op.value,value:input.valueAsNumber};
+      return input.disabled ? {key:factor.value} : {key:factor.value,op:op.value,value:input.valueAsNumber};
     });
     if (!conditions.length) {state.textContent="판단 조건을 하나 이상 추가하세요.";return;}
     if(f.mode.value==="live" && !/^\d{1,7}(\.\d{1,4})?$/.test(f.price.value)) {state.textContent="지정가 자릿수를 확인하세요.";return;}
@@ -164,7 +177,7 @@ export function setupStrategy({loadChart,orders,canLoadChart,tickerIcon}) {
     conditions.replaceChildren();
     for (const c of rule?.conditions || []) {
       const item=document.createElement("li");
-      item.textContent=draftFactors[c.key] || [factors[c.key]?.[0] || c.key,c.op==="gte" ? "≥" : "≤",c.value].join(" ");
+      item.textContent=Object.hasOwn(factors,c.key) ? [factors[c.key][0],c.op==="gte" ? "≥" : "≤",c.value].join(" ") : conditionLabel(c);
       conditions.append(item);
     }
     const edit=panel.querySelector("button");
