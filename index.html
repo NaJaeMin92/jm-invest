@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=99">
-<script type="module" src="./journal.js?v=99"></script>
+<link rel="stylesheet" href="./style.css?v=100">
+<script type="module" src="./journal.js?v=100"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header class="app-masthead"><div class="head">
@@ -78,20 +78,20 @@
 </section>
 <section id="strategy-orders" hidden>
 <fieldset class="strategy-choice"><legend>주문 방향</legend><div><label><input type="radio" name="side" value="buy" checked><span>매수</span></label><label><input type="radio" name="side" value="sell"><span>매도</span></label></div></fieldset>
-<div class="strategy-pair"><label id="strategy-sizing">매수 방식<select name="sizing"><option value="fixed">고정 수량</option><option value="split">예산 분할 계획</option></select></label><label id="strategy-quantity">주문 수량 (주)<input name="quantity" type="number" min="1" max="999999" step="1" value="1" required></label></div>
-<fieldset id="strategy-budget" hidden disabled>
-<legend>분할매수 예산</legend>
+<label id="strategy-quantity" hidden>매도 수량 (주)<input name="quantity" type="number" min="1" max="999999" step="1" value="1" required disabled></label>
+<fieldset id="strategy-budget">
+<legend>예산 분할 계획</legend>
 <label>총예산 (USD)<input name="budget" type="number" min="0.01" step="0.01" inputmode="decimal" required></label>
 <div class="strategy-pair"><label>전체 분할 수<input name="units" type="number" min="1" step="1" value="10" required></label>
 <label>한 번에 쓸 분할 수<input name="perBuy" type="number" min="1" step="1" value="1" required></label></div>
 <output id="strategy-allocation" aria-live="polite"></output>
 </fieldset>
-<label>실행 방식<select name="mode"><option value="signal">신호만 확인</option><option value="live">키움 실계좌 지정가 주문</option></select></label>
-<label id="strategy-price" hidden>주문 지정가 (USD)<input name="price" type="number" min="0.0001" step="any"></label>
+<div class="strategy-execution"><span>실행 방식</span><strong>실계좌 지정가 주문</strong></div>
+<label id="strategy-price">주문 지정가 (USD)<input name="price" type="number" min="0.0001" step="any"></label>
 <p id="strategy-watch-note">이 창이 열려 있는 동안 직전 완료 봉을 기준으로 1분마다 확인합니다. 조건을 충족하면 한 번 실행합니다.</p>
 </section></fieldset></form>
 <div class="strategy-actionbar"><p id="strategy-draft-note" hidden></p><p id="strategy-state" role="status"></p>
-<div><button type="button" id="strategy-next">주문 설정 ›</button><button type="button" id="strategy-save">규칙 저장</button><button type="button" id="strategy-start">신호 감시 시작</button><button type="button" id="strategy-stop" hidden>감시 중지</button></div></div></dialog>
+<div><button type="button" id="strategy-next">주문 설정 ›</button><button type="button" id="strategy-save">규칙 저장</button><button type="button" id="strategy-start">실계좌 자동주문 시작</button><button type="button" id="strategy-stop" hidden>감시 중지</button></div></div></dialog>
 </section>
 <section id="tab-profit" class="tab-panel" hidden>
 <h2>US equity realized P&L</h2>

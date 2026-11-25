@@ -1082,6 +1082,8 @@ body.instrument-open { overflow:hidden; }
   appearance:none; height:44px; padding-right:30px; background-image:linear-gradient(45deg,transparent 50%,#aebccb 50%),linear-gradient(135deg,#aebccb 50%,transparent 50%);
   background-size:5px 5px; background-repeat:no-repeat; background-position:calc(100% - 16px) center,calc(100% - 11px) center;
 }
+.strategy-execution { display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding-top:12px; border-top:1px solid #344350; color:#b5c3d1; font-size:13px }
+.strategy-execution strong { color:#e4edf3; font-weight:600 }
 #strategy-budget { min-width:0; margin:0; padding:10px; border:1px solid #344350; border-radius:12px }
 #strategy-allocation { white-space:pre-line; color:#c6dfd4; font-size:13px }
 .strategy-actionbar { padding:10px 16px; border-top:1px solid #33414e }

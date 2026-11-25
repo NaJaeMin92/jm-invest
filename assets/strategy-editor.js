@@ -49,7 +49,7 @@ export function libraryDetails(rule) {
   const size=rule.allocation
     ? `$${Number(rule.allocation.amount).toLocaleString("en-US",{maximumFractionDigits:2})} · ${rule.allocation.units}분할`
     : `${rule.quantity}주`;
-  const mode=draft ? "초안" : rule.mode==="live" ? "실계좌 지정가" : "신호 확인";
+  const mode=draft ? "초안" : rule.mode==="live" && rule.side==="sell" ? "실계좌 지정가" : "설정 확인";
   return {
     conditions:rule.conditions.map(conditionLabel).join(rule.join==="any" ? " 또는 " : " 그리고 "),
     frame:shortName[rule.frame],size,mode
@@ -115,12 +115,9 @@ export function setupStrategy({loadChart,orders,canLoadChart,tickerIcon}) {
     get("condition-count").textContent="조건 "+list.children.length+"개";
     get("join").hidden=list.children.length<2;
     const buy=f.side.value==="buy";
-    const split=buy && f.sizing.value==="split";
-    get("sizing").hidden=!buy;
-    f.sizing.disabled=!buy;
-    get("quantity").hidden=f.quantity.disabled=split;
-    get("budget").hidden=get("budget").disabled=!split;
-    if(split) {
+    get("quantity").hidden=f.quantity.disabled=buy;
+    get("budget").hidden=get("budget").disabled=!buy;
+    if(buy) {
       const plan=splitBudget(f.budget.value,f.units.valueAsNumber,f.perBuy.valueAsNumber);
       const usd=new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"});
       get("allocation").textContent=plan ? ["총 "+plan.rounds+"회 매수", ...plan.ranges.map(r=>{
@@ -129,17 +126,14 @@ export function setupStrategy({loadChart,orders,canLoadChart,tickerIcon}) {
       })].join("\n") : "총예산과 분할 수를 입력하세요. 각 분할에는 최소 1센트를 배정합니다.";
       f.perBuy.max=f.units.value;
     }
-    const draft=split || Array.from(list.children).some(row=>isDraft(row.querySelector(".condition-factor select").value));
-    if(draft) f.mode.value="signal";
-    f.mode.disabled=draft;
+    const draft=buy || Array.from(list.children).some(row=>isDraft(row.querySelector(".condition-factor select").value));
     get("draft-note").hidden=!draft;
-    get("watch-note").hidden=split;
-    get("draft-note").textContent=split ? "여러 거래일에 걸쳐 사용할 계획입니다. 회차별 예산을 초안으로 저장합니다." : "백테스트 후보가 포함된 규칙은 초안으로 저장할 수 있습니다.";
+    get("watch-note").hidden=draft;
+    get("draft-note").textContent=buy ? "분할 예산은 초안으로 저장합니다." : "백테스트 후보가 포함된 규칙은 초안으로 저장합니다.";
     get("start").disabled=draft;
     get("save").textContent=draft ? "초안 저장" : "규칙 저장";
-    const live=f.mode.value==="live";
-    get("price").hidden=!live; f.price.required=live;
-    get("start").textContent=live ? "실계좌 "+(f.side.value==="buy"?"매수":"매도")+" 1회 자동주문 시작" : "신호 감시 시작";
+    f.price.required=!draft;
+    get("start").textContent="실계좌 "+(buy ? "매수" : "매도")+" 1회 자동주문 시작";
     fields.disabled=Boolean(run); get("save").disabled=Boolean(run);
     get("start").hidden=Boolean(run); get("stop").hidden=!run || sending;
     get("close").disabled=sending;
@@ -157,16 +151,16 @@ export function setupStrategy({loadChart,orders,canLoadChart,tickerIcon}) {
       return input.disabled ? {key:factor.value} : {key:factor.value,op:op.value,value:input.valueAsNumber};
     });
     if (!conditions.length) {state.textContent="판단 조건을 하나 이상 추가하세요.";return;}
-    if(f.mode.value==="live" && !/^\d{1,7}(\.\d{1,4})?$/.test(f.price.value)) {state.textContent="지정가 자릿수를 확인하세요.";return;}
-    if(f.mode.value==="live" && Number(f.price.value)>=1 && (f.price.value.split(".")[1]||"").length>2) {state.textContent="$1 이상은 소수점 두 자리까지 입력하세요.";return;}
+    if(f.price.value && !/^\d{1,7}(\.\d{1,4})?$/.test(f.price.value)) {state.textContent="지정가 자릿수를 확인하세요.";return;}
+    if(Number(f.price.value)>=1 && (f.price.value.split(".")[1]||"").length>2) {state.textContent="$1 이상은 소수점 두 자리까지 입력하세요.";return;}
     let allocation;
-    if(f.side.value==="buy" && f.sizing.value==="split"){
+    if(f.side.value==="buy"){
       allocation={amount:f.budget.value,units:f.units.valueAsNumber,perBuy:f.perBuy.valueAsNumber};
       if(!splitBudget(allocation.amount,allocation.units,allocation.perBuy)){
         state.textContent="총예산과 분할 수를 확인하세요.";return;
       }
     }
-    return {allocation,symbol,frame:f.frame.value,join:f.join.value,side:f.side.value,quantity:f.quantity.value,price:f.price.value,mode:f.mode.value,conditions};
+    return {allocation,symbol,frame:f.frame.value,join:f.join.value,side:f.side.value,quantity:allocation ? undefined : f.quantity.value,price:f.price.value,mode:"live",conditions};
   }
   function showStock(symbol) {
     const rule=readStrategy(symbol);
@@ -189,9 +183,12 @@ export function setupStrategy({loadChart,orders,canLoadChart,tickerIcon}) {
     if(sheet.parentElement!==host)host.append(sheet);
     symbol=ticker; form.reset(); list.replaceChildren(); state.textContent="";
     const saved=readStrategy(symbol);
-    if(saved) for(const k of ["frame","join","side","quantity","price"]) f[k].value=saved[k];
+    if(saved) for(const k of ["frame","join","side","quantity","price"]) {
+      if(saved[k]!=null)f[k].value=saved[k];
+    }
+    if(saved?.mode==="signal" && !saved.allocation)f.price.value="";
+    if(saved?.side==="buy" && !saved.allocation)state.textContent="기존 매수 전략의 분할 예산을 입력하세요.";
     if(saved?.allocation){
-      f.sizing.value="split";
       f.budget.value=saved.allocation.amount;
       f.units.value=saved.allocation.units;
       f.perBuy.value=saved.allocation.perBuy;
@@ -206,9 +203,8 @@ export function setupStrategy({loadChart,orders,canLoadChart,tickerIcon}) {
     try {localStorage.setItem(strategyPrefix+symbol,JSON.stringify(r));state.textContent=r.allocation || r.conditions.some(c=>isDraft(c.key)) ? "초안을 저장했습니다." : "규칙을 저장했습니다.";}
     catch {state.textContent="이 브라우저에 저장하지 못했습니다.";}
   };
-  f.sizing.onchange=sync; get("budget").oninput=sync;
+  get("budget").oninput=sync;
   get("add").onclick=()=>{add();sync();list.lastElementChild.querySelector("select").focus();};
-  f.mode.onchange=sync;
   for(const radio of form.querySelectorAll('[name="side"]'))radio.onchange=sync;
   function stop(message) {
     if(run){run.abort();run=null;}
@@ -240,7 +236,6 @@ export function setupStrategy({loadChart,orders,canLoadChart,tickerIcon}) {
     signal.throwIfAborted();
     const detail=r.conditions.map(c=>factors[c.key][0]+" "+(Number.isFinite(values[c.key])?values[c.key].toFixed(2):"자료 부족")).join(" · ");
     if(!matches(r,values)) return detail;
-    if(r.mode==="signal"){stop("조건 충족 · "+detail);return;}
     const ctx=await orders.stockContext(r.symbol);
     signal.throwIfAborted();
     if(!ctx?.enabled || ctx.symbol!==r.symbol)throw Error("종목과 실주문 연결을 확인하세요.");
@@ -270,18 +265,16 @@ export function setupStrategy({loadChart,orders,canLoadChart,tickerIcon}) {
     const r=rule();if(!r)return;
     if(r.allocation || r.conditions.some(c=>isDraft(c.key)))return;
     if(!canLoadChart()){state.textContent="시세 조회를 위해 계좌에 로그인하세요.";return;}
-    if(r.mode==="live" && !["127.0.0.1","localhost"].includes(location.hostname)){state.textContent="실주문은 비공개 로컬 주문 서버에서 실행하세요.";return;}
+    if(!["127.0.0.1","localhost"].includes(location.hostname)){state.textContent="실주문은 비공개 로컬 주문 서버에서 실행하세요.";return;}
     const ctrl=new AbortController();run=ctrl;sync();state.textContent=r.symbol+" · "+shortName[r.frame]+" · 조건 확인 중";
     try {
-      if(r.mode==="live"){
-        const status=await orders.status();
-        if(run!==ctrl)return;
-        if(!status.enabled)throw Error("실주문 서버를 실행한 뒤 다시 시작하세요.");
-        await navigator.locks.request("jm-invest:auto-order",{ifAvailable:true},async lock=>{
-          if(!lock)throw Error("다른 창에서 자동주문을 감시하고 있습니다.");
-          await watch(r,ctrl);
-        });
-      } else await watch(r,ctrl);
+      const status=await orders.status();
+      if(run!==ctrl)return;
+      if(!status.enabled)throw Error("실주문 서버를 실행한 뒤 다시 시작하세요.");
+      await navigator.locks.request("jm-invest:auto-order",{ifAvailable:true},async lock=>{
+        if(!lock)throw Error("다른 창에서 자동주문을 감시하고 있습니다.");
+        await watch(r,ctrl);
+      });
     }catch(error){if(run===ctrl)stop(error.message);}
   };
   return {open,close,showStock};
