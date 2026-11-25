@@ -6,6 +6,7 @@ const nyTime = new Intl.DateTimeFormat("ko-KR", {
   timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit",
   hour:"2-digit", minute:"2-digit", second:"2-digit", hourCycle:"h23"
 });
+const shares = new Intl.NumberFormat("ko-KR",{maximumFractionDigits:8});
 const dollars = new Intl.NumberFormat("en-US", {style:"currency", currency:"USD", maximumFractionDigits:4});
 const dateString = day => new Date(day * dayMs).toISOString().slice(0,10);
 const blockOf = day => Math.floor(day / blockDays);
@@ -69,6 +70,8 @@ export function setupExecutionFlags(load) {
   const layer = document.getElementById("execution-flags");
   const dialog = document.getElementById("execution-detail"), list = document.getElementById("execution-list");
   const blocks = new Map();
+  const measure=document.createElement("canvas").getContext("2d");
+  measure.font="700 11px system-ui,sans-serif";
   let view, range, symbol, controller, timer;
   document.getElementById("execution-close").onclick = () => dialog.close();
   dialog.addEventListener("cancel",event=>event.stopPropagation());
@@ -81,7 +84,7 @@ export function setupExecutionFlags(load) {
       const value = document.createElement("b"), when = document.createElement("time");
       side.dataset.side = record.side;
       side.textContent = record.side === "buy" ? "Buy" : "Sell";
-      value.textContent = record.quantity.toLocaleString("ko-KR",{maximumFractionDigits:8}) + "주 · " + dollars.format(record.price);
+      value.textContent = shares.format(record.quantity) + "주 · " + dollars.format(record.price);
       when.textContent = record.time == null ? record.day + " 거래일" : nyTime.format(record.time * 1000) + " ET";
       when.dateTime = record.time == null ? record.day : new Date(record.time * 1000).toISOString();
       li.append(side,value,when);
@@ -105,14 +108,28 @@ export function setupExecutionFlags(load) {
         }
       }
       const p = view.geometry.executionPoint(group.index,group.records[0].price);
-      const x = Math.max(14,Math.min(p.width - 14,p.x));
       const below = p.y < p.top + 26 || (group.side === "buy" && p.y <= p.bottom - 26);
       const y = Math.max(p.top + 12,Math.min(p.bottom - 12,p.y + (below ? 15 : -15)));
-      const nearby = clusters.findLast(c=>Math.abs(c.x-x)<26 && Math.abs(c.y-y)<24);
-      if (nearby) {
-        nearby.records.push(...group.records);
-        if (nearby.side !== group.side) nearby.side = "both";
-      } else clusters.push({...group,x,y,below});
+      const cluster={...group,y,below,anchor:p.x,buy:0,sell:0};
+      cluster[group.side]=group.records.reduce((sum,record)=>sum+record.quantity,0);
+      // Merging adds text, so check again using the combined flag's width.
+      while(true){
+        const sides=["buy","sell"].filter(side=>cluster[side]>0);
+        cluster.side=sides.length===2 ? "both" : sides[0];
+        cluster.label=sides.map(side=>(side==="buy" ? "B " : "S ")+shares.format(cluster[side])+"주").join(" / ");
+        cluster.halfWidth=Math.max(11,Math.ceil(measure.measureText(cluster.label).width/2)+6);
+        cluster.x=Math.max(cluster.halfWidth,Math.min(p.width-cluster.halfWidth,cluster.anchor));
+        const index=clusters.findLastIndex(c=>Math.abs(c.x-cluster.x)<c.halfWidth+cluster.halfWidth+2 && Math.abs(c.y-cluster.y)<24);
+        if(index<0)break;
+        const [prior]=clusters.splice(index,1);
+        cluster.buy+=prior.buy;
+        cluster.sell+=prior.sell;
+        cluster.records.push(...prior.records);
+        cluster.anchor=prior.anchor;
+        cluster.y=prior.y;
+        cluster.below=prior.below;
+      }
+      clusters.push(cluster);
     }
     const focusKey = layer.contains(document.activeElement) ? document.activeElement.dataset.key : null;
     const pins = [...dots.values()].map(point=>{
@@ -132,9 +149,10 @@ export function setupExecutionFlags(load) {
       flag.dataset.below = String(group.below);
       flag.style.left = group.x + "px";
       flag.style.top = group.y + "px";
-      flag.textContent = {buy:"B",sell:"S",both:"B/S"}[group.side];
+      flag.style.setProperty("--stem-offset",(group.anchor-group.x)+"px");
+      flag.textContent = group.label;
       if (group.records.length > 1) flag.classList.add("multiple");
-      const name = {buy:"매수",sell:"매도",both:"매수·매도"}[group.side] + " 체결 " + group.records.length + "건";
+      const name = group.label.replace("B ","매수 ").replace("S ","매도 ")+" · 체결 "+group.records.length+"건";
       flag.setAttribute("aria-label",name);
       flag.setAttribute("aria-haspopup","dialog");
       flag.title = name;
