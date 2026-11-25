@@ -142,6 +142,10 @@ const loadSentiment = cachedFeed(
   data => Date.parse(data.fear_and_greed.timestamp), 60_000
 );
 
+export function loadWeeklyBand(symbol, render) {
+  return loadSigma(data => render(data.symbols[symbol] ?? null));
+}
+
 export function loadWatchSentiment(render) {
   return loadSentiment((data, saved) => {
     render({rating: titleCase(data.fear_and_greed.rating), saved});

@@ -1,7 +1,7 @@
 import {trendStyles} from "./assets/chart-trends.js?v=82";
 import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=103";
 import {setupExecutionFlags} from "./chart-executions.js?v=101";
-import {showSigmaPanel} from "./market-panels.js?v=89";
+import {calculateSigma, loadWeeklyBand, showSigmaPanel} from "./market-panels.js?v=104";
 
 import {setupChartTools} from "./chart-tools.js?v=76";
 import {orderKinds, needsPrice, populateKinds} from "./orders.js?v=83";
@@ -75,7 +75,7 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
   const executions = setupExecutionFlags(loadExecutions);
   let current="", quote=null, frame="day", afterClose=null, quoteRequest=0;
   const fullHistory = new Map();
-  let historyAbort, historyState = "";
+  let historyAbort, historyState = "", weeklyBand;
   const trade = get("trade-preview");
   const tradeForm = get("trade-preview-form"), tradeReview = get("trade-preview-review");
   const tradeStatus = get("trade-preview-status"), tradeNext = get("trade-preview-next");
@@ -835,19 +835,47 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
       if (id === requestId) chartStatus.textContent = "Intraday history is temporarily unavailable. Select another interval.";
     }
   }
+  const tradingDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit"
+  });
+  function renderStockMetrics() {
+    if (!quote) return;
+    const bars = quote.daily ?? [];
+    const closes = bars.slice(-20).map(bar => bar[4]);
+    const hasPrice = Number.isFinite(quote.price) && quote.price > 0;
+    const price = hasPrice ? quote.price : closes.at(-1);
+    const mean = closes.length === 20 && closes.every(value => Number.isFinite(value) && value > 0)
+      ? closes.reduce((sum, close) => sum + close, 0) / 20 : null;
+    const gap = mean && price > 0 ? (price / mean - 1) * 100 : null;
+    const rsi = prepareChart(bars, "day").strength.at(-1);
+    get("stock-rsi").textContent = Number.isFinite(rsi) ? rsi.toFixed(1) : "—";
+    get("stock-sma-gap").textContent = Number.isFinite(gap) ? signed(gap) + "%" : "—";
+
+    let sigma = null, label = "20D Sigma";
+    const stamp = hasPrice && quote.fromKiwoom ? Date.now() / 1000
+      : (hasPrice ? quote.asOf : null) ?? bars.at(-1)?.[0];
+    const date = Number.isFinite(stamp) ? tradingDate.format(stamp * 1000) : "";
+    if (weeklyBand && date >= weeklyBand.fromDate && date <= weeklyBand.through && price > 0) {
+      try {
+        sigma = calculateSigma({...weeklyBand, close:price}).z;
+        label = "Weekly Sigma";
+      } catch { /* Use the historical band when the option inputs are incomplete. */ }
+    }
+    if (sigma === null && mean && price > 0) {
+      const deviation = Math.sqrt(closes.reduce((sum, close) => sum + (close - mean) ** 2, 0) / 20);
+      if (deviation > 0 && !closes.every(close => close === closes[0])) sigma = (price - mean) / deviation;
+    }
+    get("stock-sigma-label").textContent = label;
+    get("stock-sigma").textContent = Number.isFinite(sigma) ? signed(sigma) + "σ" : "—";
+  }
   function renderQuote(preserve = false) {
     const pct = quote.percent, price = quote.price;
     const hasChange = Number.isFinite(price) && Number.isFinite(pct) && pct > -100;
-    const compact = new Intl.NumberFormat("en-US", {notation:"compact",maximumFractionDigits:2});
     get("stock-price").textContent = Number.isFinite(price) ? price.toFixed(2) : "—";
     get("stock-change").textContent = hasChange
       ? (pct < 0 ? "▼ " : "▲ ") + signed(price - price / (1 + pct / 100)) + "  " + signed(pct) + "%" : "";
     if (hasChange) get("stock-price").parentElement.dataset.direction = pct < 0 ? "down" : "up";
-    get("stock-range").textContent = Number.isFinite(quote.high) && Number.isFinite(quote.low)
-      ? quote.low.toFixed(2) + "–" + quote.high.toFixed(2) : "—";
-    get("stock-volume").textContent = Number.isFinite(quote.volume) ? compact.format(quote.volume) : "—";
-    get("stock-cap").textContent = Number.isFinite(quote.marketCap) ? compact.format(quote.marketCap)
-      : current === "SKHY" ? "754.89B" : "—";
+    renderStockMetrics();
     get("stock-name").textContent = [quote.name || nameFor(current), quote.exchange === "NasdaqGS" ? "NASDAQ" : quote.exchange].filter(Boolean).join("  ");
     get("stock-quote-source").hidden = false;
     get("stock-quote-source").textContent = quote.source || (quote.fromKiwoom ? "Kiwoom" : "Snapshot");
@@ -890,6 +918,7 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
           before = part.before;
           bars = mergeDaily(bars, part.bars);
           quote.daily = bars;
+          renderStockMetrics();
           historyState = before ? "Loading earlier history…" : "";
           if (!isIntraday(frame)) finishFrame(bars, Boolean(chart));
         }
@@ -918,7 +947,7 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     get("trend-menu").open=false;
     if (trade.open) trade.close();
     if(dialog.contains(get("strategy-sheet")))strategy.close();
-    current=symbol;quote=null;historyState="";sessionDate.value="";
+    current=symbol;quote=null;weeklyBand=null;historyState="";sessionDate.value="";
     selectPanel("chart");
     document.body.classList.add("instrument-open");
     if (!dialog.open) dialog.showModal();
@@ -929,12 +958,18 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     get("stock-symbol").textContent=displaySymbol(symbol);
     document.title=displaySymbol(symbol)+" · TradeInSight";
     get("stock-name").textContent=nameFor(symbol);
-    for (const id of ["stock-price","stock-range","stock-volume","stock-cap"]) get(id).textContent="—";
+    for (const id of ["stock-price","stock-sigma","stock-rsi","stock-sma-gap"]) get(id).textContent="—";
     get("stock-change").textContent="";get("stock-time").textContent="Loading quote…";
     get("stock-quote-source").hidden = true;
     get("stock-chart-sign-in").hidden = isSignedIn();
     get("external-chart").replaceChildren();get("external-chart").hidden=true;
     canvas.hidden=true;get("stock-frames").hidden=true;
+    get("stock-sigma-label").textContent = "Sigma";
+    loadWeeklyBand(symbol, band => {
+      if (current !== symbol) return;
+      weeklyBand = band;
+      renderStockMetrics();
+    }).catch(() => {});
     setFavorite();setFrame("day");
     await loadInstrumentQuote(symbol);
   }
