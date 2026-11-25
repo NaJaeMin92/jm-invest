@@ -50,6 +50,12 @@ async function request(path, { method = "GET", body, accessToken = token } = {})
 
 const holdingsPanel = document.querySelector("#account-holdings");
 const holdingsToggle = document.querySelector("#open-kiwoom");
+const assetToggle = document.getElementById("asset-details-toggle");
+const assetDetails = document.getElementById("asset-details");
+assetToggle.onclick = () => {
+  assetDetails.hidden = !assetDetails.hidden;
+  assetToggle.setAttribute("aria-expanded", String(!assetDetails.hidden));
+};
 const navigation = document.querySelector("#bottom-nav");
 const accountNavLabel=document.getElementById("account-nav-label");
 const navButtons = [...navigation.querySelectorAll("button")];
@@ -1031,10 +1037,11 @@ loadDirectory().catch(() => {});
 async function loadValuation(accessToken) {
   const value = document.querySelector("#portfolio-value");
   const performance = document.querySelector("#kiwoom-return");
-  const performanceRow = document.querySelector("#account-performance");
-  performanceRow.hidden = true;
-  const breakdown=document.getElementById("asset-breakdown");
-  breakdown.hidden=true;
+  assetDetails.hidden = true;
+  assetToggle.hidden = true;
+  assetToggle.setAttribute("aria-expanded", "false");
+  const profitRow = document.getElementById("asset-profit");
+  profitRow.hidden = true;
   delete value.dataset.loaded;
   value.textContent = "조회 중…";
   performance.textContent = "";
@@ -1069,16 +1076,14 @@ async function loadValuation(accessToken) {
       currency.textContent=part.value;
       return currency;
     }));
-    if(hasCash){
-      document.getElementById("asset-stocks").textContent=holdingKRW.format(stocks);
-      document.getElementById("asset-cash").textContent=holdingKRW.format(cash);
-      document.getElementById("asset-other-row").hidden=!(rp>0);
-      document.getElementById("asset-other").textContent=rp>0 ? holdingKRW.format(rp) : "";
-      breakdown.hidden=false;
-    }
-    performanceRow.hidden = !numeric(balance.return_pct);
+    document.getElementById("asset-stocks").textContent = holdingKRW.format(stocks);
+    document.getElementById("asset-cash").textContent = hasCash ? holdingKRW.format(cash) : "—";
+    document.getElementById("asset-other-row").hidden = !(rp > 0);
+    document.getElementById("asset-other").textContent = rp > 0 ? holdingKRW.format(rp) : "";
+    assetToggle.hidden = false;
     showPerformance(performance,balance.return_pct,signedWatchPercent);
     showHoldings(balance);
+    profitRow.hidden = false;
 
     showProfit(balance.realized_profit);
     return balance;

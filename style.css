@@ -867,33 +867,37 @@ body.instrument-open { overflow:hidden; }
 #pending-orders #pending-next { background:#c8d7ec; color:#172435; flex:1.7; }
 #pending-orders [data-action="cancel"] #pending-next { background:#e6b6b3; color:#342222; }
 #account-home .asset-overview {
-  display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end;
-  gap:6px 12px; padding:10px 2px; border-bottom:1px solid var(--line);
+  display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center;
+  gap:3px 12px; padding:12px 2px 13px; border-bottom:1px solid var(--line);
 }
-#private #asset-title, #account-performance span { margin:0; color:#adbccc; font:500 12px/1.35 system-ui }
-#account-home .asset-overview .portfolio-value { display:block; font:550 15px/1.25 system-ui; color:#bac7d6; margin:2px 0 0; letter-spacing:0 }
-#account-home .asset-overview .portfolio-value[data-loaded] { font-size:clamp(23px,5.8vw,31px); color:#f4f6f9; letter-spacing:-.045em; font-variant-numeric:tabular-nums }
+#private #asset-title { grid-area:1/1; margin:0; color:#adbccc; font:500 13px/1.35 system-ui }
+#asset-details-toggle, #open-kiwoom { background:none; border:0; border-radius:5px; min-height:44px; color:inherit }
+#asset-details-toggle { grid-area:1/2/3/3; align-self:start; padding:0 3px 0 12px; font:500 13px system-ui; color:#b6c3d3 }
+#asset-details-toggle::after, #open-kiwoom::after {
+  content:""; display:inline-block; width:6px; height:6px; margin:0 2px 3px 8px;
+  border:solid currentColor; border-width:0 1.5px 1.5px 0; transform:rotate(45deg);
+}
+#asset-details-toggle[aria-expanded="true"]::after, #open-kiwoom[aria-expanded="true"]::after { transform:rotate(225deg); vertical-align:-2px }
+#account-home .asset-overview .portfolio-value { grid-area:2/1; margin:0; color:#bac7d6; font:550 15px/1.25 system-ui }
+#account-home .asset-overview .portfolio-value[data-loaded] { color:#f4f6f9; font-size:clamp(25px,6vw,32px); letter-spacing:-.045em; font-variant-numeric:tabular-nums }
 .asset-overview .portfolio-value small { color:#b5c0ce; font-size:.7em; margin-right:.13em }
-#account-performance { display:grid; justify-items:end; gap:2px; margin:0 }
-#kiwoom-return { color:#e0e6ec; font:600 16px/1.4 system-ui; font-variant-numeric:tabular-nums }
-#asset-breakdown { grid-column:1/-1; display:flex; flex-wrap:wrap; gap:3px 10px; margin:0; padding:0; border:0 }
-#asset-breakdown div { display:flex; align-items:baseline; flex-wrap:wrap; column-gap:5px }
-#asset-breakdown dt { color:#9daaba; font:400 12px/1.4 system-ui }
-#asset-breakdown dd { margin:0; color:#e1e7ee; font:550 13px/1.4 system-ui; font-variant-numeric:tabular-nums }
+#asset-profit { grid-column:1/-1; margin:0; color:#aab6c6; font:400 13px/1.5 system-ui }
+#asset-profit strong { margin-left:4px; font-weight:600; font-variant-numeric:tabular-nums }
+#asset-details { grid-column:1/-1; display:grid; gap:7px; margin:7px 0 0; padding:10px 0 0; border-top:1px solid var(--line) }
+#asset-details div { display:flex; justify-content:space-between; align-items:baseline; gap:12px }
+#asset-details dt { color:#adb9c8; font:400 13px/1.4 system-ui }
+#asset-details dd { margin:0; color:#e1e7ee; font:550 14px/1.4 system-ui; font-variant-numeric:tabular-nums }
 #account-home [data-direction="up"] { color:#ff9fae; }
 #account-home [data-direction="down"] { color:#75d8bb; }
 #account-home .broker-row { min-height:60px; grid-template-columns:32px 1fr auto; }
 #account-home .broker-logo { width:32px; height:32px; }
 #account-home .broker-name strong { font-size:15px; }
-#open-kiwoom .broker-name { display:flex; align-items:center; gap:5px }
-#open-kiwoom .account-chevron { display:inline-block; padding:0; font-size:18px; transform:rotate(90deg) }
-.broker-performance { display:grid; gap:3px; text-align:right; font:400 11px/1.45 system-ui; color:var(--muted) }
-.broker-performance b { margin-left:3px; color:var(--text); font-size:13px; font-variant-numeric:tabular-nums }
-
-#open-kiwoom[aria-expanded="true"] .account-chevron { transform:rotate(-90deg); }
-#account-holdings { padding:12px 0 8px; }
+#open-kiwoom { padding:0; text-align:left; font:600 clamp(15px,4vw,18px)/1.3 system-ui }
+#open-kiwoom::after { color:var(--muted) }
+#account-holdings { padding:0 0 8px; }
 .holdings-heading { display:flex; justify-content:space-between; align-items:center; min-height:44px; gap:8px; }
-.holdings-heading h3 { margin:0; font-size:19px; letter-spacing:-.035em; }
+.holdings-heading h3 { margin:0; letter-spacing:-.035em; }
+.holdings-heading:has(#open-kiwoom[aria-expanded="false"]) #holding-sort { display:none }
 #holding-distribution { margin:3px 0 13px; }
 .distribution-bar { display:flex; height:8px; border-radius:8px; overflow:hidden; }
 .distribution-bar i { flex-basis:0; min-width:0; }
