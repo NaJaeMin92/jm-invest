@@ -50,7 +50,6 @@ async function request(path, { method = "GET", body, accessToken = token } = {})
 
 const holdingsPanel = document.querySelector("#account-holdings");
 const holdingsToggle = document.querySelector("#open-kiwoom");
-const logout = document.querySelector("#logout");
 const navigation = document.querySelector("#bottom-nav");
 const accountNavLabel=document.getElementById("account-nav-label");
 const navButtons = [...navigation.querySelectorAll("button")];
@@ -284,32 +283,6 @@ login.addEventListener("submit", async (event) => {
   }
 });
 
-document.querySelector("#logout").addEventListener("click", () => {
-  const accessToken = token;
-  token = null;
-  valuationSnapshot = null;
-  heldWatchSymbols.clear();
-  strategy.close();
-  orders.signOut();
-  instrument.clearAccountData();
-  saveSession(null);
-  holdingsList.replaceChildren();
-  document.getElementById("holding-distribution").hidden = true;
-  document.querySelector("#profit-list").replaceChildren();
-  document.querySelector("#profit-period").textContent = "";
-  document.querySelector("#profit-updated").textContent = "";
-  document.querySelector("#profit-total").textContent = "Awaiting sync";
-  workspace.hidden = true;
-  document.querySelector("#account-performance").hidden = true;
-  document.querySelector("#portfolio-value").textContent = "";
-  document.querySelector("#kiwoom-return").textContent = "";
-  renderWatchlist();
-  setDetail(false);
-  login.reset();
-  selectView("home");
-  request("/auth/v1/logout?scope=local", { method: "POST", accessToken }).catch(() => {});
-});
-
 const holdingsList = document.querySelector("#holdings-list");
 const numeric = value => value != null && value !== "" && Number.isFinite(Number(value));
 const holdingUSD = new Intl.NumberFormat("ko-KR", {style:"currency", currency:"USD", currencyDisplay:"narrowSymbol", maximumFractionDigits:4});
@@ -378,6 +351,15 @@ function renderHoldingWeights(holdings) {
 function showHoldings(balance) {
   holdingsList.replaceChildren();
   const holdings = balance?.holdings;
+  let totalProfit=null, averageReturn=null;
+  if(Array.isArray(holdings)){
+    if(holdings.every(h=>numeric(h.profit_krw)))totalProfit=holdings.reduce((sum,h)=>sum+Number(h.profit_krw),0);
+    if(holdings.length && holdings.every(h=>numeric(h.return_pct))){
+      averageReturn=holdings.reduce((sum,h)=>sum+Number(h.return_pct),0)/holdings.length;
+    }
+  }
+  showPerformance(document.getElementById("kiwoom-holdings-profit"),totalProfit,signedWon.format);
+  showPerformance(document.getElementById("kiwoom-holdings-average"),averageReturn,signedWatchPercent);
   const hasRows = Array.isArray(holdings) && holdings.length > 0;
   document.getElementById("holding-count").textContent = Array.isArray(holdings) ? holdings.length : "";
   document.getElementById("holding-columns").hidden = !hasRows;
@@ -996,6 +978,9 @@ async function loadValuation(accessToken) {
   const performance = document.querySelector("#kiwoom-return");
   const performanceRow = document.querySelector("#account-performance");
   performanceRow.hidden = true;
+  const breakdown=document.getElementById("asset-breakdown");
+  breakdown.hidden=true;
+  delete value.dataset.loaded;
   value.textContent = "조회 중…";
   performance.textContent = "";
   showHoldings(null);
@@ -1014,7 +999,6 @@ async function loadValuation(accessToken) {
       value.textContent = "잔고 동기화 대기";
       return;
     }
-    const won = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" });
     const stocks = Number(balance.value_krw);
     const hasCash = balance.cash_domestic_krw != null && balance.cash_foreign_krw != null;
     const cash = hasCash ? Number(balance.cash_domestic_krw) + Number(balance.cash_foreign_krw) : 0;
@@ -1022,7 +1006,21 @@ async function loadValuation(accessToken) {
     const candidate = estimate == null || !hasCash ? null : Number(estimate) - stocks - cash;
     const rp = candidate != null && Number.isFinite(candidate) && candidate >= 0 ? candidate : null;
     const total = rp == null ? stocks + cash : Number(estimate);
-    value.textContent = won.format(total);
+    if(!numeric(balance.value_krw) || !Number.isFinite(total))throw new Error("Invalid valuation");
+    value.dataset.loaded="true";
+    value.replaceChildren(...holdingKRW.formatToParts(total).map(part=>{
+      if(part.type!=="currency")return part.value;
+      const currency=document.createElement("small");
+      currency.textContent=part.value;
+      return currency;
+    }));
+    if(hasCash){
+      document.getElementById("asset-stocks").textContent=holdingKRW.format(stocks);
+      document.getElementById("asset-cash").textContent=holdingKRW.format(cash);
+      document.getElementById("asset-other-row").hidden=!(rp>0);
+      document.getElementById("asset-other").textContent=rp>0 ? holdingKRW.format(rp) : "";
+      breakdown.hidden=false;
+    }
     performanceRow.hidden = !numeric(balance.return_pct);
     showPerformance(performance,balance.return_pct,signedWatchPercent);
     showHoldings(balance);

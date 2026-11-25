@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=97">
-<script type="module" src="./journal.js?v=98"></script>
+<link rel="stylesheet" href="./style.css?v=99">
+<script type="module" src="./journal.js?v=99"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header class="app-masthead"><div class="head">
@@ -108,17 +108,20 @@
 </section>
 <div id="tab-account" hidden>
 <section id="account-home" aria-label="투자 계좌" lang="ko">
-<div class="total-row">
-<div class="balance-summary">
-<h2>총 투자 자산</h2>
-<strong id="portfolio-value" class="portfolio-value">조회 중…</strong>
-<p id="account-performance" hidden>보유주식 수익률 <strong id="kiwoom-return"></strong></p>
-</div>
-</div>
+<section class="asset-overview" aria-labelledby="asset-title">
+<h2 id="asset-title">총 투자 자산</h2>
+<strong id="portfolio-value" class="portfolio-value" aria-live="polite">조회 중…</strong>
+<p id="account-performance" hidden><strong id="kiwoom-return"></strong> 보유주식 수익률</p>
+<dl id="asset-breakdown" hidden>
+<div><dt>주식 평가액</dt><dd id="asset-stocks"></dd></div>
+<div><dt>예수금</dt><dd id="asset-cash"></dd></div>
+<div id="asset-other-row" hidden><dt>기타 자산</dt><dd id="asset-other"></dd></div>
+</dl>
+</section>
 <button class="broker-row" id="open-kiwoom" type="button" aria-expanded="false" aria-controls="account-holdings">
 <img class="broker-logo" src="./assets/kiwoom-global.jpg" width="44" height="44" alt="">
-<span class="broker-name"><strong>키움증권</strong></span>
-<span class="account-chevron" aria-hidden="true">›</span>
+<span class="broker-name"><strong>키움증권</strong><span class="account-chevron" aria-hidden="true">›</span></span>
+<span class="broker-performance"><span>총 평가손익 <b id="kiwoom-holdings-profit">—</b></span><span title="보유종목 수익률의 단순평균">평균 수익률 <b id="kiwoom-holdings-average">—</b></span></span>
 </button>
 <section id="account-holdings" aria-label="미국주식 보유종목" hidden>
 <div class="holdings-heading"><h3>보유종목 <span id="holding-count"></span></h3>
@@ -135,7 +138,6 @@
 <div class="broker-name"><strong>삼성증권</strong><small>종합매매</small></div>
 <span class="row-status">미연동</span>
 </div>
-<button id="logout" type="button">로그아웃</button>
 </section>
 </div>
 </div>
