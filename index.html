@@ -9,9 +9,10 @@
 <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=101">
-<script type="module" src="./journal.js?v=104"></script>
+<link rel="preconnect" href="https://mfycpprqyaidoixytdim.supabase.co" crossorigin>
+<link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
+<link rel="stylesheet" href="./style.css?v=105">
+<script type="module" src="./journal.js?v=105"></script>
 </head>
 <body class="trade-page" data-view="home">
 <header class="app-masthead"><div class="head">
@@ -109,9 +110,9 @@
 <div id="tab-account" hidden>
 <section id="account-home" aria-label="투자 계좌" lang="ko">
 <section class="asset-overview" aria-labelledby="asset-title">
-<h2 id="asset-title">총 투자 자산</h2>
-<strong id="portfolio-value" class="portfolio-value" aria-live="polite">조회 중…</strong>
-<p id="account-performance" hidden><strong id="kiwoom-return"></strong> 보유주식 수익률</p>
+<div class="asset-total"><h2 id="asset-title">총 투자 자산</h2>
+<strong id="portfolio-value" class="portfolio-value" aria-live="polite">조회 중…</strong></div>
+<p id="account-performance" hidden><span>보유주식 수익률</span><strong id="kiwoom-return"></strong></p>
 <dl id="asset-breakdown" hidden>
 <div><dt>주식 평가액</dt><dd id="asset-stocks"></dd></div>
 <div><dt>예수금</dt><dd id="asset-cash"></dd></div>

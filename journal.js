@@ -504,9 +504,10 @@ const watchDollars = new Intl.NumberFormat("en-US", {
   style: "currency", currency: "USD", maximumFractionDigits: 4
 });
 const signedWatchPercent = change => `${change > 0 ? "+" : ""}${change.toFixed(2)}%`;
+const directoryNames = new Map();
 const nameFor = symbol => snapshots.get(symbol)?.name
   || marketSymbols.find(item => item.symbol === symbol)?.name
-  || stockDirectory?.find(item => item.symbol === symbol)?.name || symbol;
+  || directoryNames.get(symbol) || symbol;
 const watchEditor = setupWatchEditor({watchKey, nameFor, tickerIcon, refresh() {
   renderWatchlist();
   refreshWatchlistQuotes();
@@ -522,6 +523,40 @@ const kiwoomRegular = new Map();
 const externalPrices = new Map();
 const minuteHistory = new Map(), liveMinutes = new Map(), changedSymbols = new Set();
 const unavailableSymbols = new Set();
+// Display-only quotes. Read them after owner authentication, never in the order ticket.
+const savedWatchQuotes = new Map();
+const watchCacheKey = "jm-invest:watch-prices:v1";
+const watchCacheAge = 30 * 60 * 1000;
+let watchStorage, watchCacheTimer;
+function openWatchCache(remember) {
+  savedWatchQuotes.clear();
+  try {
+    watchStorage = remember ? localStorage : sessionStorage;
+    const entries = JSON.parse(watchStorage.getItem(watchCacheKey) || "[]");
+    for (const [symbol, entry] of entries) {
+      if (Number.isFinite(entry?.price) && entry.price > 0 && entry.at > Date.now() - watchCacheAge) savedWatchQuotes.set(symbol, entry);
+    }
+  } catch {}
+}
+function flushWatchCache() {
+  if (!watchCacheTimer) return;
+  clearTimeout(watchCacheTimer);
+  watchCacheTimer = undefined;
+  try { watchStorage?.setItem(watchCacheKey, JSON.stringify([...savedWatchQuotes])); } catch {}
+}
+function saveWatchQuote(symbol, market, at) {
+  if (!Number.isFinite(at) || !(market.price > 0)) return;
+  const previous = savedWatchQuotes.get(symbol);
+  if (previous && (previous.at > at || previous.at === at && previous.change === market.change && previous.price === market.price && previous.extendedChange === market.extendedChange && previous.label === market.label)) return;
+  savedWatchQuotes.delete(symbol);
+  savedWatchQuotes.set(symbol, {at, price:market.price, change:market.change, marketType:market.marketType,
+    label:market.label, extendedChange:market.extendedChange});
+  if (savedWatchQuotes.size > 200) savedWatchQuotes.delete(savedWatchQuotes.keys().next().value);
+  watchCacheTimer ??= setTimeout(flushWatchCache, 1500);
+}
+window.addEventListener("pagehide", flushWatchCache);
+document.addEventListener("visibilitychange", () => { if (document.hidden) flushWatchCache(); });
+
 const kiwoomQuoteStatus = document.querySelector("#kiwoom-quote-status");
 // Set the HTTPS URL of the authenticated, quote-only gateway when provisioned.
 const kiwoomGateway = document.querySelector('meta[name="kiwoom-quote-gateway"]')?.content;
@@ -582,10 +617,13 @@ async function syncKiwoomQuotes() {
   const stream = {key, token, controller};
   kiwoomStream = stream;
   try {
+    const selected = new Set(symbols);
+    const visible = [...watchList.children].map(row => row.dataset.symbol).filter(symbol => selected.has(symbol));
+    const ordered = [...new Set([...(book ? [book] : []), ...visible, ...symbols])];
     const response = await fetch(kiwoomEndpoint, {
       method: "POST",
       headers: {"Content-Type": "application/json", Authorization: "Bearer " + token},
-      body: key,
+      body: JSON.stringify(book ? {symbols:ordered, book} : ordered),
       signal: controller.signal
     });
     if (!response.ok || !response.body) {
@@ -623,7 +661,7 @@ async function syncKiwoomQuotes() {
             kiwoomDaily.set(update.symbol, update.daily);
           } else if (Number.isFinite(update.price)) {
             if (update.marketType) {
-              externalPrices.set(update.symbol, update);
+              externalPrices.set(update.symbol, {...update, receivedAt:Date.now()/1000});
             } else if (update.snapshot) {
               const received = usMarketSession(), previous = lastKiwoomPrices.get(update.symbol);
               const sameSession = previous?.received.date === received.date && previous.received.phase === received.phase;
@@ -742,11 +780,59 @@ const instrument = setupInstrument({
   readList: readWatchlist,
   saveList: watchEditor.saveList,
 });
+const watchRows = new Map();
 const watchDate = new Intl.DateTimeFormat("en-US", {month:"short", day:"numeric", timeZone:"America/New_York"});
+function watchMarket(symbol, session) {
+  if (!token) return null;
+  const date = session.date.replaceAll("-", "");
+  const external = externalPrices.get(symbol);
+  if (external) {
+    const market = {...external, label:external.marketType};
+    saveWatchQuote(symbol, market, external.receivedAt * 1000);
+    return market;
+  }
+  const tick = kiwoomTicks.get(symbol);
+  const snapshot = lastKiwoomPrices.get(symbol);
+  const daily = kiwoomDaily.get(symbol)?.find(row => row.date < date
+    || row.date === date && ["After","Close"].includes(session.phase));
+  const regular = kiwoomRegular.get(symbol);
+  const freshOvernight = tick?.session === "4" && tick.tradedAt >= Date.now() / 1000 - 120;
+  const live = tick?.date === date || freshOvernight ? tick : null;
+  const useTick = live && !(snapshot?.sampledAt > (live.receivedAt ?? live.tradedAt) && snapshot.price !== live.price);
+  const lastBar = minuteHistory.get(symbol)?.at(-1);
+  const barSession = lastBar && !useTick && usMarketSession(new Date(lastBar[0] * 1000));
+  const timedSnapshot = snapshot?.received.date === session.date && snapshot.received.phase === session.phase
+    && (snapshot.moved || barSession?.date === session.date && barSession.phase === session.phase);
+  const price = useTick ? live.price : snapshot?.price ?? daily?.price;
+  const label = useTick ? (kiwoomPhases[live.session] || "Last") : timedSnapshot ? session.phase : snapshot ? "Last" : "Close";
+  const change = label === "Regular" ? (useTick ? live.change : snapshot.change)
+    : regular?.date === date ? regular.change : daily?.change;
+  if (price != null || Number.isFinite(change)) {
+    const market = {price, change, label,
+      extendedChange:["Pre", "After", "Overnight", "Last"].includes(label) ? (useTick ? live.change : snapshot?.change) : null,
+      changeDate:regular?.date === date ? date : daily?.date};
+    const at = useTick ? live.receivedAt ?? live.tradedAt : snapshot?.sampledAt;
+    saveWatchQuote(symbol, market, at * 1000);
+    return market;
+  }
+  const saved = savedWatchQuotes.get(symbol);
+  return !unavailableSymbols.has(symbol) && saved?.at > Date.now() - watchCacheAge ? {...saved, saved:true} : null;
+}
 function renderWatchlist(changed) {
+  const session = usMarketSession();
+  if (kiwoomQuoteStatus.textContent.startsWith("Kiwoom connected")
+      && (kiwoomTicks.size || lastKiwoomPrices.size || externalPrices.size)) {
+    kiwoomQuoteStatus.textContent = "";
+  }
+  if (changed && !sortDirection) {
+    for (const symbol of changed) {
+      const row = watchRows.get(symbol);
+      if (row) paintWatchRow(row, symbol, watchMarket(symbol, session), session);
+    }
+    return;
+  }
   watchEditor.renameHeading();
   const symbols = readWatchlist();
-  const session = usMarketSession();
   const summary = document.getElementById("watch-summary");
   const summaryKey = session.date + "/" + symbols.length;
   if (summary.dataset.key !== summaryKey) {
@@ -754,37 +840,7 @@ function renderWatchlist(changed) {
     summary.textContent = watchDate.format(new Date(session.date + "T12:00:00Z")) + " ET · " +
       symbols.length + (symbols.length === 1 ? " symbol" : " symbols");
   }
-  const date = session.date.replaceAll("-", "");
-  const quotes = new Map(symbols.map(symbol => {
-    if (!token) return [symbol, null];
-    const external = externalPrices.get(symbol);
-    if (external) return [symbol, {...external, label: external.marketType}];
-    const tick = kiwoomTicks.get(symbol);
-    const snapshot = lastKiwoomPrices.get(symbol);
-    const daily = kiwoomDaily.get(symbol)?.find(row => row.date < date
-      || row.date === date && ["After","Close"].includes(session.phase));
-    const regular = kiwoomRegular.get(symbol);
-    const freshOvernight = tick?.session === "4" && tick.tradedAt >= Date.now() / 1000 - 120;
-    const live = tick?.date === date || freshOvernight ? tick : null;
-    const useTick = live && !(snapshot?.sampledAt > (live.receivedAt ?? live.tradedAt) && snapshot.price !== live.price);
-    const lastBar = minuteHistory.get(symbol)?.at(-1);
-    const barSession = lastBar && !useTick && usMarketSession(new Date(lastBar[0] * 1000));
-    const timedSnapshot = snapshot?.received.date === session.date && snapshot.received.phase === session.phase
-      && (snapshot.moved || barSession?.date === session.date && barSession.phase === session.phase);
-    const price = useTick ? live.price : snapshot?.price ?? daily?.price;
-    const label = useTick ? (kiwoomPhases[live.session] || "Last") : timedSnapshot ? session.phase : snapshot ? "Last" : "Close";
-    const change = label === "Regular" ? (useTick ? live.change : snapshot.change)
-      : regular?.date === date ? regular.change : daily?.change;
-    return [symbol, price != null || Number.isFinite(change)
-      ? {price, change, label,
-        extendedChange: ["Pre", "After", "Overnight", "Last"].includes(label) ? (useTick ? live.change : snapshot?.change) : null,
-        changeDate: regular?.date === date ? date : daily?.date}
-      : null];
-  }));
-  if (kiwoomQuoteStatus.textContent.startsWith("Kiwoom connected")
-      && (kiwoomTicks.size || lastKiwoomPrices.size || externalPrices.size)) {
-    kiwoomQuoteStatus.textContent = "";
-  }
+  const quotes = new Map(symbols.map(symbol => [symbol, watchMarket(symbol, session)]));
   symbols.sort((a, b) => {
     const vixFirst = Number(b === "VIX") - Number(a === "VIX");
     if (vixFirst) return vixFirst;
@@ -796,17 +852,17 @@ function renderWatchlist(changed) {
     }
     return sortDirection * (left - right);
   });
-  const existing = new Map([...watchList.children].map(row => [row.dataset.symbol, row]));
+  const removed = new Set(watchRows.keys());
   document.querySelector("#watch-empty").hidden = Boolean(symbols.length);
   symbols.forEach((symbol, index) => {
-    let row = existing.get(symbol);
+    let row = watchRows.get(symbol);
     const fresh = !row;
-    if (fresh) row = makeWatchRow(symbol);
-    existing.delete(symbol);
+    if (fresh) { row = makeWatchRow(symbol); watchRows.set(symbol, row); }
+    removed.delete(symbol);
     if (watchList.children[index] !== row) watchList.insertBefore(row, watchList.children[index] || null);
     if (fresh || !changed || changed.has(symbol)) paintWatchRow(row, symbol, quotes.get(symbol), session);
   });
-  for (const row of existing.values()) row.remove();
+  for (const symbol of removed) { watchRows.get(symbol).remove(); watchRows.delete(symbol); }
 }
 
 function tickerIcon(symbol) {
@@ -873,9 +929,9 @@ function paintWatchRow(row, symbol, market, session) {
   const caption = row.querySelector(".watch-caption"), tag = caption.lastElementChild;
   caption.firstElementChild.textContent = nameFor(symbol);
   tag.hidden = !market;
-  tag.textContent = market?.label || "";
+  tag.textContent = market?.saved ? "Saved" : market?.label || "";
   tag.className = market?.marketType ? "session-tag futures" : "session-tag";
-  tag.title = market && !market.marketType && ["Pre", "After"].includes(session.phase) && market.label !== session.phase
+  tag.title = market?.saved ? new Date(market.at).toLocaleString() : market && !market.marketType && ["Pre", "After"].includes(session.phase) && market.label !== session.phase
     ? session.phase + " quote pending" : "";
 
   const chart = row.querySelector(".mini-chart");
@@ -912,7 +968,17 @@ function paintWatchRow(row, symbol, market, session) {
   extra.textContent = extra.hidden ? "" : market.label + ": " + signedWatchPercent(market.extendedChange);
   extra.dataset.direction = market?.extendedChange < 0 ? "down" : "up";
 }
-var stockDirectory;
+let directoryRequest;
+function loadDirectory() {
+  directoryRequest ??= fetch("./assets/symbols.json", {priority:"low"}).then(async response => {
+    if (!response.ok) throw new Error("directory unavailable");
+    const items = await response.json();
+    for (const item of items) directoryNames.set(item.symbol, item.name);
+    renderWatchlist();
+    return items;
+  }).catch(error => { directoryRequest = null; throw error; });
+  return directoryRequest;
+}
 watchForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const query = document.querySelector("#watch-symbol").value.trim().toUpperCase().replace(/^\^/, "");
@@ -921,11 +987,7 @@ watchForm.addEventListener("submit", async (event) => {
   if (!query) return;
   watchStatus.textContent = "Searching…";
   try {
-    if (!stockDirectory) {
-      const response = await fetch("./assets/symbols.json");
-      if (!response.ok) throw new Error("directory unavailable");
-      stockDirectory = await response.json();
-    }
+    const stockDirectory = await loadDirectory();
     const matches = [...marketSymbols, ...stockDirectory].filter((item) =>
       item.symbol.includes(query) || item.name.toUpperCase().includes(query)
     ).sort((a, b) => {
@@ -960,18 +1022,11 @@ watchForm.addEventListener("submit", async (event) => {
     }
   } catch {
     watchStatus.textContent = "Search is unavailable. Please try again.";
-    stockDirectory = null;
   }
 });
 
 renderWatchlist();
-fetch("./assets/symbols.json").then((response) => {
-  if (!response.ok) throw new Error("directory unavailable");
-  return response.json();
-}).then((items) => {
-  stockDirectory = items;
-  renderWatchlist();
-}).catch(() => {});
+loadDirectory().catch(() => {});
 
 async function loadValuation(accessToken) {
   const value = document.querySelector("#portfolio-value");
@@ -1040,6 +1095,8 @@ async function openWorkspace(session, remember) {
   }
   const stored = saveSession(remember ? session.refresh_token : null);
   token = session.access_token;
+  openWatchCache(remember);
+  renderWatchlist();
   login.hidden = true;
   setDetail(false);
   workspace.hidden = false;
