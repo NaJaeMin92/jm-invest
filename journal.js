@@ -640,7 +640,9 @@ async function syncKiwoomQuotes() {
             if (update.marketType) {
               externalPrices.set(update.symbol, {...update, receivedAt:Date.now()/1000});
             } else if (update.snapshot) {
-              const received = usMarketSession(), previous = lastKiwoomPrices.get(update.symbol);
+              const previous = lastKiwoomPrices.get(update.symbol);
+              if (previous?.sampledAt > update.sampledAt) continue;
+              const received = Number.isFinite(update.sampledAt) ? usMarketSession(new Date(update.sampledAt * 1000)) : usMarketSession();
               const sameSession = previous?.received.date === received.date && previous.received.phase === received.phase;
               const moved = sameSession && (previous.moved || previous.price !== update.price);
               lastKiwoomPrices.set(update.symbol, {...update, received, moved});
@@ -931,7 +933,7 @@ function paintWatchRow(row, symbol, market, session) {
   const change = market?.change;
   const quotePrice = Number.isFinite(market?.price)
     ? market.marketType === "Index" ? market.price.toFixed(2) : watchDollars.format(market.price) : "—";
-  main.textContent = showWatchPrice ? quotePrice : Number.isFinite(change) ? signedWatchPercent(change) : "—";
+  main.textContent = !showWatchPrice && Number.isFinite(change) ? signedWatchPercent(change) : quotePrice;
   main.title = showWatchPrice ? "Show percentage change" : "Show price";
   main.setAttribute("aria-label", symbol + " " + main.textContent + ". " + main.title);
   quote.dataset.direction = Number.isFinite(change) ? (change < 0 ? "down" : "up") : "";

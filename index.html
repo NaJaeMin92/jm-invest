@@ -11,15 +11,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://mfycpprqyaidoixytdim.supabase.co" crossorigin>
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=107">
-<script type="module" src="./journal.js?v=107"></script>
+<link rel="stylesheet" href="./style.css?v=108">
+<script type="module" src="./journal.js?v=108"></script>
 </head>
 <body class="trade-page" data-view="home">
-<header class="app-masthead"><div class="head">
-<a href="./" class="brand-home" aria-label="TradeInSight home"><img src="./assets/mark.svg" width="28" height="28" alt="">TradeInSight</a>
-<div class="masthead-actions"><button id="watch-login" type="button" data-shortcut="account" lang="en">Sign in</button>
-<button id="home-search" type="button" aria-label="Search stocks and ETFs" aria-haspopup="dialog" aria-controls="watch-editor"><svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg></button></div>
-</div></header>
 <main id="account">
 <div class="page-title"><span id="section-icon" aria-hidden="true"></span><h1 id="page-heading">Accounts</h1></div>
 <section class="panel">
@@ -34,7 +29,7 @@
 <section id="tab-home" class="tab-panel" lang="en" aria-labelledby="watch-title">
 <div class="watch-heading">
 <div class="watch-title-group"><h1 id="watch-title">My Watchlist</h1><p id="watch-summary"></p></div>
-<span id="watch-sentiment-rating" hidden></span>
+<div class="watch-heading-actions"><button id="watch-login" type="button" data-shortcut="account" lang="en">Sign in</button><span id="watch-sentiment-rating" hidden></span></div>
 </div>
 <div class="watch-toolbar">
 <button id="watch-edit" type="button" aria-haspopup="dialog" aria-controls="watch-editor"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M10 4H4v16h16v-7M11 13l9-9"/></svg><span>Edit Watchlist</span></button>
@@ -42,6 +37,7 @@
 </div>
 <p id="watch-empty" hidden>No symbols in this watchlist.</p>
 <ul id="home-holdings" class="watch-list"></ul>
+<button id="home-search" type="button" aria-label="Search stocks and ETFs" aria-haspopup="dialog" aria-controls="watch-editor"><svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg><span>Search stocks and ETFs</span></button>
 </section>
 <section id="tab-strategies" class="tab-panel" lang="ko" aria-labelledby="library-title" hidden>
 <div class="watch-heading library-heading"><div class="watch-title-group"><h1 id="library-title" lang="en">Strategies</h1><p id="strategy-count"></p></div>

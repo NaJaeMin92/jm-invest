@@ -99,6 +99,31 @@ class BrokerOrdersTest(unittest.TestCase):
         self.assertEqual(len(history["bars"]),3)
         self.assertEqual(history["bars"],sorted(history["bars"]))
 
+    def test_watch_cache_shares_inflight_reads_and_expires_them(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+        import os
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            caches = [server.WatchQuoteCache(root) for _ in range(2)]
+            started, release = Event(), Event()
+            def load():
+                started.set()
+                release.wait(3)
+                return {"symbol":"TEST", "price":10, "sampledAt":123}
+            loader = Mock(side_effect=load)
+            with ThreadPoolExecutor(2) as pool:
+                first = pool.submit(caches[0].read, "price", "TEST", loader)
+                self.assertTrue(started.wait(3))
+                self.assertIsNone(caches[1].read("price", "TEST"))
+                second = pool.submit(caches[1].read, "price", "TEST", loader)
+                release.set()
+                self.assertEqual(first.result(), second.result())
+            loader.assert_called_once()
+            self.assertEqual(caches[1].read("price", "TEST")["sampledAt"], 123)
+            os.utime(root / "price-TEST", (1, 1))
+            self.assertIsNone(caches[1].read("price", "TEST"))
+
     def test_quiet_watch_symbol_refreshes_without_waiting_for_fill(self):
         from queue import SimpleQueue
         clock = [100.0]
@@ -106,9 +131,10 @@ class BrokerOrdersTest(unittest.TestCase):
         stop.is_set.side_effect = lambda: clock[0] > 131
         stop.wait.side_effect = lambda delay: clock.__setitem__(0, clock[0] + delay)
         broker = Mock()
+        broker.watch_cache.read.side_effect = lambda kind, symbol, load=None: load() if load else None
         updates = SimpleQueue()
         with patch.object(server.time,"monotonic",side_effect=lambda:clock[0]):
-            server.refresh_watch_prices(broker,"token",[{"symbol":"AVGG"}],updates,stop,{"AVGG":110})
+            server.refresh_watch_prices(broker,"token",[{"symbol":"AVGG"}],updates,stop,{"AVGG":110},server.Event())
         self.assertEqual(broker.current_quote.call_count,2)
 
     def test_buy_and_sell_wire_payload(self):

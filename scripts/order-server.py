@@ -3,7 +3,7 @@ import argparse
 from functools import lru_cache
 from datetime import datetime, timedelta
 from decimal import Decimal
-from fcntl import LOCK_EX, LOCK_NB, flock
+from fcntl import LOCK_EX, LOCK_NB, LOCK_SH, flock
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import math
@@ -176,6 +176,50 @@ def execution_record(row, symbol, session):
     return dict(day=day.date().isoformat(), time=stamp, side=side, price=price, quantity=quantity)
 
 
+class WatchQuoteCache:
+    # Both localhost servers use these short-lived market-data reads.
+    lifetime = {"price": 3, "daily": 120, "minute": 45}
+
+    def __init__(self, directory):
+        self.directory = directory
+        try:
+            directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        except OSError:
+            self.directory = None
+
+    def read(self, kind, symbol, load=None):
+        if self.directory is None:
+            return load() if load else None
+        path = self.directory / (kind + "-" + symbol)
+        flags = os.O_RDWR | os.O_CREAT if load else os.O_RDONLY
+        try:
+            fd = os.open(path, flags | os.O_NOFOLLOW, 0o600)
+        except OSError:
+            return load() if load else None
+        with os.fdopen(fd, "r+" if load else "r") as entry:
+            try:
+                flock(entry, LOCK_EX if load else LOCK_SH | LOCK_NB)
+            except BlockingIOError:
+                return None
+            age = time.time() - os.fstat(fd).st_mtime
+            if 0 <= age < self.lifetime[kind]:
+                try:
+                    return json.load(entry)
+                except (OSError, ValueError):
+                    pass
+            if load is None:
+                return None
+            frame = load()
+            if frame:
+                try:
+                    entry.seek(0)
+                    entry.write(json.dumps(frame, separators=(",", ":")))
+                    entry.truncate()
+                except OSError:
+                    pass
+            return frame
+
+
 class Kiwoom:
     def __init__(self, key, secret):
         self.key = key
@@ -186,6 +230,7 @@ class Kiwoom:
         self.directory_lock = Lock()
         self.directory = {}
         self.directory_until = 0
+        self.watch_cache = WatchQuoteCache(Path.home() / "Library/Caches/jm-invest/watch-quotes")
         self.read_schedule = Path.home() / ".jm-invest-kiwoom-reads"
 
     def access_token(self):
@@ -786,37 +831,66 @@ def watch_series(points):
     return [[stamp, price] for stamp, price in points if stamp >= cutoff]
 
 
-def refresh_watch_prices(broker, token, items, updates, stopped, last_trade):
+def start_watch_reads(broker, token, items, updates, stopped, last_trade):
+    first_prices = Event()
+    Thread(target=refresh_watch_prices, args=(broker, token, items, updates, stopped, last_trade, first_prices),
+           daemon=True).start()
+    Thread(target=seed_kiwoom_quotes, args=(broker, token, items, updates, stopped, first_prices),
+           daemon=True).start()
+
+
+def refresh_watch_prices(broker, token, items, updates, stopped, last_trade, first_prices):
     last_read = {}
+    for item in items:
+        symbol = item["symbol"]
+        frame = broker.watch_cache.read("price", symbol)
+        if frame:
+            updates.put(frame)
+            last_read[symbol] = time.monotonic() - max(0, time.time() - frame["sampledAt"])
     while not stopped.is_set():
-        for item in items:
+        for index, item in enumerate(items):
             if stopped.is_set():
                 return
             symbol = item["symbol"]
             now = time.monotonic()
-            if symbol in last_read and now - max(last_read[symbol], last_trade.get(symbol, 0)) < 15:
-                continue
-            last_read[symbol] = now
             try:
-                snapshot = broker.current_quote(token, item)
-                if snapshot:
-                    updates.put(snapshot)
+                if symbol in last_read and now - max(last_read[symbol], last_trade.get(symbol, 0)) < 15:
+                    continue
+                last_read[symbol] = now
+                frame = broker.watch_cache.read("price", symbol, lambda: broker.current_quote(token, item))
+                if frame:
+                    updates.put(frame)
             except (OSError, KeyError, ValueError, TypeError):
                 continue
+            finally:
+                if index + 1 == min(8, len(items)):
+                    first_prices.set()
         stopped.wait(1)
 
 
-def seed_kiwoom_quotes(broker, token, items, snapshots, stopped):
-    for read_quote in (broker.daily_quote, broker.minute_quote):
+def seed_kiwoom_quotes(broker, token, items, updates, stopped, first_prices):
+    missing = []
+    for kind, read_quote in (("daily", broker.daily_quote), ("minute", broker.minute_quote)):
         for item in items:
             if stopped.is_set():
                 return
-            try:
-                quote = read_quote(token, item)
-            except (OSError, KeyError, ValueError, TypeError):
-                quote = None
-            if quote:
-                snapshots.put(quote)
+            frame = broker.watch_cache.read(kind, item["symbol"])
+            if frame:
+                updates.put(frame)
+            else:
+                missing.append((kind, read_quote, item))
+    while not first_prices.wait(.25):
+        if stopped.is_set():
+            return
+    for kind, read_quote, item in missing:
+        if stopped.is_set():
+            return
+        try:
+            frame = broker.watch_cache.read(kind, item["symbol"], lambda: read_quote(token, item))
+            if frame:
+                updates.put(frame)
+        except (OSError, KeyError, ValueError, TypeError):
+            continue
 
 
 def refresh_external_quotes(symbols, snapshots, stopped):
@@ -966,9 +1040,9 @@ class App(BaseHTTPRequestHandler):
                 raise Problem(400, "종목 코드를 확인하세요.")
             if book_symbol is not None and book_symbol not in requested:
                 raise Problem(400, "호가 조회 종목을 확인하세요.")
-            token = self.quote_broker.access_token()
             external = [symbol for symbol in dict.fromkeys(requested) if symbol in YAHOO_SYMBOLS]
             equities = [symbol for symbol in dict.fromkeys(requested) if symbol not in YAHOO_SYMBOLS]
+            token = self.quote_broker.access_token() if equities else None
             directory = self.quote_broker.symbol_directory(token) if equities else {}
             items, unsupported = [], []
             for symbol in equities:
@@ -992,10 +1066,7 @@ class App(BaseHTTPRequestHandler):
             last_trade = {}
             updates.put({"unsupported": unsupported})
             if items:
-                Thread(target=refresh_watch_prices, args=(self.quote_broker, token, items, updates, stopped, last_trade),
-                       daemon=True).start()
-                Thread(target=seed_kiwoom_quotes, args=(self.quote_broker, token, items, updates, stopped),
-                       daemon=True).start()
+                start_watch_reads(self.quote_broker, token, items, updates, stopped, last_trade)
                 worker = Thread(target=subscribe_quotes, args=(self.quote_broker, token, items, book, updates, stopped),
                                 daemon=True)
                 worker.start()
