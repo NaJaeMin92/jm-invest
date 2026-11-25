@@ -295,11 +295,6 @@ const holdingUSD = new Intl.NumberFormat("ko-KR", {style:"currency", currency:"U
 const holdingKRW = new Intl.NumberFormat("ko-KR", {style:"currency", currency:"KRW"});
 const formatHolding = (value, formatter) => numeric(value) ? formatter.format(Number(value)) : "—";
 
-function tradedQuantity(bought, sold) {
-  if (!numeric(bought) || !numeric(sold)) return "—";
-  return (Number(bought) + Number(sold)).toLocaleString("ko-KR") + "주";
-}
-
 const holdingSort = document.getElementById("holding-sort");
 const signedWon = new Intl.NumberFormat("ko-KR", {style:"currency", currency:"KRW", signDisplay:"exceptZero"});
 
@@ -374,8 +369,7 @@ function showHoldings(balance) {
       ["보유수량", numeric(holding.quantity) ? Number(holding.quantity).toLocaleString("ko-KR", {maximumFractionDigits:8}) + "주" : "—"],
       ["주식 내 비중",weight], ["매입가",formatHolding(holding.cost_price,holdingUSD)],
       ["매입금액",formatHolding(holding.cost_krw,holdingKRW)], ["현재가",formatHolding(holding.current_price,holdingUSD)],
-      ["평가금액",formatHolding(holding.value_krw,holdingKRW)], ["전일 거래수량",tradedQuantity(holding.previous_buy_qty,holding.previous_sell_qty)],
-      ["금일 거래수량",tradedQuantity(holding.today_buy_qty,holding.today_sell_qty)]
+      ["평가금액",formatHolding(holding.value_krw,holdingKRW)]
     ]) {
       const cell = document.createElement("div"), term = document.createElement("dt"), data = document.createElement("dd");
       term.textContent = label;
