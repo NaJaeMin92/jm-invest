@@ -427,8 +427,10 @@ body.instrument-open { overflow:hidden; }
   --bg:#101720; --panel:#1b2633; --text:#f1f4f6; --muted:#aab8c9; --line:#2b3745; --accent:#afdcca;
   background:var(--bg); font-family:-apple-system,BlinkMacSystemFont,"Geist",sans-serif;
 }
-.trade-page:not([data-view="home"],[data-view="strategies"]) > header { display:none; }
+.trade-page:not([data-view="home"],[data-view="strategies"],[data-view="account"]) > header,
+.trade-page[data-view="account"] .masthead-actions { display:none; }
 .trade-page:not([data-view="home"]) main { max-width:680px; padding-inline:16px; padding-top:env(safe-area-inset-top); }
+.trade-page[data-view="account"] main { padding-top:0; }
 .trade-page:not([data-view="home"]) .panel { background:transparent; border:0; border-radius:0; overflow:visible; }
 .trade-page:not([data-view="home"]) .page-title { margin:12px 0 15px; min-height:48px; gap:11px; }
 .trade-page:not([data-view="home"]) #page-heading { font-size:clamp(28px,7vw,38px); font-weight:670; letter-spacing:-.045em; }
