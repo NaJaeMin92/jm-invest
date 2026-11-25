@@ -50,12 +50,6 @@ async function request(path, { method = "GET", body, accessToken = token } = {})
 
 const holdingsPanel = document.querySelector("#account-holdings");
 const holdingsToggle = document.querySelector("#open-kiwoom");
-const assetToggle = document.getElementById("asset-details-toggle");
-const assetDetails = document.getElementById("asset-details");
-assetToggle.onclick = () => {
-  assetDetails.hidden = !assetDetails.hidden;
-  assetToggle.setAttribute("aria-expanded", String(!assetDetails.hidden));
-};
 const navigation = document.querySelector("#bottom-nav");
 const accountNavLabel=document.getElementById("account-nav-label");
 const navButtons = [...navigation.querySelectorAll("button")];
@@ -293,7 +287,44 @@ const holdingsList = document.querySelector("#holdings-list");
 const numeric = value => value != null && value !== "" && Number.isFinite(Number(value));
 const holdingUSD = new Intl.NumberFormat("ko-KR", {style:"currency", currency:"USD", currencyDisplay:"narrowSymbol", maximumFractionDigits:4});
 const holdingKRW = new Intl.NumberFormat("ko-KR", {style:"currency", currency:"KRW"});
-const formatHolding = (value, formatter) => numeric(value) ? formatter.format(Number(value)) : "—";
+const holdingDollars = new Intl.NumberFormat("ko-KR", {style:"currency", currency:"USD", currencyDisplay:"narrowSymbol"});
+const signedDollars = new Intl.NumberFormat("ko-KR", {style:"currency", currency:"USD", currencyDisplay:"narrowSymbol", signDisplay:"exceptZero"});
+const holdingCurrency = document.getElementById("holding-currency");
+const currencyKey = "jm-invest:holdings-currency:v1";
+try { if (localStorage.getItem(currencyKey) === "USD") holdingCurrency.value = "USD"; } catch {}
+const moneyRenderers = [];
+holdingCurrency.onchange = () => {
+  try { localStorage.setItem(currencyKey, holdingCurrency.value); } catch {}
+  for (const render of moneyRenderers) render();
+};
+
+function holdingMoney(holding, currency) {
+  const usd = currency === "USD";
+  const isDollarHolding = !holding.currency || holding.currency.trim() === "USD";
+  const quantity = Number(holding.quantity);
+  const hasQuantity = Number.isFinite(quantity) && quantity > 0;
+  const product = price => hasQuantity && numeric(price) ? quantity * Number(price) : null;
+  const perShare = total => hasQuantity && numeric(total) ? Number(total) / quantity : null;
+  const usdValue = numeric(holding.current_value) ? Number(holding.current_value) : product(holding.current_price);
+  const fx = Number(holding.exchange_rate) || (usdValue > 0 ? Number(holding.value_krw) / usdValue : null);
+  const unit = usd ? holdingUSD : holdingKRW;
+  const amount = usd ? holdingDollars : holdingKRW;
+  function money(exact, estimate, formatter) {
+    if (numeric(exact)) return formatter.format(Number(exact));
+    return numeric(estimate) ? "≈" + formatter.format(Number(estimate)) : "—";
+  }
+  if (usd && !isDollarHolding) return {costPrice:"—", price:"—", cost:"—", value:"—", profit:"—", profitValue:null};
+  const estimatedProfit = usd && fx > 0 && numeric(holding.profit_krw) ? Number(holding.profit_krw) / fx : null;
+  const profit = usd ? holding.profit_amount : holding.profit_krw;
+  return {
+    costPrice: usd ? money(holding.cost_price, null, unit) : money(holding.cost_price_krw, perShare(holding.cost_krw), unit),
+    price: usd ? money(holding.current_price, null, unit) : money(holding.current_price_krw, perShare(holding.value_krw), unit),
+    cost: usd ? money(holding.cost_amount, product(holding.cost_price), amount) : money(holding.cost_krw, null, amount),
+    value: usd ? money(holding.current_value, usdValue, amount) : money(holding.value_krw, null, amount),
+    profit: money(profit, estimatedProfit, usd ? signedDollars : signedWon),
+    profitValue: numeric(profit) ? Number(profit) : estimatedProfit
+  };
+}
 
 const holdingSort = document.getElementById("holding-sort");
 const signedWon = new Intl.NumberFormat("ko-KR", {style:"currency", currency:"KRW", signDisplay:"exceptZero"});
@@ -320,24 +351,20 @@ holdingSort.onchange = sortHoldings;
 const weightPercent = new Intl.NumberFormat("ko-KR",{style:"percent",maximumFractionDigits:2});
 
 function showHoldings(balance) {
+  moneyRenderers.length = 0;
   holdingsList.replaceChildren();
   const holdings = balance?.holdings;
-  let totalProfit=null, averageReturn=null;
-  if(Array.isArray(holdings)){
-    if(holdings.every(h=>numeric(h.profit_krw)))totalProfit=holdings.reduce((sum,h)=>sum+Number(h.profit_krw),0);
-    if(holdings.length && holdings.every(h=>numeric(h.return_pct))){
-      averageReturn=holdings.reduce((sum,h)=>sum+Number(h.return_pct),0)/holdings.length;
-    }
-  }
+  const totalProfit = Array.isArray(holdings) && holdings.every(h => numeric(h.profit_krw))
+    ? holdings.reduce((sum, h) => sum + Number(h.profit_krw), 0) : null;
   const profitAmount = document.getElementById("kiwoom-holdings-profit");
   showPerformance(profitAmount, totalProfit, signedWon.format);
   if (numeric(totalProfit) && numeric(balance?.return_pct)) {
     profitAmount.append(" (" + signedWatchPercent(Number(balance.return_pct)) + ")");
   }
-  showPerformance(document.getElementById("kiwoom-holdings-average"),averageReturn,signedWatchPercent);
   const hasRows = Array.isArray(holdings) && holdings.length > 0;
   document.getElementById("holding-count").textContent = Array.isArray(holdings) ? holdings.length : "";
   document.getElementById("holding-columns").hidden = !hasRows;
+  holdingCurrency.hidden = !hasRows;
   holdingSort.hidden = !hasRows || holdings.length < 2;
   if (!hasRows) {
     const item = document.createElement("li");
@@ -360,27 +387,34 @@ function showHoldings(balance) {
     identity.append(symbol,company);
     const profit = document.createElement("span"), rate = document.createElement("strong");
     rate.className = "position-rate";
-    showPerformance(profit,holding.profit_krw,signedWon.format);
     showPerformance(rate,holding.return_pct,signedWatchPercent);
     head.append(identity,profit,rate);
-    head.setAttribute("aria-label", [symbol.textContent, company.textContent, "평가손익 " + profit.textContent, "수익률 " + rate.textContent].filter(Boolean).join(", "));
 
     const metrics = document.createElement("dl");
     metrics.className = "holding-values";
     const weight = totalHoldingsValue > 0
       ? weightPercent.format(Number(holding.value_krw) / totalHoldingsValue) : "—";
-    for (const [label,value] of [
+    const moneyCells = {};
+    for (const [label, value, field] of [
       ["보유수량", numeric(holding.quantity) ? Number(holding.quantity).toLocaleString("ko-KR", {maximumFractionDigits:8}) + "주" : "—"],
-      ["주식 내 비중",weight], ["매입가",formatHolding(holding.cost_price,holdingUSD)],
-      ["매입금액",formatHolding(holding.cost_krw,holdingKRW)], ["현재가",formatHolding(holding.current_price,holdingUSD)],
-      ["평가금액",formatHolding(holding.value_krw,holdingKRW)]
+      ["주식 내 비중", weight], ["매입가", "", "costPrice"], ["매입금액", "", "cost"],
+      ["현재가", "", "price"], ["평가금액", "", "value"]
     ]) {
       const cell = document.createElement("div"), term = document.createElement("dt"), data = document.createElement("dd");
       term.textContent = label;
       data.textContent = value;
+      if (field) moneyCells[field] = data;
       cell.append(term,data);
       metrics.append(cell);
     }
+    function renderMoney() {
+      const amounts = holdingMoney(holding, holdingCurrency.value);
+      for (const [field, cell] of Object.entries(moneyCells)) cell.textContent = amounts[field];
+      showPerformance(profit, amounts.profitValue, () => amounts.profit);
+      head.setAttribute("aria-label", [symbol.textContent, company.textContent, "평가손익 " + profit.textContent, "수익률 " + rate.textContent].filter(Boolean).join(", "));
+    }
+    moneyRenderers.push(renderMoney);
+    renderMoney();
     details.append(head,metrics);
     item.append(details);
     holdingsList.append(item);
@@ -999,15 +1033,10 @@ loadDirectory().catch(() => {});
 
 async function loadValuation(accessToken) {
   const value = document.querySelector("#portfolio-value");
-  const performance = document.querySelector("#kiwoom-return");
-  assetDetails.hidden = true;
-  assetToggle.hidden = true;
-  assetToggle.setAttribute("aria-expanded", "false");
-  const profitRow = document.getElementById("asset-profit");
-  profitRow.hidden = true;
+  const metrics = document.getElementById("asset-metrics");
+  metrics.hidden = true;
   delete value.dataset.loaded;
   value.textContent = "조회 중…";
-  performance.textContent = "";
   showHoldings(null);
   try {
     const [balance] = await request("/rest/v1/kiwoom_valuation?select=*&limit=1", { accessToken });
@@ -1039,14 +1068,9 @@ async function loadValuation(accessToken) {
       currency.textContent=part.value;
       return currency;
     }));
-    document.getElementById("asset-stocks").textContent = holdingKRW.format(stocks);
     document.getElementById("asset-cash").textContent = hasCash ? holdingKRW.format(cash) : "—";
-    document.getElementById("asset-other-row").hidden = !(rp > 0);
-    document.getElementById("asset-other").textContent = rp > 0 ? holdingKRW.format(rp) : "";
-    assetToggle.hidden = false;
-    showPerformance(performance,balance.return_pct,signedWatchPercent);
     showHoldings(balance);
-    profitRow.hidden = false;
+    metrics.hidden = false;
 
     showProfit(balance.realized_profit);
     return balance;
