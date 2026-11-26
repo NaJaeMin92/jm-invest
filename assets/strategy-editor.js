@@ -3,7 +3,7 @@ import {factors, metrics, matches} from "./strategy.js?v=84";
 import {firstBuyQuantity} from "./first-touch.js?v=113";
 import {touchRecordKey, watchFirstTouch} from "./first-touch-watch.js?v=113";
 
-const presets = {
+export const strategyPresets = {
   firstTouch:{label:"전략 1", nickname:"겹지지 첫매수", side:"buy", conditions:[],
     touch:{rsiCeiling:60, tolerance:1, reactions:4, rally:20, drawdown:20, single:"notify"}},
   overheat:{label:"전략 2", nickname:"과열 분할매도", side:"sell",
@@ -186,7 +186,7 @@ export function setupStrategy({loadChart,orders,canLoadChart,tickerIcon,subscrib
       state.textContent="1차 예산으로 지정가 1주 이상을 매수할 수 있어야 합니다.";return;
     }
     const incomplete=preset!=="custom" && (!f.price.value || (f.side.value==="buy" && !allocation));
-    return {preset,nickname:f.nickname.value.trim() || presets[preset].nickname, touch:settings,incomplete,allocation,symbol,frame:touch ? "day" : f.frame.value,join:f.join.value,side:f.side.value,quantity:allocation ? undefined : f.quantity.value,price:f.price.value,mode:"live",conditions};
+    return {preset,nickname:f.nickname.value.trim() || strategyPresets[preset].nickname, touch:settings,incomplete,allocation,symbol,frame:touch ? "day" : f.frame.value,join:f.join.value,side:f.side.value,quantity:allocation ? undefined : f.quantity.value,price:f.price.value,mode:"live",conditions};
   }
   function showStock(symbol) {
     const rule=readStrategy(symbol);
@@ -221,11 +221,11 @@ export function setupStrategy({loadChart,orders,canLoadChart,tickerIcon,subscrib
     setStage("conditions"); sheet.showModal();
   }
   function loadPreset(key,saved) {
-    const base=presets[key];
+    const base=strategyPresets[key];
     form.reset(); list.replaceChildren();
     f.preset.value=key; f.nickname.value=saved?.nickname ?? base.nickname;
     const variants=readStrategy(symbol)?.variants;
-    for(const [value,option] of Object.entries(presets)){
+    for(const [value,option] of Object.entries(strategyPresets)){
       const name=(variants?.[value]?.nickname || option.nickname);
       f.preset.querySelector('[value="'+value+'"]').textContent=value==="custom" && name===option.label ? name : option.label+" · "+name;
     }
@@ -257,7 +257,7 @@ export function setupStrategy({loadChart,orders,canLoadChart,tickerIcon,subscrib
       if(previous){const {variants:ignored,...old}=previous; variants[old.preset || "custom"]=old;}
       variants[r.preset]=r;
       localStorage.setItem(strategyPrefix+symbol,JSON.stringify({...r,variants}));
-      const label=presets[r.preset].label;
+      const label=strategyPresets[r.preset].label;
       f.preset.selectedOptions[0].textContent=label===r.nickname ? label : label+" · "+r.nickname;
       state.textContent="저장했습니다 · "+r.nickname;
     } catch {state.textContent="이 브라우저에 저장하지 못했습니다.";}

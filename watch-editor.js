@@ -223,5 +223,6 @@ export function setupWatchEditor({watchKey, nameFor, tickerIcon, refresh}) {
       notice.textContent=wanted.length+" moved.";
     } catch { notice.textContent="Unable to move symbols."; }
   };
-  return {readList,saveList,renameHeading,open};
+  const allSymbols = () => [...new Set(allGroups().flatMap(group => readList(group.id)))];
+  return {readList,allSymbols,saveList,renameHeading,open};
 }

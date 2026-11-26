@@ -1,5 +1,8 @@
-import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=113";
-import {setupWatchEditor} from "./watch-editor.js?v=95";
+import {setupRadar} from "./assets/radar.js?v=114";
+import {setupCalendar} from "./assets/calendar.js?v=114";
+import {setupLab} from "./assets/lab.js?v=114";
+import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=114";
+import {setupWatchEditor} from "./watch-editor.js?v=114";
 import {setupOrders} from "./orders.js?v=83";
 import { setupInstrument, sparkline } from "./instrument.js?v=112";
 import {loadWatchSentiment} from "./market-panels.js?v=104";
@@ -13,6 +16,7 @@ const message = document.querySelector("#status");
 let token = null;
 let valuationSnapshot = null;
 let returnToStock = null;
+let returnToView = null;
 const heldWatchSymbols = new Set();
 const watchSymbolKey = symbol => symbol.trim().toUpperCase().replaceAll(".", "-");
 const storageKey = "jm-invest:private-refresh:v1";
@@ -55,9 +59,12 @@ const accountNavLabel=document.getElementById("account-nav-label");
 const navButtons = [...navigation.querySelectorAll("button")];
 function selectView(view) {
   if (!token && view !== "account") returnToStock = null;
-  const needsLogin = !["home","strategies"].includes(view) && !token;
+  const needsLogin = !["home","strategies","calendar","lab","radar"].includes(view) && !token;
   document.getElementById("watch-login").hidden = Boolean(token);
   accountNavLabel.textContent=token ? "Account" : "Sign in";
+  if (document.body.dataset.view === "lab" && view !== "lab") lab.close();
+  if (document.body.dataset.view === "radar" && view !== "radar") radar.close();
+  if (view !== "account") returnToView = null;
   document.body.dataset.view = view;
   setDetail(view === "account" && !needsLogin);
   login.hidden = !needsLogin;
@@ -73,10 +80,13 @@ function selectView(view) {
     else button.removeAttribute("aria-current");
   }
   document.querySelector("#page-heading").textContent = {
-    strategies:"Strategies", home:"My Watchlist", account:"계좌", profit:"Realized P&L", more:"Menu"
+    strategies:"Strategies", lab:"Lab", radar:"Radar", calendar:"Calendar", home:"My Watchlist", account:"계좌", profit:"Realized P&L", more:"Menu"
   }[view];
   document.querySelector("#page-heading").lang = view === "account" ? "ko" : "en";
   if(view==="strategies") renderStrategies();
+  if(view==="calendar") calendar.refresh();
+  if(view==="lab") lab.open();
+  if(view==="radar") radar.open();
   window.scrollTo(0, 0);
   if (view === "home") refreshWatchlistQuotes();
   else syncKiwoomQuotes();
@@ -520,6 +530,7 @@ const nameFor = symbol => snapshots.get(symbol)?.name
 const watchEditor = setupWatchEditor({watchKey, nameFor, tickerIcon, refresh() {
   renderWatchlist();
   refreshWatchlistQuotes();
+  if(document.body.dataset.view==="calendar") calendar.refresh();
 }});
 document.getElementById("home-search").onclick = () => {
   watchEditor.open(true);
@@ -754,8 +765,21 @@ async function loadChart(symbol, frame, before, signal, day) {
   if (!response.ok) throw new Error(payload.message || "Kiwoom chart unavailable.");
   return payload;
 }
+async function loadExecutions(symbol, from, to, signal) {
+    const endpoint = new URL("executions", new URL(kiwoomEndpoint, location.href));
+    endpoint.search = new URLSearchParams({symbol,from:from.replaceAll("-",""),to:to.replaceAll("-","")});
+    const response = await fetch(endpoint,{headers:{Authorization:"Bearer "+token},cache:"no-store",signal});
+    if (!response.ok) throw new Error("체결 내역을 불러오지 못했습니다.");
+    return (await response.json()).executions;
+}
 const canLoadChart=()=>Boolean(token && kiwoomEndpoint);
 const strategy=setupStrategy({loadChart,orders,canLoadChart,tickerIcon,subscribeOrderBook});
+const calendar=setupCalendar({getWatchlist:watchEditor.allSymbols,getHoldings:()=>heldWatchSymbols});
+const radar=setupRadar({getWatchlist:watchEditor.allSymbols,getHoldings:()=>heldWatchSymbols,
+  loadChart,canLoadChart,readStrategy,openStock:symbol=>instrument.open(symbol),
+  onSignIn(){returnToView="radar";selectView("account");}});
+const lab=setupLab({readSymbols:()=>[...new Set([...watchEditor.allSymbols(),...heldWatchSymbols])],
+  loadChart,loadExecutions,canLoadChart,readStrategy,onSignIn(){returnToView="lab";selectView("account");}});
 const instrument = setupInstrument({
   orders,strategy,isSignedIn:()=>Boolean(token),
   async readPositionSnapshot(symbol) {
@@ -771,13 +795,7 @@ const instrument = setupInstrument({
   },
   subscribeOrderBook,
   canLoadChart,
-  async loadExecutions(symbol, from, to, signal) {
-    const endpoint = new URL("executions", new URL(kiwoomEndpoint, location.href));
-    endpoint.search = new URLSearchParams({symbol,from:from.replaceAll("-",""),to:to.replaceAll("-","")});
-    const response = await fetch(endpoint,{headers:{Authorization:"Bearer "+token},cache:"no-store",signal});
-    if (!response.ok) throw new Error("체결 내역을 불러오지 못했습니다.");
-    return (await response.json()).executions;
-  },
+  loadExecutions,
   loadChart,
   signIn(symbol) {
     returnToStock = symbol;
@@ -1049,6 +1067,9 @@ async function loadValuation(accessToken) {
       }
     }
     renderWatchlist();
+    if(document.body.dataset.view==="calendar") calendar.refresh();
+    if(document.body.dataset.view==="lab") lab.open();
+    if(document.body.dataset.view==="radar") radar.open();
     if (!balance) {
       value.textContent = "잔고 동기화 대기";
       return;
@@ -1097,6 +1118,8 @@ async function openWorkspace(session, remember) {
     selectView("home");
     instrument.open(returnToStock);
     returnToStock = null;
+  } else if(returnToView) {
+    selectView(returnToView);
   } else {
     selectView(document.body.dataset.view || "home");
     instrument.refresh();
@@ -1134,5 +1157,6 @@ async function restoreSession() {
   }
 }
 
-selectView(new URLSearchParams(location.search).get("view")==="account" ? "account" : "home");
+const initialView=new URLSearchParams(location.search).get("view");
+selectView(["account","strategies","lab","calendar","radar"].includes(initialView) ? initialView : "home");
 restoreSession();

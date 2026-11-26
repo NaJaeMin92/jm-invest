@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: refresh-sigma
+  group: publish-market-data
 
 jobs:
   refresh:
