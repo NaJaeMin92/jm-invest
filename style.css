@@ -316,10 +316,10 @@ button.broker-row:hover { background:#2a2c31; }
 .watch-list { list-style:none; padding:0; margin:0; }
 #private .watch-list li {
   display:grid; grid-template-columns:35px minmax(0,1fr) 19% 26.5%; align-items:center;
-  column-gap:clamp(5px,2vw,12px); min-height:69px; margin:0; padding:6px 2px;
+  column-gap:clamp(5px,2vw,12px); min-height:50px; margin:0; padding:3px 2px;
   white-space:normal; overflow-wrap:normal; border-bottom:1px solid #27323f;
 }
-#private .watch-list li[data-symbol="VIX"] { background:#1b2834; border:1px solid #354655; padding-inline:9px; border-radius:13px; margin-bottom:5px; }
+#private .watch-list li[data-symbol="VIX"] { background:#1b2834; border:1px solid #354655; padding-inline:9px; border-radius:11px; margin-bottom:2px; }
 #private .watch-list li[data-symbol="VIX"] .watch-ticker-icon { background:#314b50; color:#b5e5d7; }
 .watch-ticker-icon { position:relative; width:35px; height:35px; display:grid; place-items:center; border-radius:50%; overflow:hidden; background:#344263; color:white; font-size:13px; font-weight:700; }
 .watch-ticker-icon img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:white; }
@@ -334,12 +334,13 @@ button.broker-row:hover { background:#2a2c31; }
 .session-tag { flex:none; font-size:9px; line-height:14px; color:#9b81ff; background:#252443; border-radius:4px; padding:0 4px; }
 .session-tag.global-session { background:#122f42; font-size:8px; padding:0 2px; }
 .session-tag.futures { color:#739afe; background:#1b2948; }
-.watch-quote { display:grid; justify-items:end; gap:2px; white-space:nowrap; }
-.watch-list .watch-metric { position:relative; z-index:1; min-height:34px; border:0; touch-action:manipulation; min-width:min(100%,85px); padding:4px 8px; background:#263341; border-radius:8px; text-align:right; font-size:15px; line-height:20px; font-weight:650; font-variant-numeric:tabular-nums; color:#cad5df; }
-.watch-list .watch-metric::after { content:""; position:absolute; inset:-5px 0; }
+.watch-quote { display:grid; justify-items:end; gap:1px; white-space:nowrap; }
+.watch-list .watch-metric { position:relative; z-index:1; min-height:30px; border:0; touch-action:manipulation; min-width:min(100%,85px); padding:4px 8px; background:#263341; border-radius:8px; text-align:right; font-size:15px; line-height:20px; font-weight:650; font-variant-numeric:tabular-nums; color:#cad5df; }
+.watch-list .watch-metric::after { content:""; position:absolute; inset:-7px 0; }
 .watch-quote[data-direction="down"] .watch-metric { background:#183b34; color:var(--down); }
 .watch-quote[data-direction="up"] .watch-metric { background:#422832; color:var(--up); }
-.watch-quote small { max-width:100%; white-space:normal; text-align:right; font-size:12px; color:#aab4c9; }
+.watch-quote small:empty { display:none }
+.watch-quote small { line-height:14px; max-width:100%; white-space:normal; text-align:right; font-size:12px; color:#aab4c9; }
 .watch-quote small[data-direction="down"] { color:var(--down); }
 .watch-quote small[data-direction="up"] { color:var(--up); }
 #watch-sentiment-rating {
@@ -1286,3 +1287,16 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
   .trade-page #bottom-nav { padding-inline:max(3px,env(safe-area-inset-left)) max(3px,env(safe-area-inset-right)) }
   .trade-page #bottom-nav button { padding-inline:0 }
 }
+
+#lab-windows { margin-top:24px }
+#lab-window-source,#lab-model,.lab-window-summary { color:var(--workspace-muted); font-size:12px }
+.lab-window-group { margin-top:20px }
+.lab-window-group h3 { margin:0; font-size:16px }
+.lab-window-summary { margin:5px 0 8px }
+.lab-window-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px 10px; padding:11px 0; border-top:1px solid var(--workspace-edge); font-variant-numeric:tabular-nums }
+.lab-window-row strong { font-size:13px }
+.lab-window-row b { color:var(--workspace-mint); font-size:16px }
+.lab-window-row b[data-negative] { color:#efb6ac }
+.lab-window-row small { grid-column:1/-1; color:var(--workspace-muted); font-size:12px }
+.lab-controls { grid-template-columns:repeat(2,minmax(0,1fr)) }
+#lab-run { grid-column:auto }

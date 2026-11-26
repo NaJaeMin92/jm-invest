@@ -1,6 +1,8 @@
+import {usMarketSession} from "../watch-quotes.js?v=64";
 import {publicQuote} from "../instrument.js?v=112";
 import {metrics, matches, factors} from "./strategy.js?v=84";
-import {firstTouchLevels, firstTouchDecision} from "./first-touch.js?v=113";
+import {touchCandidate} from "./lab-backtest.js?v=115";
+import {firstTouchLevels} from "./first-touch.js?v=113";
 
 const dayMs = 86400000;
 const nyDay = new Intl.DateTimeFormat("en-CA", {timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit"});
@@ -18,27 +20,7 @@ export function executionWindows(first, last) {
   return ranges;
 }
 
-// OHLC shows the price range touched during a session, but not the exact order of ticks.
-export function touchCandidate(levels, settings, bar) {
-  const opening = bar[1], low = bar[3];
-  const points = [low, opening];
-  for (const line of levels.lines) {
-    for (const edge of [-1, 0, 1]) {
-      const price = line.price * (1 + edge * settings.tolerance / 100);
-      if (price >= low && price <= opening) points.push(price);
-    }
-  }
-  points.sort((a, b) => b - a);
-  let notice;
-  for (let i = 1; i < points.length; i++) {
-    for (const price of [(points[i-1] + points[i]) / 2, points[i]]) {
-      const decision = firstTouchDecision(levels, settings, opening, price);
-      if (decision?.action === "buy") return {side:"buy", label:"매수 후보", detail:decision.reason};
-      if (decision?.action === "notify") notice = {side:null, label:"검토 후보", detail:decision.reason};
-    }
-  }
-  return notice;
-}
+export {touchCandidate} from "./lab-backtest.js?v=115";
 
 function replayIssue(rule) {
   if (rule.preset === "firstTouch") return rule.touch ? "" : "터치 설정이 없습니다.";
@@ -72,12 +54,17 @@ export function compareSessions(days, signals, fills) {
     matchDays:fills && events.filter(r => r.signal?.side && r.fills.some(f => f.side===r.signal.side)).length};
 }
 
-async function loadBars(symbol, needed, loadChart, canRead, signal) {
-  const today = nyDay.format(new Date());
+async function loadBars(symbol, needed, loadChart, canRead, signal, progress=()=>{}) {
+  const now=new Date(), session=usMarketSession(now), today=session.date;
+  const hour=Number(new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"2-digit",hourCycle:"h23"}).format(now));
+  const closedToday=session.phase==="After" || hour>=16;
   const bars = new Map();
   const merge = rows => {
     for (const bar of rows || []) {
-      if (Array.isArray(bar) && bar.slice(0,5).every(Number.isFinite) && bar[4]>0 && dateKey(bar[0]*1000)<today) bars.set(bar[0],bar);
+      if(!Array.isArray(bar) || bar.length<5 || !bar.slice(0,5).every(Number.isFinite))continue;
+      const [stamp,opening,high,low,closing]=bar, day=dateKey(stamp*1000);
+      if(low>0 && low<=Math.min(opening,closing) && high>=Math.max(opening,closing) &&
+         (day<today || closedToday && day===today))bars.set(stamp,bar);
     }
   };
   let source, issue;
@@ -87,10 +74,13 @@ async function loadBars(symbol, needed, loadChart, canRead, signal) {
       merge(first?.daily);
       source = first?.source || "키움";
       let before = first?.before;
+      progress(bars.size);
       while (before && bars.size < needed) {
         const page = await loadChart(symbol, "day", before, signal);
         merge(page?.bars);
-        if (!page?.before || page.before >= before) break;
+        progress(bars.size);
+        if (!page?.before) break;
+        if (page.before >= before) throw Error("이전 일봉 페이지가 중복됐습니다.");
         before = page.before;
       }
     } catch(error) { signal.throwIfAborted(); issue = error; }
@@ -136,21 +126,65 @@ function appendEvents(container, events) {
 
 export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, readStrategy, onSignIn}) {
   const symbolInput=get("symbol"), period=get("period"), status=get("status"), result=get("results"), login=get("login");
-  let controller, lastAccess;
+  const strategies=get("strategy"), windows=get("windows");
+  for(let y=1;y<=30;y++) get("years").append(new Option(y+"년","y"+y));
+  let controller, lastAccess, history;
+  let rules=new Map();
+  const annual=()=>period.value.startsWith("y");
+  function selectRules(preferred){
+    const active=readStrategy(symbolInput.value);
+    rules=new Map(Object.entries(active?.variants || {}).filter(([,r])=>Array.isArray(r?.conditions)));
+    const key=active?.preset || "custom";
+    if(active)rules.set(key,active);
+    strategies.replaceChildren(...[...rules].map(([k,r])=>new Option(r.nickname || "저장된 "+(r.side==="buy"?"매수":"매도")+" 전략",k)));
+    if(!rules.size)strategies.append(new Option("등록 전략 없음",""));
+    strategies.value=rules.has(preferred)?preferred:active?key:"";
+    strategies.disabled=rules.size<2;
+  }
+  function changed(){
+    controller?.abort();controller=null;result.hidden=true;windows.hidden=true;
+    login.hidden=canLoadChart();
+    get("run").textContent=annual()?"백테스트 실행":"전략 검증";
+    if(!annual())return review();
+    status.textContent=rules.size ? "최근 일봉 기준 월별 10구간과 무작위 10구간을 비교합니다." : "Strategies에서 이 종목의 전략을 먼저 저장하세요.";
+  }
 
   async function review() {
     controller?.abort();
     const task = new AbortController(), {signal}=task;
     controller=task;
     const symbol=symbolInput.value;
-    result.hidden=true;
+    result.hidden=true;windows.hidden=true;
     if (!symbol) {status.textContent="관심종목에 종목을 추가하세요.";return;}
     const count=Number(period.value);
-    const canRead=canLoadChart(), rule=readStrategy(symbol) ?? example, issue=replayIssue(rule);
+    const canRead=canLoadChart(), saved=rules.get(strategies.value);
+    const rule=saved ?? example, issue=replayIssue(rule);
     lastAccess = canRead;
     login.hidden=canRead;
     status.textContent="일봉을 불러오는 중…";
     try {
+      if(annual()){
+        if(!saved)throw Error("Strategies에서 이 종목의 전략을 먼저 저장하세요.");
+        if(issue)throw Error(issue);
+        const years=Number(period.value.slice(1));
+        const key=[symbol,canRead,nyDay.format(new Date()),new Date().getUTCHours()].join("/");
+        if(history?.key!==key){
+          const loaded=await loadBars(symbol,Infinity,loadChart,canRead,signal,n=>{if(!signal.aborted)status.textContent="일봉 "+n.toLocaleString()+"개 조회 중…";});
+          signal.throwIfAborted();
+          history={...loaded,key:loaded.partial?null:key};
+        }
+        const {bars,source,partial}=history;
+        if(!bars.length)throw Error("조회할 수 있는 완료 일봉이 없습니다.");
+        status.textContent="백테스트 구간을 구성하는 중…";
+        const groups=await calculateWindows(bars,years,saved,signal,n=>{status.textContent="구간 "+n+" 계산 중…";});
+        signal.throwIfAborted();
+        renderWindows(groups,years,rule,symbol,bars,source);
+        windows.hidden=false;
+        const completed=groups.rolling.filter(Boolean).length+groups.random.length;
+        status.textContent=[completed+"/20구간 계산 완료",completed<20?"완전한 검증 기간과 지표 준비 이력이 있는 구간만 계산했습니다.":"",
+          partial?"시세 일부만 조회되었습니다. 다시 실행하면 재조회합니다.":""].filter(Boolean).join(" · ");
+        return;
+      }
       const warmup=rule.frame==="month" ? 1400 : rule.frame==="week" ? 600 : 400;
       const {bars,source,partial}=await loadBars(symbol, count+warmup, loadChart, canRead, signal);
       signal.throwIfAborted();
@@ -215,11 +249,69 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
       if (preferred) symbolInput.value=preferred;
     }
     if(controller && prev===symbolInput.value && lastAccess===canLoadChart())return;
-    return review();
+    const initial=!strategies.options.length;
+    selectRules(prev===symbolInput.value?strategies.value:null);
+    if(initial && rules.size)period.value="y1";
+    return changed();
   }
   get("run").addEventListener("click",e=>{e.preventDefault();review();});
   get("form")?.addEventListener("submit",e=>{e.preventDefault();review();});
-  for (const control of [period,symbolInput])control.addEventListener("change",review);
+  symbolInput.addEventListener("change",()=>{selectRules(null);changed();});
+  for (const control of [period,strategies])control.addEventListener("change",changed);
   login.addEventListener("click",()=>onSignIn());
-  return {open,close(){controller?.abort();controller=null; result.hidden=true; get("events").replaceChildren();}};
+  return {open,close(){controller?.abort();controller=null; windows.hidden=true; result.hidden=true; get("events").replaceChildren();}};
+}
+
+function calculateWindows(bars,years,rule,signal,progress){
+  return new Promise((resolve,reject)=>{
+    signal.throwIfAborted();
+    const worker=new Worker(new URL("./lab-backtest-worker.js?v=115",import.meta.url),{type:"module"});
+    const finish=()=>{worker.terminate();signal.removeEventListener("abort",abort);};
+    const abort=()=>{finish();reject(signal.reason);};
+    signal.addEventListener("abort",abort,{once:true});
+    worker.onmessage=({data})=>{
+      if(data.progress){progress(data.progress);return;}
+      finish();
+      if(data.error)reject(Error(data.error));else resolve(data.results);
+    };
+    worker.onerror=()=>{finish();reject(Error("백테스트 계산을 완료하지 못했습니다."));};
+    const {variants,...selected}=rule;
+    worker.postMessage({bars,years,rule:selected});
+  });
+}
+
+const percent=value=>(value>0?"+":"")+(value*100).toFixed(2)+"%";
+function renderWindows(groups,years,rule,symbol,bars,source){
+  get("window-title").textContent=(rule.nickname || "저장 전략")+" · "+years+"년 백테스트";
+  get("window-source").textContent=symbol+" · "+source+" · "+dateKey(bars[0][0]*1000)+" – "+dateKey(bars.at(-1)[0]*1000);
+  const budget=Number(rule.allocation?.amount)||10000;
+  const order=Number(rule.price)>0 ? "$"+rule.price+" 당일 지정가" : "시가 모의 체결";
+  const qty=rule.allocation?"첫 회차 예산":Number(rule.quantity)>0?rule.quantity+"주":"가용 전량";
+  get("model").textContent="각 구간에서 $"+budget.toLocaleString()+"로 독립 시작 · "+(rule.side==="buy"?"현금 시작":"첫날 시가에 보유 가능한 정수 주식으로 시작")+
+    ". 첫 신호에 한 번 주문합니다 ("+qty+", "+order+"). "+
+    (rule.preset==="firstTouch"?"일봉에서 터치 후보가 나온 다음 거래일에 주문합니다. ":"직전 완료 봉의 신호로 해당 거래일에 주문합니다. ")+
+    "수익률과 최대낙폭은 종가 평가 기준이며 수수료·슬리피지·배당 현금흐름은 별도 반영하지 않습니다.";
+  const root=get("window-groups");root.replaceChildren();
+  for(const [key,title] of [["rolling","월별 슬라이딩"],["random","무작위 구간"]]){
+    const rows=groups[key].filter(Boolean),section=document.createElement("section"),h=document.createElement("h3"),summary=document.createElement("p");
+    section.className="lab-window-group";h.textContent=title+" · "+rows.length+"/10";
+    summary.className="lab-window-summary";
+    if(rows.length){
+      const sorted=rows.map(r=>r.profit).sort((a,b)=>a-b),mid=sorted.length/2;
+      const median=(sorted[Math.floor(mid)]+sorted[Math.ceil(mid)-1])/2;
+      summary.textContent="중앙 수익률 "+percent(median)+" · 체결 발생 "+rows.filter(r=>r.filled).length+"구간";
+    }else summary.textContent="계산 가능한 구간이 없습니다.";
+    section.append(h,summary);
+    for(const [index,r] of rows.entries()){
+      const item=document.createElement("div"),label=document.createElement("strong"),value=document.createElement("b"),detail=document.createElement("small");
+      item.className="lab-window-row";
+      const name=key==="random"?"표본 "+(index+1):r.offset?r.offset+"개월 전":"최근";
+      label.textContent=name+" · "+r.start+" ~ "+r.end;
+      value.textContent=percent(r.profit);value.toggleAttribute("data-negative",r.profit<0);
+      detail.textContent="최대낙폭 "+percent(r.drawdown)+" · 단순보유 "+percent(r.benchmark)+" · "+
+        (r.filled?r.filled+" "+r.qty+"주 체결":r.signalDay?"신호 발생 · 체결 없음":"신호 없음");
+      item.append(label,value,detail);section.append(item);
+    }
+    root.append(section);
+  }
 }

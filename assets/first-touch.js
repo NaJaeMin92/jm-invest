@@ -30,13 +30,18 @@ export function independentReactions(line, bars, tolerance) {
 
 // Only completed daily bars enter the guides. The placeholder identifies the still-open week/month.
 export function firstTouchLevels(closed, today, settings) {
-  const bars = closed.slice(-252);
-  const lines = chartTrends(bars, "day").filter(g => g.key === "support" || g.key === "long" && g.slope > 0)
-    .map(g => ({kind:g.key, price:at(g, bars.length), reactions:independentReactions(g, bars, settings.tolerance)}));
+  const geometry = firstTouchGeometry(closed,settings);
   const series = [...closed, [today, 0, 0, 0, 0, 0]];
   const rsi = Object.fromEntries(["day","week","month"].map(frame =>
     [frame, prepareChart(series, frame).strength.at(-2) ?? null]));
-  return {lines, high:recentSwingHigh(bars, settings.rally), rsi};
+  return {...geometry,rsi};
+}
+
+export function firstTouchGeometry(closed,settings) {
+  const bars = closed.slice(-252);
+  const lines = chartTrends(bars, "day").filter(g => g.key === "support" || g.key === "long" && g.slope > 0)
+    .map(g => ({kind:g.key, price:at(g, bars.length), reactions:independentReactions(g, bars, settings.tolerance)}));
+  return {lines,high:recentSwingHigh(bars,settings.rally)};
 }
 
 export function firstTouchDecision(levels, settings, previous, price) {

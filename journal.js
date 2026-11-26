@@ -1,6 +1,6 @@
 import {setupRadar} from "./assets/radar.js?v=114";
 import {setupCalendar} from "./assets/calendar.js?v=114";
-import {setupLab} from "./assets/lab.js?v=114";
+import {setupLab} from "./assets/lab.js?v=115";
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=114";
 import {setupWatchEditor} from "./watch-editor.js?v=114";
 import {setupOrders} from "./orders.js?v=83";
@@ -778,7 +778,14 @@ const calendar=setupCalendar({getWatchlist:watchEditor.allSymbols,getHoldings:()
 const radar=setupRadar({getWatchlist:watchEditor.allSymbols,getHoldings:()=>heldWatchSymbols,
   loadChart,canLoadChart,readStrategy,openStock:symbol=>instrument.open(symbol),
   onSignIn(){returnToView="radar";selectView("account");}});
-const lab=setupLab({readSymbols:()=>[...new Set([...watchEditor.allSymbols(),...heldWatchSymbols])],
+function labSymbols(){
+  const symbols=new Set([...watchEditor.allSymbols(),...heldWatchSymbols]);
+  try{
+    for(const key of Object.keys(localStorage))if(key.startsWith(strategyPrefix))symbols.add(key.slice(strategyPrefix.length));
+  }catch { /* Symbols from the watchlist remain available without device storage. */ }
+  return [...symbols];
+}
+const lab=setupLab({readSymbols:labSymbols,
   loadChart,loadExecutions,canLoadChart,readStrategy,onSignIn(){returnToView="lab";selectView("account");}});
 const instrument = setupInstrument({
   orders,strategy,isSignedIn:()=>Boolean(token),

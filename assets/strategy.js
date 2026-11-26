@@ -14,13 +14,17 @@ export const factors = {
 
 export function metrics(daily, frame) {
   const chart = prepareChart(daily, frame);
-  const i = chart.bars.length-2; // The current period is still open.
+  return metricsAt(chart,frame,chart.bars.length-2); // The current period is still open.
+}
+
+export function metricsAt(chart, frame, i, includeTrends=true) {
   if (i < 0) return {};
   const bars = chart.bars, close = bars[i][4];
   const distance = value => value > 0 ? 100*(close/value-1) : null;
   const result = {rsi:chart.strength[i], ma:distance(study(chart,"MA").lines[0].values[i])};
   const [upper,,lower] = study(chart,"BOLL").lines.map(line=>line.values[i]);
   if (upper > lower) result.band = 100*(close-lower)/(upper-lower);
+  if (!includeTrends) return result;
   // The tested candle must not participate in constructing its reference lines.
   for (const g of chartTrends(bars,frame,i)) {
     if (g.key==="fibonacci" && g.label!=="61.8%") continue;
