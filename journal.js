@@ -1,4 +1,4 @@
-import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=100";
+import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=113";
 import {setupWatchEditor} from "./watch-editor.js?v=95";
 import {setupOrders} from "./orders.js?v=83";
 import { setupInstrument, sparkline } from "./instrument.js?v=112";
@@ -755,7 +755,7 @@ async function loadChart(symbol, frame, before, signal, day) {
   return payload;
 }
 const canLoadChart=()=>Boolean(token && kiwoomEndpoint);
-const strategy=setupStrategy({loadChart,orders,canLoadChart,tickerIcon});
+const strategy=setupStrategy({loadChart,orders,canLoadChart,tickerIcon,subscribeOrderBook});
 const instrument = setupInstrument({
   orders,strategy,isSignedIn:()=>Boolean(token),
   async readPositionSnapshot(symbol) {

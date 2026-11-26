@@ -7,7 +7,7 @@ export const trendStyles = {
   fibonacci: {label:"피보나치", color:"#dcc78f"}
 };
 
-function pivots(bars, field, radius) {
+export function pivots(bars, field, radius) {
   const result = [];
   for (let i = radius; i < bars.length - radius; i++) {
     const value = bars[i][field];
