@@ -1,5 +1,5 @@
 import {setupCalendar} from "./assets/calendar.js?v=114";
-import {setupLab} from "./assets/lab.js?v=115";
+import {setupLab} from "./assets/lab.js?v=119";
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=114";
 import {setupWatchEditor} from "./watch-editor.js?v=114";
 import {setupOrders} from "./orders.js?v=83";
@@ -58,7 +58,7 @@ const accountNavLabel=document.getElementById("account-nav-label");
 const navButtons = [...navigation.querySelectorAll("button")];
 function selectView(view) {
   if (!token && view !== "account") returnToStock = null;
-  const needsLogin = !["home","strategies","calendar","lab"].includes(view) && !token;
+  const needsLogin = !["home","calendar","lab"].includes(view) && !token;
   document.getElementById("watch-login").hidden = Boolean(token);
   accountNavLabel.textContent=token ? "Account" : "Sign in";
   if (document.body.dataset.view === "lab" && view !== "lab") lab.close();
@@ -78,12 +78,12 @@ function selectView(view) {
     else button.removeAttribute("aria-current");
   }
   document.querySelector("#page-heading").textContent = {
-    strategies:"Strategies", lab:"Lab", calendar:"Calendar", home:"My Watchlist", account:"계좌", profit:"Realized P&L", more:"Menu"
+    lab:"Lab", calendar:"Calendar", home:"My Watchlist", account:"계좌", profit:"Realized P&L", more:"Menu"
   }[view];
   document.querySelector("#page-heading").lang = view === "account" ? "ko" : "en";
-  if(view==="strategies") renderStrategies();
+
   if(view==="calendar") calendar.refresh();
-  if(view==="lab") lab.open();
+  if(view==="lab") {renderStrategies();lab.open();}
   window.scrollTo(0, 0);
   if (view === "home") refreshWatchlistQuotes();
   else syncKiwoomQuotes();
@@ -207,7 +207,7 @@ for(const filter of document.querySelectorAll("#strategy-filter button")){
   filter.onclick=()=>{strategyFilter=filter.dataset.side;renderStrategies();};
 }
 window.addEventListener("storage",event=>{
-  if(document.body.dataset.view==="strategies" && (!event.key || event.key.startsWith(strategyPrefix) || event.key.startsWith(selectionPrefix)))renderStrategies();
+  if(document.body.dataset.view==="lab" && (!event.key || event.key.startsWith(strategyPrefix) || event.key.startsWith(selectionPrefix)))renderStrategies();
 });
 strategyPicker.onsubmit=e=>{
   e.preventDefault();
@@ -216,7 +216,7 @@ strategyPicker.onsubmit=e=>{
   openLibraryStrategy(symbol);
 };
 document.getElementById("strategy-sheet").addEventListener("close",()=>{
-  if(document.body.dataset.view==="strategies")renderStrategies();
+  if(document.body.dataset.view==="lab"){renderStrategies();lab.refreshRules();}
 });
 
 // Native modal dialogs make the rest of the document inert. Keep the single
@@ -1158,5 +1158,5 @@ async function restoreSession() {
 }
 
 const initialView=new URLSearchParams(location.search).get("view");
-selectView(["account","strategies","lab","calendar"].includes(initialView) ? initialView : "home");
+selectView(initialView==="strategies" ? "lab" : ["account","lab","calendar"].includes(initialView) ? initialView : "home");
 restoreSession();

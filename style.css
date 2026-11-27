@@ -1104,7 +1104,7 @@ body.instrument-open { overflow:hidden; }
 :root { --nav-space:calc(62px + env(safe-area-inset-bottom)) }
 .trade-page #bottom-nav {
   position:fixed; inset:auto 0 0; transform:none; width:min(680px,100%); box-sizing:border-box;
-  margin:0 auto; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:0;
+  margin:0 auto; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:0;
   padding:3px max(8px,env(safe-area-inset-right)) max(5px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));
   border:0; border-top:1px solid #303948; border-radius:0; background:#101722; z-index:100;
 }
@@ -1298,3 +1298,6 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 #mobile-install-help h2 { margin:14px 0 6px; font-size:20px }
 #mobile-install-help p { margin:0 0 18px; color:#bdc9d5 }
 #mobile-install-help form button { width:100%; background:#254037; color:#c6e6d8; border:0; font-weight:600 }
+
+#tab-strategies { margin-top:24px; border-top:1px solid var(--workspace-edge); }
+#tab-strategies > summary { padding:14px 0; cursor:pointer; font-weight:600; }

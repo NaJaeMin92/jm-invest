@@ -11,6 +11,12 @@ const get = id => document.getElementById("lab-" + id);
 const example = {nickname:"예시 · RSI 30 이하", side:"buy", frame:"day", join:"all",
   conditions:[{key:"rsi",op:"lte",value:30}]};
 
+const templates = [
+  ["builtin-rsi", "RSI 과매도 · RSI(14) ≤ 30", {key:"rsi",op:"lte",value:30}],
+  ["builtin-bollinger", "볼린저 하단 · %B ≤ 0", {key:"band",op:"lte",value:0}],
+  ["builtin-sma", "SMA20 추세 추종 · 종가 ≥ SMA20", {key:"ma",op:"gte",value:0}]
+];
+
 export function executionWindows(first, last) {
   const ranges = [];
   const end = Date.parse(last);
@@ -137,8 +143,14 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
     const key=active?.preset || "custom";
     if(active)rules.set(key,active);
     strategies.replaceChildren(...[...rules].map(([k,r])=>new Option(r.nickname || "저장된 "+(r.side==="buy"?"매수":"매도")+" 전략",k)));
-    if(!rules.size)strategies.append(new Option("등록 전략 없음",""));
-    strategies.value=rules.has(preferred)?preferred:active?key:"";
+    const group=document.createElement("optgroup");
+    group.label="대표 전략";
+    for(const [id,nickname,condition] of templates){
+      rules.set(id,{nickname,side:"buy",frame:"day",join:"all",conditions:[condition]});
+      group.append(new Option(nickname,id));
+    }
+    strategies.append(group);
+    strategies.value=rules.has(preferred)?preferred:active?key:templates[0][0];
     strategies.disabled=rules.size<2;
   }
   function changed(){
@@ -251,7 +263,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
     if(controller && prev===symbolInput.value && lastAccess===canLoadChart())return;
     const initial=!strategies.options.length;
     selectRules(prev===symbolInput.value?strategies.value:null);
-    if(initial && rules.size)period.value="y1";
+    if(initial)period.value="y1";
     return changed();
   }
   get("run").addEventListener("click",e=>{e.preventDefault();review();});
@@ -259,7 +271,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
   symbolInput.addEventListener("change",()=>{selectRules(null);changed();});
   for (const control of [period,strategies])control.addEventListener("change",changed);
   login.addEventListener("click",()=>onSignIn());
-  return {open,close(){controller?.abort();controller=null; windows.hidden=true; result.hidden=true; get("events").replaceChildren();}};
+  return {open,refreshRules(){selectRules(strategies.value);},close(){controller?.abort();controller=null; windows.hidden=true; result.hidden=true; get("events").replaceChildren();}};
 }
 
 function calculateWindows(bars,years,rule,signal,progress){
