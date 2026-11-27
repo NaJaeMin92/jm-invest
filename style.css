@@ -1325,13 +1325,13 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 
 #trade-preview[open]:has(#trade-preview-review:not([hidden])) {
   inset:max(12px,env(safe-area-inset-top)) 0 calc(var(--nav-space) + 12px);
-  margin:auto; width:min(360px,calc(100% - 32px)); height:fit-content;
+  margin:auto; width:min(360px,calc(100% - 32px)); height:max-content; overflow-y:auto;
   max-height:calc(100dvh - var(--nav-space) - max(12px,env(safe-area-inset-top)) - 12px);
-  grid-template-rows:auto minmax(0,1fr) auto; border:1px solid var(--separator); border-radius:22px; padding:0;
+  grid-template-rows:max-content max-content max-content; border:1px solid var(--separator); border-radius:22px; padding:0;
 }
 #trade-preview:has(#trade-preview-review:not([hidden])) :is(.ticket-instrument,#trade-pending) { display:none; }
 #trade-preview:has(#trade-preview-review:not([hidden])) .order-sheet-head { padding:6px 12px 0 18px; }
-#trade-preview-review { padding:0 18px 16px; }
+#trade-preview-review { padding:0 18px 16px; overflow:visible; }
 #trade-preview-review .order-facts { gap:8px 12px; padding:12px; }
 #trade-preview-review .trade-review-actions { margin-top:12px; }
 

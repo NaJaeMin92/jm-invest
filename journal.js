@@ -3,7 +3,7 @@ import {setupLab} from "./assets/lab.js?v=119";
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=114";
 import {setupWatchEditor} from "./watch-editor.js?v=126";
 import {setupOrders} from "./orders.js?v=83";
-import { setupInstrument, sparkline } from "./instrument.js?v=125";
+import { setupInstrument, sparkline } from "./instrument.js?v=136";
 import {loadWatchSentiment} from "./market-panels.js?v=104";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -384,6 +384,7 @@ holdingSort.onchange = sortHoldings;
 const weightPercent = new Intl.NumberFormat("ko-KR",{style:"percent",maximumFractionDigits:2});
 
 function showHoldings(balance) {
+  const expanded = new Set([...holdingsList.querySelectorAll("details[open]")].map(row=>row.dataset.symbol));
   moneyRenderers.length = 0;
   holdingsList.replaceChildren();
   const holdings = balance?.holdings;
@@ -418,6 +419,8 @@ function showHoldings(balance) {
     symbol.textContent = holding.symbol || holding.name || "—";
     company.textContent = holding.name !== symbol.textContent ? holding.name || "" : "";
     identity.append(symbol,company);
+    details.dataset.symbol = holding.symbol || "";
+    details.open = expanded.has(details.dataset.symbol);
     const ticker = watchSymbolKey(typeof holding.symbol==="string" ? holding.symbol : "");
     if (/^[A-Z][A-Z0-9.-]{0,11}$/.test(ticker)) {
       const link = document.createElement("a");
@@ -1211,7 +1214,7 @@ function refreshValuation() {
 }
 setInterval(()=>{
   if (!document.hidden && document.body.dataset.view==="account") refreshValuation();
-},30000);
+},1000);
 document.addEventListener("visibilitychange",()=>{
   if (!document.hidden && document.body.dataset.view==="account") refreshValuation();
 });
@@ -1257,7 +1260,7 @@ async function loadValuation(accessToken) {
     value.dataset.loaded="true";
     const updated = Date.parse(balance.observed_at);
     stamp.textContent = Number.isFinite(updated) ? "잔고 기준 "+new Intl.DateTimeFormat("ko-KR", {
-      timeZone:"Asia/Seoul",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",hourCycle:"h23"
+      timeZone:"Asia/Seoul",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"
     }).format(updated)+" KST" : "";
     value.replaceChildren(...holdingKRW.formatToParts(total).map(part=>{
       if(part.type!=="currency")return part.value;
@@ -1266,7 +1269,8 @@ async function loadValuation(accessToken) {
       return currency;
     }));
     document.getElementById("asset-cash").textContent = hasCash ? holdingKRW.format(cash) : "—";
-    showHoldings(balance);
+    if (!previous || previous.return_pct !== balance.return_pct ||
+        JSON.stringify(previous.holdings) !== JSON.stringify(balance.holdings)) showHoldings(balance);
     metrics.hidden = false;
 
     showProfit(balance.realized_profit);

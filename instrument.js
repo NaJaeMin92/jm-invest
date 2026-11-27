@@ -106,8 +106,7 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
   const won = new Intl.NumberFormat("ko-KR", {style: "currency", currency: "KRW"});
   const sideName = {buy: "매수", sell: "매도"};
   const onPhonePages = location.hostname === "najaemin92.github.io" && /iPhone/i.test(navigator.userAgent);
-  const previewOnly = onPhonePages ? "실주문은 설치된 JM Invest 앱에서 확인하세요."
-    : "미리보기 모드입니다. 실계좌 주문은 이 Mac의 비공개 서버에서 할 수 있습니다.";
+
   let tradeSide, orderContext, reviewId, tradeBusy = false, tradeVersion = 0;
   let unsubscribeBook, pendingBook, bookPaint, bookRevision = 0, liveTradePrice, displayedBook;
   let position, positionRequest;
@@ -326,7 +325,7 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
       const context = await orders.stockContext(current);
       if (version !== tradeVersion || !trade.open) return;
       orderContext = context;
-      tradeStatus.textContent = context?.enabled ? "" : previewOnly;
+      tradeStatus.textContent = "";
       showTradeQuote(liveTradePrice ?? context?.price);
       if (context && revision === bookRevision) showOrderBook(context);
       else if (displayedBook) showOrderBook(displayedBook);
@@ -477,7 +476,7 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     tradeForm.hidden = true;
     tradeReview.hidden = false;
     tradeConfirm.disabled = !reviewId && !onPhonePages;
-    tradeStatus.textContent = reviewId ? "" : previewOnly;
+    tradeStatus.textContent = "";
     get("trade-review-title").focus();
   });
 
@@ -487,7 +486,7 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     tradeConfirm.disabled = true;
     tradeReview.hidden = true;
     tradeForm.hidden = false;
-    tradeStatus.textContent = orderContext?.enabled ? "" : previewOnly;
+    tradeStatus.textContent = "";
     quantity.focus();
   };
 
