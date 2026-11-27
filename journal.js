@@ -324,12 +324,19 @@ const holdingDollars = new Intl.NumberFormat("ko-KR", {style:"currency", currenc
 const signedDollars = new Intl.NumberFormat("ko-KR", {style:"currency", currency:"USD", currencyDisplay:"narrowSymbol", signDisplay:"exceptZero"});
 const holdingCurrency = document.getElementById("holding-currency");
 const currencyKey = "jm-invest:holdings-currency:v1";
-try { if (localStorage.getItem(currencyKey) === "USD") holdingCurrency.value = "USD"; } catch {}
+let selectedHoldingCurrency = "KRW";
+try { if (localStorage.getItem(currencyKey) === "USD") selectedHoldingCurrency = "USD"; } catch {}
 const moneyRenderers = [];
-holdingCurrency.onchange = () => {
-  try { localStorage.setItem(currencyKey, holdingCurrency.value); } catch {}
-  for (const render of moneyRenderers) render();
-};
+for (const button of holdingCurrency.querySelectorAll("button")) {
+  button.setAttribute("aria-pressed",String(button.dataset.currency===selectedHoldingCurrency));
+  button.onclick=()=>{
+    selectedHoldingCurrency=button.dataset.currency;
+    try { localStorage.setItem(currencyKey,selectedHoldingCurrency); } catch {}
+    for (const option of holdingCurrency.querySelectorAll("button"))
+      option.setAttribute("aria-pressed",String(option===button));
+    for (const render of moneyRenderers) render();
+  };
+}
 
 function holdingMoney(holding, currency) {
   const usd = currency === "USD";
@@ -437,7 +444,16 @@ function showHoldings(balance) {
     const profit = document.createElement("span"), rate = document.createElement("strong");
     rate.className = "position-rate";
     showPerformance(rate,holding.return_pct,signedWatchPercent);
-    head.append(profit,rate);
+    const quantity = document.createElement("span"), prices = document.createElement("span");
+    const costPrice = document.createElement("span"), currentPrice = document.createElement("strong");
+    const performance = document.createElement("span");
+    const quantityText = numeric(holding.quantity) ? Number(holding.quantity).toLocaleString("ko-KR", {maximumFractionDigits:8}) : "—";
+    quantity.className = "position-quantity";
+    quantity.textContent = quantityText;
+    prices.className = performance.className = "position-pair";
+    prices.append(costPrice,currentPrice);
+    performance.append(profit,rate);
+    head.append(quantity,prices,performance);
 
     const metrics = document.createElement("dl");
     metrics.className = "holding-values";
@@ -457,10 +473,12 @@ function showHoldings(balance) {
       metrics.append(cell);
     }
     function renderMoney() {
-      const amounts = holdingMoney(holding, holdingCurrency.value);
+      const amounts = holdingMoney(holding, selectedHoldingCurrency);
       for (const [field, cell] of Object.entries(moneyCells)) cell.textContent = amounts[field];
+      costPrice.textContent = amounts.costPrice;
+      currentPrice.textContent = amounts.price;
       showPerformance(profit, amounts.profitValue, () => amounts.profit);
-      head.setAttribute("aria-label", [symbol.textContent, company.textContent, "평가손익 " + profit.textContent, "수익률 " + rate.textContent].filter(Boolean).join(", "));
+      head.setAttribute("aria-label", [symbol.textContent, company.textContent, "보유수량 " + quantityText, "매입가 " + amounts.costPrice, "현재가 " + amounts.price, "평가손익 " + profit.textContent, "수익률 " + rate.textContent].filter(Boolean).join(", "));
     }
     moneyRenderers.push(renderMoney);
     renderMoney();

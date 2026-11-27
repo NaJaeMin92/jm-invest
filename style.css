@@ -921,7 +921,7 @@ body.instrument-open { overflow:hidden; }
 #holding-count { color:#9eafc6; font-size:14px; font-variant-numeric:tabular-nums; }
 #holding-sort { min-height:44px; padding-inline:4px; background:transparent; border:0; color:#bdc8d9; font:inherit; font-size:13px; }
 .position-line {
-  display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(74px,.7fr) 9px;
+  display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,.62fr) minmax(0,.9fr) minmax(0,1.1fr) 9px;
   align-items:center; column-gap:clamp(4px,1.3vw,10px); text-align:right; font-variant-numeric:tabular-nums;
 }
 .position-line > :first-child { text-align:left; }
@@ -1406,3 +1406,18 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 #asset-updated { color:var(--muted); font-size:11px; }
 #asset-updated:empty { display:none; }
 a.position-identity { color:inherit; text-decoration:none; }
+
+#holding-currency { display:inline-flex; align-items:center; gap:2px; padding:2px; border-radius:10px; background:#182431; }
+#holding-currency button { min-height:40px; padding:0 9px; border:0; background:transparent; color:#b4c3d1; font:600 12px system-ui; }
+#holding-currency button[aria-pressed=true] { background:#314250; color:#eff6fc; border-radius:8px; }
+.position-pair { display:grid; gap:2px; min-width:0; overflow-wrap:anywhere; line-height:1.2; }
+#holding-columns .position-pair { display:block; }
+.position-pair > span:first-child { color:var(--muted); }
+.position-pair .position-rate { justify-self:end; padding:2px 4px; }
+.position-quantity { overflow-wrap:anywhere; }
+@media(max-width:390px) {
+  #holding-columns { font-size:10px; }
+  #holdings-list summary { font-size:11px; }
+  .position-identity strong { font-size:14px; }
+  .position-identity small { font-size:10px; }
+}
