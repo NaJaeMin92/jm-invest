@@ -1347,7 +1347,6 @@ async function loadValuation(accessToken) {
       currency.textContent=part.value;
       return currency;
     }));
-    document.getElementById("asset-cash").textContent = hasCash ? holdingKRW.format(cash) : "—";
     if (!previous || previous.return_pct !== balance.return_pct ||
         JSON.stringify(previous.holdings) !== JSON.stringify(balance.holdings)) showHoldings(balance);
     metrics.hidden = false;
