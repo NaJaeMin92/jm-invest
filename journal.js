@@ -250,6 +250,32 @@ for (const button of navButtons) {
   });
 }
 
+let tabSwipe;
+document.addEventListener("touchstart",event=>{
+  tabSwipe=undefined;
+  if (event.touches.length!==1 || document.querySelector("dialog[open]") ||
+      event.target.closest("button,input,select,textarea,summary,nav,a:not(.symbol-link)")) return;
+  const {identifier,clientX,clientY}=event.touches[0];
+  if (clientX<24 || clientX>window.innerWidth-24) return;
+  tabSwipe={identifier,x:clientX,y:clientY,view:document.body.dataset.view,time:performance.now()};
+},{passive:true});
+document.addEventListener("touchcancel",()=>{tabSwipe=undefined;},{passive:true});
+document.addEventListener("touchend",event=>{
+  const start=tabSwipe;
+  tabSwipe=undefined;
+  if (!start || watchHold?.active || document.querySelector("dialog[open]") ||
+      start.view!==document.body.dataset.view || performance.now()-start.time>650) return;
+  const finger=Array.from(event.changedTouches).find(touch=>touch.identifier===start.identifier);
+  if (!finger) return;
+  const dx=finger.clientX-start.x, dy=finger.clientY-start.y;
+  if (Math.abs(dx)<70 || Math.abs(dx)<Math.abs(dy)*1.6) return;
+  const current=navButtons.findIndex(button=>button.getAttribute("aria-current")==="page");
+  const next=navButtons[current+(dx<0?1:-1)];
+  if (current<0 || !next) return;
+  event.preventDefault();
+  next.click();
+},{capture:true,passive:false});
+
 for (const button of document.querySelectorAll("[data-shortcut]")) {
   button.addEventListener("click", () => selectView(button.dataset.shortcut));
 }
