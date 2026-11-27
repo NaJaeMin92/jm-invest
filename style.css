@@ -1336,8 +1336,8 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 #watch-title-picker { position:absolute; inset:50% 0 auto; transform:translateY(-50%); width:100%; min-height:44px; opacity:0; cursor:pointer; }
 #tab-home .watch-title-group:focus-within { outline:2px solid #a3e9cf; outline-offset:4px; border-radius:4px; }
 
-/* Floating controls above the watchlist, with clearance for the final row. */
-.trade-page:not(:has(dialog[open])) #bottom-nav {
+/* Use the same floating navigation in app tabs and dialogs. */
+.trade-page #bottom-nav {
   inset:auto 0 calc(7px + env(safe-area-inset-bottom));
   width:min(560px,calc(100% - 40px));
   padding:3px;
@@ -1348,11 +1348,11 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
   -webkit-backdrop-filter:blur(20px) saturate(145%);
   backdrop-filter:blur(20px) saturate(145%);
 }
-.trade-page:not(:has(dialog[open])) #bottom-nav button {
+.trade-page #bottom-nav button {
   min-height:48px;
   border-radius:21px;
 }
-.trade-page:not(:has(dialog[open])) #bottom-nav button[aria-current=page] {
+.trade-page #bottom-nav button[aria-current=page] {
   background:#a3e9cf18;
 }
 #home-search {
