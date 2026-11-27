@@ -472,7 +472,7 @@ class Kiwoom:
         return {"quantity": quantity, "averagePrice": average if quantity and average and average > 0 else None,
                 "markPrice": positive_quote(row.get("now_pric"))}
 
-    def executions(self, symbol, start, end):
+    def executions(self, symbol, start, end, grouped=False):
         if symbol in YAHOO_SYMBOLS:
             return []
         token = self.access_token()
@@ -498,8 +498,15 @@ class Kiwoom:
                 seen.add(key)
                 headers.update({"cont-yn": "Y", "next-key": key})
 
-        days = {row.get("ord_dt") for row in rows("ust21180", {"strt_dt": start, "end_dt": end})
-                if str(row.get("stk_cd", "")).strip() == item["jmcode"] and (finite_quote(row.get("cntr_qty")) or 0) > 0}
+        orders = [row for row in rows("ust21180", {"strt_dt": start, "end_dt": end})
+                  if str(row.get("stk_cd", "")).strip() == item["jmcode"] and (finite_quote(row.get("cntr_qty")) or 0) > 0]
+        orders = [row for row in orders if isinstance(row.get("ord_dt"), str)
+                  and re.fullmatch(r"\d{8}", row["ord_dt"]) and start <= row["ord_dt"] <= end]
+        if grouped:
+            records = [execution_record(row, item["jmcode"], row["ord_dt"]) for row in orders]
+            if all(record is not None for record in records):
+                return records
+        days = {row["ord_dt"] for row in orders}
         records = []
         for session in sorted(day for day in days if isinstance(day, str) and start <= day <= end):
             for row in rows("ust21150", {"ord_dt": session, "query_tp": "5"}):
@@ -1164,7 +1171,7 @@ class App(BaseHTTPRequestHandler):
                 span = -1
             if not 0 <= span < 84 or len(start) != 8 or len(end) != 8:
                 raise Problem(400, "체결 조회 기간을 확인하세요.")
-            self.write_json(200, {"executions": self.quote_broker.executions(symbol, start, end)})
+            self.write_json(200, {"executions": self.quote_broker.executions(symbol, start, end, grouped=query.get("grouped") == ["1"])})
         except Problem as error:
             self.write_json(error.status, {"message": str(error)})
         except (OSError, ValueError):

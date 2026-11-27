@@ -183,7 +183,7 @@ export function setupExecutionFlags(load) {
     const end = Math.min((key+1)*blockDays-1,today+1);
     let delay = 0;
     try {
-      const data = await load(symbol,dateString(start),dateString(end),request.signal);
+      const data = await load(symbol,dateString(start),dateString(end),request.signal,!barSeconds[view.frame]);
       if (request.signal.aborted) return;
       const prior = cached?.records.filter(record=>record.day < dateString(start)) ?? [];
       blocks.set(key,{at:Date.now(),records:prior.concat(data)});
@@ -212,7 +212,7 @@ export function setupExecutionFlags(load) {
   return {
     reset,
     show(nextSymbol,nextView) {
-      if (symbol !== nextSymbol) reset();
+      if (symbol !== nextSymbol || (view && Boolean(barSeconds[view.frame]) !== Boolean(barSeconds[nextView.frame]))) reset();
       symbol = nextSymbol;
       view = nextView;
       const [from,to] = viewRange(view.bars,view.frame,view.start,view.end);
