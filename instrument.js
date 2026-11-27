@@ -1,5 +1,6 @@
 import {trendStyles} from "./assets/chart-trends.js?v=82";
 import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=144";
+import {setupStockTrades} from "./assets/stock-trades.js?v=158";
 import {setupExecutionFlags} from "./chart-executions.js?v=143";
 import {calculateSigma, loadWeeklyBand} from "./market-panels.js?v=104";
 
@@ -74,6 +75,12 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
   const dialog=get("stock-detail"), canvas=get("market-chart");
   const executions = setupExecutionFlags(loadExecutions);
   let current="", quote=null, frame="day", afterClose=null, quoteRequest=0;
+  const stockTrades = setupStockTrades({
+    loadExecutions, canLoadChart,
+    onSignIn:()=>{const symbol=current;back(()=>signIn(symbol));},
+    onShowChart:()=>draw(),
+    onShowTrades:()=>{if(dialog.classList.contains("expanded"))setExpanded(false);dialog.scrollTop=0;}
+  });
   const fullHistory = new Map();
   let historyAbort, weeklyBand;
   const trade = get("trade-preview");
@@ -591,7 +598,7 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
 
   function draw() {
     area.classList.toggle("moving-drawing",tools.drawingOptions());
-    if (!chart || !chart.bars.length || !dialog.open) return;
+    if (!chart || !chart.bars.length || !dialog.open || get("chart-panel").hidden) return;
     const options = {...tools.chartOptions(), windowSize, trends};
     canvas.hidden = false;
     canvas.classList.toggle("with-rsi", options.lower === "RSI");
@@ -948,7 +955,7 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
     executions.reset();
     get("trend-menu").open=false;
     if (trade.open) trade.close();
-    current=symbol;quote=null;weeklyBand=null;sessionDate.value="";
+    current=symbol;stockTrades.reset(symbol);quote=null;weeklyBand=null;sessionDate.value="";
     document.body.classList.add("instrument-open");
     if (!dialog.open) dialog.showModal();
     dialog.scrollTop=0;
@@ -985,6 +992,7 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
     historyAbort?.abort();
     if (trade.open) trade.close();
     executions.reset();
+    stockTrades.reset();
     current="";quote=null;chart=null;endDrag();
     tools.updateSeries(null,current,frame);
     if(dialog.open) dialog.close();

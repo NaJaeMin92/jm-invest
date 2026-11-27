@@ -18,8 +18,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://mfycpprqyaidoixytdim.supabase.co" crossorigin>
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=157">
-<script type="module" src="./journal.js?v=156"></script>
+<link rel="stylesheet" href="./style.css?v=158">
+<script type="module" src="./journal.js?v=158"></script>
 </head>
 <body class="trade-page" data-view="home">
 <main id="account">
@@ -258,6 +258,10 @@
 <div class="instrument-quote"><strong id="stock-price">—</strong>
 <div class="stock-move"><b id="stock-change"></b> <span id="stock-sigma" hidden></span></div></div>
 <div class="quote-time"><span id="stock-time" role="status"></span><button id="stock-chart-sign-in" type="button" lang="en" hidden>Sign in</button><button id="stock-quote-retry" type="button" hidden>Retry</button></div>
+<div class="stock-view-picker" role="group" aria-label="종목 상세 화면">
+<button type="button" id="stock-chart-view" aria-controls="chart-panel" aria-pressed="true">차트</button>
+<button type="button" id="stock-trades-view" aria-controls="stock-trades" aria-pressed="false">거래내역</button>
+</div>
 <section id="chart-panel">
 <div id="chart-area"><div id="drawing-actions" hidden aria-label="Selected drawing">
 <button id="drawing-move" type="button" aria-label="Move drawing" title="Move drawing" aria-pressed="false">✥</button>
@@ -305,6 +309,12 @@
 <button type="button" id="chart-play">Play</button>
 <button type="button" id="chart-stop">Done</button>
 </div>
+</section>
+<section id="stock-trades" aria-label="종목별 거래내역" hidden>
+<header><strong id="stock-trades-title"></strong><span>미국 동부시간</span></header>
+<ul id="stock-trades-list"></ul>
+<p id="stock-trades-status" role="status"></p>
+<button type="button" id="stock-trades-more" hidden>이전 30일 보기</button>
 </section>
 <div id="stock-order-bar" role="group" aria-label="Stock order">
 <button id="stock-buy" type="button" aria-haspopup="dialog" aria-controls="trade-preview">Buy</button>
