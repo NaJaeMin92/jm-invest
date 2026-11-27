@@ -1,7 +1,7 @@
 import {setupCalendar} from "./assets/calendar.js?v=114";
 import {setupLab} from "./assets/lab.js?v=119";
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=114";
-import {setupWatchEditor} from "./watch-editor.js?v=120";
+import {setupWatchEditor} from "./watch-editor.js?v=126";
 import {setupOrders} from "./orders.js?v=83";
 import { setupInstrument, sparkline } from "./instrument.js?v=125";
 import {loadWatchSentiment} from "./market-panels.js?v=104";

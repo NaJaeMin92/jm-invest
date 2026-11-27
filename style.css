@@ -1335,3 +1335,9 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 #trade-preview-review { padding:0 18px 16px; }
 #trade-preview-review .order-facts { gap:8px 12px; padding:12px; }
 #trade-preview-review .trade-review-actions { margin-top:12px; }
+
+#tab-home .watch-title-group { position:relative; display:flex; align-items:center; gap:8px; }
+#tab-home .watch-title-group::after { content:""; width:7px; height:7px; flex:none; border:solid #aab8c9; border-width:0 1.5px 1.5px 0; transform:translateY(-2px) rotate(45deg); }
+#watch-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#watch-title-picker { position:absolute; inset:50% 0 auto; transform:translateY(-50%); width:100%; min-height:44px; opacity:0; cursor:pointer; }
+#tab-home .watch-title-group:focus-within { outline:2px solid #a3e9cf; outline-offset:4px; border-radius:4px; }

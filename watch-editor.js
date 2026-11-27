@@ -31,7 +31,12 @@ export function setupWatchEditor({watchKey, nameFor, tickerIcon, refresh}) {
   }
   function renameHeading() {
     const title = allGroups().find(group => group.id === active())?.title || "My Watchlist";
-    get("watch-title").lastChild.textContent = title;
+    get("watch-title").textContent = title;
+    const picker = get("watch-title-picker");
+    const lists = allGroups();
+    if (picker.options.length !== lists.length || lists.some((list,index) =>
+      picker.options[index].value !== list.id || picker.options[index].text !== list.title)) fillSelect(picker,lists);
+    picker.value = active();
   }
   function saveList(symbols, id = active(), manualOrder = false) {
     try {
@@ -160,12 +165,15 @@ export function setupWatchEditor({watchKey, nameFor, tickerIcon, refresh}) {
   });
   get("watch-edit").onclick=()=>open();
   get("watch-editor-done").onclick=()=>editor.close();
-  get("watch-active-list").onchange=event=>{
+  function switchList(event) {
     localStorage.setItem(activeKey,JSON.stringify(event.target.value));
     selected.clear();undo=null;
     get("watch-move-form").hidden=true;
-    refresh();render();
-  };
+    refresh();
+    if (editor.open) render();
+  }
+  get("watch-active-list").onchange = switchList;
+  get("watch-title-picker").onchange = switchList;
   get("watch-select-all").onchange=event=>{
     selected=new Set(event.target.checked?readList():[]);selectionChanged();
   };
