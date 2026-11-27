@@ -59,7 +59,6 @@ const navButtons = [...navigation.querySelectorAll("button")];
 function selectView(view) {
   if (!token && view !== "account") returnToStock = null;
   const needsLogin = !["home","calendar","lab"].includes(view) && !token;
-  document.getElementById("watch-login").hidden = Boolean(token);
   accountNavLabel.textContent=token ? "Account" : "Sign in";
   if (document.body.dataset.view === "lab" && view !== "lab") lab.close();
   if (view !== "account") returnToView = null;

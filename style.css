@@ -273,11 +273,10 @@ button.broker-row:hover { background:#2a2c31; }
 .ui-icon { width:24px; height:24px; flex:none; display:block; }
 .trade-page:is([data-view="home"],[data-view="strategies"]) { --bg:#101720; --text:#f0f3f6; --down:#74d8bb; --up:#ff9eae; background:var(--bg); }
 .trade-page:is([data-view="home"],[data-view="account"],[data-view="strategies"]) .page-title { display:none; }
-#watch-login,#stock-chart-sign-in { min-height:44px; padding:0 15px; border:1px solid #39594d; border-radius:12px; background:#203831; color:#c6e6d8; font:600 14px system-ui; }
+#stock-chart-sign-in { min-height:44px; padding:0 15px; border:1px solid #39594d; border-radius:12px; background:#203831; color:#c6e6d8; font:600 14px system-ui; }
 [data-view="home"].trade-page { min-height:100dvh; }
 [data-view="home"].trade-page main { max-width:680px; padding:env(safe-area-inset-top) 0 0; }
 .watch-heading-actions { display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
-.watch-heading #watch-login { width:auto; padding:0 10px; font-size:13px; }
 #home-search {
   position:fixed; z-index:6; left:50%; bottom:calc(var(--nav-space) + 8px); transform:translateX(-50%);
   display:flex; justify-content:center; align-items:center; gap:8px; width:min(320px,calc(100% - 48px));
@@ -1379,3 +1378,12 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 #home-index-value[data-direction=down] { color:var(--down); }
 #home-index-value[data-direction=up] { color:var(--up); }
 @media(max-width:350px) { #home-search { font-size:13px; } }
+
+.trade-page[data-view="account"] main:has(#login:not([hidden])) {
+  padding-top:calc(env(safe-area-inset-top) + 16px);
+}
+@media (display-mode:standalone) and (max-width:540px) {
+  .trade-page[data-view="account"] main:has(#login:not([hidden])) {
+    padding-top:calc(max(44px,env(safe-area-inset-top)) + 16px);
+  }
+}
