@@ -389,7 +389,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
   symbolInput.addEventListener("change",()=>{selectRules(null);changed();});
   for (const control of [period,strategies])control.addEventListener("change",changed);
   login.addEventListener("click",()=>onSignIn());
-  return {open,refreshRules(){selectRules(strategies.value);},close(){controller?.abort();controller=null; windows.hidden=true; result.hidden=true; all.hidden=true; get("events").replaceChildren();}};
+  return {open,refreshRules(){selectRules(strategies.value);}};
 }
 
 function calculateWindows(bars,years,rule,signal,progress,seed){

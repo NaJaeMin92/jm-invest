@@ -1,5 +1,5 @@
 import {setupCalendar} from "./assets/calendar.js?v=114";
-import {setupLab} from "./assets/lab.js?v=150";
+import {setupLab} from "./assets/lab.js?v=151";
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=114";
 import {setupWatchEditor} from "./watch-editor.js?v=146";
 import {setupOrders} from "./orders.js?v=83";
@@ -60,7 +60,6 @@ function selectView(view) {
   if (!token && view !== "account") returnToStock = null;
   const needsLogin = !["home","calendar","lab"].includes(view) && !token;
   accountNavLabel.textContent=token ? "Account" : "Sign in";
-  if (document.body.dataset.view === "lab" && view !== "lab") lab.close();
   if (view !== "account") returnToView = null;
   document.body.dataset.view = view;
   setDetail(view === "account" && !needsLogin);
