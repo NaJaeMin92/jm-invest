@@ -1368,3 +1368,8 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
   padding-inline:16px;
   border-color:#a9c7dc38;
 }
+
+@media (max-width:540px) and (orientation:portrait) {
+  #home-holdings { container-type:size; }
+  #private #home-holdings > li { min-height:max(44px,calc((100cqh - 2px) / 9)); padding-block:2px; }
+}
