@@ -18,8 +18,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://mfycpprqyaidoixytdim.supabase.co" crossorigin>
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=142">
-<script type="module" src="./journal.js?v=143"></script>
+<link rel="stylesheet" href="./style.css?v=148">
+<script type="module" src="./journal.js?v=148"></script>
 </head>
 <body class="trade-page" data-view="home">
 <main id="account">
@@ -56,6 +56,7 @@
 <button type="submit" id="lab-run">전략 검증</button>
 </form>
 <p id="lab-status" class="workspace-status" role="status"></p>
+<button id="lab-infer" class="lab-signin" type="button" hidden>체결 기록으로 전략 만들기</button><p id="lab-inference" class="workspace-status"></p>
 <button id="lab-login" class="lab-signin" type="button" hidden>계좌 로그인</button>
 <section id="lab-windows" hidden aria-labelledby="lab-window-title"><div class="lab-result-heading"><h2 id="lab-window-title"></h2><span id="lab-window-source"></span></div><p id="lab-model"></p><div id="lab-window-groups"></div></section>
 <section id="lab-results" aria-labelledby="lab-rule" hidden>
@@ -254,9 +255,6 @@
 <div class="instrument-quote"><strong id="stock-price">—</strong>
 <div class="stock-move"><b id="stock-change"></b> <span id="stock-sigma" hidden></span></div></div>
 <div class="quote-time"><span id="stock-time" role="status"></span><button id="stock-chart-sign-in" type="button" lang="en" hidden>Sign in</button><button id="stock-quote-retry" type="button" hidden>Retry</button></div>
-<nav class="instrument-tabs" aria-label="Symbol information">
-<button type="button" id="chart-tab" data-panel="chart" aria-current="page" aria-controls="chart-panel">Chart</button><button type="button" data-panel="sigma" aria-controls="sigma-panel">Sigma</button><button type="button" data-panel="strategies" aria-controls="stock-strategy-panel">Strategies</button>
-</nav>
 <section id="chart-panel">
 <div id="chart-area"><div id="drawing-actions" hidden aria-label="Selected drawing">
 <button id="drawing-move" type="button" aria-label="Move drawing" title="Move drawing" aria-pressed="false">✥</button>
@@ -297,10 +295,6 @@
 <ul id="execution-list"></ul>
 </dialog>
 <figure id="dual-market-chart" hidden><figcaption id="dual-market-caption"></figcaption><canvas id="secondary-market-chart" role="img" aria-label="Second symbol chart"></canvas></figure>
-<div id="chart-history" hidden>
-<span id="chart-dates"></span>
-<small id="chart-coverage"></small>
-</div>
 <div id="chart-task" hidden>
 <p id="chart-tool-status" role="status"></p>
 <button type="button" id="chart-finish">Finish</button>
@@ -308,27 +302,6 @@
 <button type="button" id="chart-play">Play</button>
 <button type="button" id="chart-stop">Done</button>
 </div>
-</section>
-<section class="market-panel" id="sigma-panel" aria-labelledby="sigma-heading" hidden>
-<h3 id="sigma-heading">Weekly Sigma</h3>
-<div id="sigma-content" aria-live="polite"></div>
-<a class="market-source" id="sigma-source" href="https://www.nasdaq.com/market-activity" target="_blank" rel="noopener noreferrer">Nasdaq option chain ↗</a>
-<details class="sigma-calculator"><summary>Calculate with option quotes</summary>
-<form id="sigma-calculator">
-<label>Anchor close<input type="number" min="0.001" step="any" name="anchor" required></label>
-<label>Observed close<input type="number" min="0.001" step="any" name="close" required></label>
-<label>ATM call midpoint<input type="number" min="0.001" step="any" name="call" required></label>
-<label>ATM put midpoint<input type="number" min="0.001" step="any" name="put" required></label>
-<label>Anchor date<input type="date" name="fromDate" required></label>
-<label>Band end<input type="date" name="through" required></label>
-<label>Option expiration<input type="date" name="expiry" required></label>
-<button type="submit">Calculate</button><p id="sigma-error" role="status"></p>
-</form></details>
-</section>
-<section class="market-panel" id="stock-strategy-panel" lang="ko" aria-labelledby="stock-strategy-title" hidden>
-<h3 id="stock-strategy-title"></h3>
-<p id="stock-strategy-summary"></p><ul id="stock-strategy-conditions"></ul>
-<button type="button" id="stock-strategy-edit" aria-haspopup="dialog" aria-controls="strategy-sheet"></button>
 </section>
 <div id="stock-order-bar" role="group" aria-label="Stock order">
 <button id="stock-buy" type="button" aria-haspopup="dialog" aria-controls="trade-preview">Buy</button>

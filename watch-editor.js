@@ -59,7 +59,9 @@ export function setupWatchEditor({watchKey, nameFor, tickerIcon, refresh}) {
   function selectionChanged() {
     const symbols = readList();
     const count = selected.size;
-    get("watch-selection").textContent=symbols.length+(symbols.length===1 ? " symbol" : " symbols");
+    get("watch-selection").textContent=editor.dataset.entry==="search"
+      ? "Add to "+(allGroups().find(group=>group.id===active())?.title || "My Watchlist")
+      : symbols.length+(symbols.length===1 ? " symbol" : " symbols");
     get("watch-selected-count").textContent=count+" selected";
     get("watch-actions").hidden=!count || get("watch-manage-panel").hidden;
     if(!count)get("watch-move-form").hidden=true;
@@ -150,6 +152,8 @@ export function setupWatchEditor({watchKey, nameFor, tickerIcon, refresh}) {
   get("watch-manage-tab").onclick=()=>selectTool(false);
   get("watch-search-tab").onclick=()=>selectTool(true);
   function open(search=false) {
+    editor.dataset.entry=search?"search":"manage";
+    get("watch-editor-title").textContent=search?"Search":"Edit Watchlist";
     selected=new Set();
     notice.textContent="";
     render();

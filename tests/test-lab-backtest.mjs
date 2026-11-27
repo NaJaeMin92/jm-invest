@@ -3,16 +3,16 @@ import assert from "node:assert/strict";
 import {planWindows,shiftMonth,simulateWindow,runWindows} from "../assets/lab-backtest.js";
 const day=86400000;
 const date=i=>new Date(Date.UTC(2015,0,1)+i*day);
-const days=Array.from({length:4200},(_,i)=>date(i)).filter(d=>d.getUTCDay()!==0 && d.getUTCDay()!==6).map(d=>d.toISOString().slice(0,10));
+const days=Array.from({length:4600},(_,i)=>date(i)).filter(d=>d.getUTCDay()!==0 && d.getUTCDay()!==6).map(d=>d.toISOString().slice(0,10));
 
-test("10 rolling calendar-year windows end monthly and 10 distinct random windows have the same span",()=>{
+test("20 rolling calendar-year windows end monthly and 20 distinct random windows have the same span",()=>{
   assert.equal(shiftMonth("2024-02-29",-12),"2023-02-28");
   assert.equal(shiftMonth("2024-03-31",-1),"2024-02-29");
   for(const years of [1,2,3,5,10]){
     const result=planWindows(days,years,15,()=>0.3);
-    assert.deepEqual(result.rolling.map(r=>r.end),Array.from({length:10},(_,i)=>shiftMonth(days.at(-1),-i)));
-    const all=[...result.rolling,...result.random];assert.equal(all.length,20);
-    assert.equal(new Set(all.map(w=>w.first+"/"+w.last)).size,20);
+    assert.deepEqual(result.rolling.map(r=>r.end),Array.from({length:20},(_,i)=>shiftMonth(days.at(-1),-i)));
+    const all=[...result.rolling,...result.random];assert.equal(all.length,40);
+    assert.equal(new Set(all.map(w=>w.first+"/"+w.last)).size,40);
     for(const r of all){assert.equal(r.start,shiftMonth(r.end,-12*years));assert(days[r.first]>r.start && days[r.last]<=r.end);}
   }
 });
@@ -42,6 +42,6 @@ test("weekly and monthly rules see only completed frames and the worker produces
   for(const frame of ["week","month"]){
     const rule={side:"buy",quantity:"2",frame,conditions:[{key:"rsi",op:"gte",value:99}],join:"all"};
     const {rolling,random}=runWindows(data,1,rule);
-    assert.equal(random.length,10);assert(rolling.every(r=>r.qty===2 && typeof r.filled==="string"));
+    assert.equal(random.length,20);assert(rolling.every(r=>r.qty===2 && typeof r.filled==="string"));
   }
 });

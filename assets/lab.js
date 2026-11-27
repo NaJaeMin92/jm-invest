@@ -1,7 +1,8 @@
 import {usMarketSession} from "../watch-quotes.js?v=64";
 import {publicQuote} from "../instrument.js?v=112";
-import {metrics, matches, factors} from "./strategy.js?v=84";
-import {touchCandidate} from "./lab-backtest.js?v=115";
+import {metrics, metricsAt, matches, factors} from "./strategy.js?v=115";
+import {prepareChart} from "../instrument-chart.js?v=103";
+import {touchCandidate, windowsPerGroup} from "./lab-backtest.js?v=146";
 import {firstTouchLevels} from "./first-touch.js?v=113";
 
 const dayMs = 86400000;
@@ -11,11 +12,50 @@ const get = id => document.getElementById("lab-" + id);
 const example = {nickname:"예시 · RSI 30 이하", side:"buy", frame:"day", join:"all",
   conditions:[{key:"rsi",op:"lte",value:30}]};
 
+const condition = (key, op, value) => ({key,op,value});
 const templates = [
-  ["builtin-rsi", "RSI 과매도 · RSI(14) ≤ 30", {key:"rsi",op:"lte",value:30}],
-  ["builtin-bollinger", "볼린저 하단 · %B ≤ 0", {key:"band",op:"lte",value:0}],
-  ["builtin-sma", "SMA20 추세 추종 · 종가 ≥ SMA20", {key:"ma",op:"gte",value:0}]
-];
+  ["rsi", "RSI 과매도", "buy", [condition("rsi","lte",30)]],
+  ["bollinger", "볼린저 하단", "buy", [condition("band","lte",0)]],
+  ["sma", "SMA20 추세 추종", "buy", [condition("ma","gte",0)]],
+  ["rsi-high", "RSI 과매수", "sell", [condition("rsi","gte",70)]],
+  ["band-high", "볼린저 상단", "sell", [condition("band","gte",100)]],
+  ["dual", "RSI·볼린저 동시 과매도", "buy", [condition("rsi","lte",35),condition("band","lte",10)]],
+  ["pullback", "SMA20 눌림목", "buy", [condition("ma","lte",-3),condition("rsi","gte",40)]],
+  ["support", "지지선 접근", "buy", [condition("support","gte",0),condition("support","lte",1)]],
+  ["resistance", "저항선 접근", "sell", [condition("resistance","gte",-1),condition("resistance","lte",0)]],
+  ["fibonacci", "피보나치 61.8% 접근", "buy", [condition("fibonacci","gte",-1),condition("fibonacci","lte",1)]]
+].map(([id,nickname,side,conditions])=>["builtin-"+id,{nickname,side,conditions,frame:"day",join:"all"}]);
+
+const learnedKey = symbol => "jm-invest:lab-fill-rules:v1:" + symbol;
+
+export function inferFillRules(bars,fills) {
+  const chart=prepareChart(bars,"day");
+  const start=Math.max(20,bars.length-120);
+  const split=start+Math.floor((bars.length-start)*.7);
+  const fillsBySide = new Map(["buy","sell"].map(side=>[side,new Set(fills.filter(f=>f.side===side).map(f=>f.day))]));
+  const trials=templates.map(([id,rule])=>({id,rule,train:0,trainHits:0,test:0,testHits:0,actualTest:0}));
+  for(let i=start;i<bars.length;i++){
+    const values=metricsAt(chart,"day",i-1);
+    const day=dateKey(bars[i][0]*1000);
+    for(const trial of trials){
+      const filled=fillsBySide.get(trial.rule.side).has(day), signal=matches(trial.rule,values);
+      if(i<split){
+        if(signal){trial.train++;if(filled)trial.trainHits++;}
+      }else{
+        if(filled)trial.actualTest++;
+        if(signal){trial.test++;if(filled)trial.testHits++;}
+      }
+    }
+  }
+  return ["buy","sell"].flatMap(side=>{
+    const selected=trials.filter(t=>t.rule.side===side && t.trainHits>=2)
+      .sort((a,b)=>b.trainHits/Math.sqrt(b.train)-a.trainHits/Math.sqrt(a.train))[0];
+    if(!selected || selected.testHits===0 ||
+        selected.testHits/selected.test <= selected.actualTest/(bars.length-split)) return [];
+    const {rule,trainHits,train,testHits,test,actualTest}=selected;
+    return [{...rule,nickname:"체결 기반 · "+rule.nickname,sample:{trainHits,train,testHits,test,actualTest}}];
+  });
+}
 
 export function executionWindows(first, last) {
   const ranges = [];
@@ -26,7 +66,7 @@ export function executionWindows(first, last) {
   return ranges;
 }
 
-export {touchCandidate} from "./lab-backtest.js?v=115";
+export {touchCandidate} from "./lab-backtest.js?v=146";
 
 function replayIssue(rule) {
   if (rule.preset === "firstTouch") return rule.touch ? "" : "터치 설정이 없습니다.";
@@ -143,11 +183,18 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
     const key=active?.preset || "custom";
     if(active)rules.set(key,active);
     strategies.replaceChildren(...[...rules].map(([k,r])=>new Option(r.nickname || "저장된 "+(r.side==="buy"?"매수":"매도")+" 전략",k)));
+    try {
+      for(const rule of JSON.parse(localStorage.getItem(learnedKey(symbolInput.value)) || "[]")){
+        const key="learned-"+rule.side;
+        rules.set(key,rule);
+        strategies.append(new Option(rule.nickname,key));
+      }
+    } catch {}
     const group=document.createElement("optgroup");
     group.label="대표 전략";
-    for(const [id,nickname,condition] of templates){
-      rules.set(id,{nickname,side:"buy",frame:"day",join:"all",conditions:[condition]});
-      group.append(new Option(nickname,id));
+    for(const [id,rule] of templates){
+      rules.set(id,rule);
+      group.append(new Option(rule.nickname,id));
     }
     strategies.append(group);
     strategies.value=rules.has(preferred)?preferred:active?key:templates[0][0];
@@ -156,9 +203,12 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
   function changed(){
     controller?.abort();controller=null;result.hidden=true;windows.hidden=true;
     login.hidden=canLoadChart();
+    get("infer").hidden=!canLoadChart() || !symbolInput.value;
+    const sample=rules.get(strategies.value)?.sample;
+    get("inference").textContent=sample ? `학습 구간 신호 ${sample.train}일 중 ${sample.trainHits}일 일치 · 검증 구간 신호 ${sample.test}일 중 ${sample.testHits}일 일치` : "";
     get("run").textContent=annual()?"백테스트 실행":"전략 검증";
     if(!annual())return review();
-    status.textContent=rules.size ? "최근 일봉 기준 월별 10구간과 무작위 10구간을 비교합니다." : "Strategies에서 이 종목의 전략을 먼저 저장하세요.";
+    status.textContent=rules.size ? `최근 일봉 기준 월별 ${windowsPerGroup}구간과 무작위 ${windowsPerGroup}구간을 비교합니다.` : "Strategies에서 이 종목의 전략을 먼저 저장하세요.";
   }
 
   async function review() {
@@ -193,7 +243,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
         renderWindows(groups,years,rule,symbol,bars,source);
         windows.hidden=false;
         const completed=groups.rolling.filter(Boolean).length+groups.random.length;
-        status.textContent=[completed+"/20구간 계산 완료",completed<20?"완전한 검증 기간과 지표 준비 이력이 있는 구간만 계산했습니다.":"",
+        status.textContent=[completed+"/"+(2*windowsPerGroup)+"구간 계산 완료",completed<2*windowsPerGroup?"완전한 검증 기간과 지표 준비 이력이 있는 구간만 계산했습니다.":"",
           partial?"시세 일부만 조회되었습니다. 다시 실행하면 재조회합니다.":""].filter(Boolean).join(" · ");
         return;
       }
@@ -249,6 +299,38 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
     }
   }
 
+  get("infer").onclick=async ()=>{
+    const symbol=symbolInput.value;
+    if(!symbol || !canLoadChart())return;
+    controller?.abort();
+    const task=new AbortController(), {signal}=task;
+    controller=task;
+    const button=get("infer");
+    button.disabled=true;
+    status.textContent="최근 체결과 직전 일봉을 대조하는 중…";
+    try {
+      const {bars}=await loadBars(symbol,390,loadChart,true,signal);
+      if(bars.length<50)throw Error("전략을 비교할 완료 일봉이 부족합니다.");
+      const days=bars.slice(-120).map(bar=>dateKey(bar[0]*1000));
+      const fills=[];
+      for(const [from,to] of executionWindows(days[0],days.at(-1))){
+        const records=await loadExecutions(symbol,from,to,signal,true);
+        signal.throwIfAborted();
+        if(!Array.isArray(records))throw Error("체결 내역을 불러오지 못했습니다.");
+        fills.push(...records);
+      }
+      const learned=inferFillRules(bars,fills);
+      if(!learned.length)throw Error("검증 구간에서도 반복해서 일치한 전략이 없습니다.");
+      localStorage.setItem(learnedKey(symbol),JSON.stringify(learned));
+      selectRules("learned-"+learned[0].side);
+      period.value="y1";
+      changed();
+      status.textContent=learned.length+"개 전략을 이 기기의 Lab에 저장했습니다.";
+    }catch(error) {
+      if(!signal.aborted)status.textContent=error.message || "체결 기반 전략을 만들지 못했습니다.";
+    }finally{button.disabled=false;}
+  };
+
   function open() {
     const prev=symbolInput.value;
     const symbols=[...new Set(readSymbols())].filter(s=>typeof s==="string" && /^[A-Z][A-Z0-9.-]{0,11}$/.test(s));
@@ -277,7 +359,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
 function calculateWindows(bars,years,rule,signal,progress){
   return new Promise((resolve,reject)=>{
     signal.throwIfAborted();
-    const worker=new Worker(new URL("./lab-backtest-worker.js?v=115",import.meta.url),{type:"module"});
+    const worker=new Worker(new URL("./lab-backtest-worker.js?v=146",import.meta.url),{type:"module"});
     const finish=()=>{worker.terminate();signal.removeEventListener("abort",abort);};
     const abort=()=>{finish();reject(signal.reason);};
     signal.addEventListener("abort",abort,{once:true});
@@ -306,7 +388,7 @@ function renderWindows(groups,years,rule,symbol,bars,source){
   const root=get("window-groups");root.replaceChildren();
   for(const [key,title] of [["rolling","월별 슬라이딩"],["random","무작위 구간"]]){
     const rows=groups[key].filter(Boolean),section=document.createElement("section"),h=document.createElement("h3"),summary=document.createElement("p");
-    section.className="lab-window-group";h.textContent=title+" · "+rows.length+"/10";
+    section.className="lab-window-group";h.textContent=title+" · "+rows.length+"/"+windowsPerGroup;
     summary.className="lab-window-summary";
     if(rows.length){
       const sorted=rows.map(r=>r.profit).sort((a,b)=>a-b),mid=sorted.length/2;

@@ -1,9 +1,9 @@
 import {setupCalendar} from "./assets/calendar.js?v=114";
-import {setupLab} from "./assets/lab.js?v=119";
+import {setupLab} from "./assets/lab.js?v=147";
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=114";
-import {setupWatchEditor} from "./watch-editor.js?v=126";
+import {setupWatchEditor} from "./watch-editor.js?v=146";
 import {setupOrders} from "./orders.js?v=83";
-import { setupInstrument, sparkline } from "./instrument.js?v=143";
+import { setupInstrument, sparkline } from "./instrument.js?v=148";
 import {loadWatchSentiment} from "./market-panels.js?v=104";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -251,38 +251,82 @@ for (const button of navButtons) {
   });
 }
 
+const reduceTabMotion = matchMedia("(prefers-reduced-motion: reduce)");
 let tabSwipe;
+function tabMotionTargets(view) {
+  if (view === "account" && !login.hidden) return [login];
+  const panel = document.getElementById("tab-" + view);
+  return Array.from(panel?.children ?? []).filter(child => child.id !== "home-search" && !child.hidden);
+}
+function clearTabSwipe(returnToOrigin = false) {
+  const swipe = tabSwipe;
+  tabSwipe = undefined;
+  for (const target of swipe?.targets ?? []) {
+    target.style.removeProperty("translate");
+    if (returnToOrigin && !reduceTabMotion.matches) {
+      target.animate([{translate:swipe.offset + "px 0"},{translate:"0 0"}],
+        {duration:220,easing:"cubic-bezier(.22,.8,.25,1)"});
+    }
+  }
+  return swipe;
+}
 document.addEventListener("touchstart",event=>{
-  tabSwipe=undefined;
+  clearTabSwipe(true);
   if (event.touches.length!==1 || document.querySelector("dialog[open]") ||
       event.target.closest("button,input,select,textarea,summary,nav,a:not(.symbol-link)")) return;
   const {identifier,clientX,clientY}=event.touches[0];
   if (clientX<24 || clientX>window.innerWidth-24) return;
   tabSwipe={identifier,x:clientX,y:clientY,view:document.body.dataset.view,time:performance.now()};
 },{passive:true});
-document.addEventListener("touchcancel",()=>{tabSwipe=undefined;},{passive:true});
+document.addEventListener("touchmove",event=>{
+  const swipe=tabSwipe;
+  if (!swipe) return;
+  if (event.touches.length!==1 || watchHold?.active || document.querySelector("dialog[open]") ||
+      swipe.view!==document.body.dataset.view) {
+    clearTabSwipe(true);
+    return;
+  }
+  const finger=event.touches[0];
+  if (finger.identifier!==swipe.identifier) return;
+  const dx=finger.clientX-swipe.x, dy=finger.clientY-swipe.y;
+  if (!swipe.targets) {
+    if (Math.abs(dy)>10 && Math.abs(dy)>=Math.abs(dx)) {
+      clearTabSwipe();
+      return;
+    }
+    if (Math.abs(dx)<10 || Math.abs(dx)<=Math.abs(dy)*1.35 || !event.cancelable) return;
+    swipe.targets=tabMotionTargets(swipe.view);
+  }
+  if (event.cancelable) event.preventDefault();
+  const current=navButtons.findIndex(button=>button.dataset.view===swipe.view);
+  const neighbor=navButtons[current+(dx<0?1:-1)];
+  swipe.offset=Math.sign(dx)*Math.min(88,Math.abs(dx)*(neighbor && !neighbor.hidden ? .48 : .22));
+  if (!reduceTabMotion.matches) {
+    for (const target of swipe.targets) target.style.translate=swipe.offset+"px 0";
+  }
+},{passive:false});
+document.addEventListener("touchcancel",()=>clearTabSwipe(true),{passive:true});
 document.addEventListener("touchend",event=>{
-  const start=tabSwipe;
-  tabSwipe=undefined;
-  if (!start || watchHold?.active || document.querySelector("dialog[open]") ||
-      start.view!==document.body.dataset.view || performance.now()-start.time>650) return;
-  const finger=Array.from(event.changedTouches).find(touch=>touch.identifier===start.identifier);
-  if (!finger) return;
-  const dx=finger.clientX-start.x, dy=finger.clientY-start.y;
-  if (Math.abs(dx)<70 || Math.abs(dx)<Math.abs(dy)*1.6) return;
+  const swipe=tabSwipe;
+  if (!swipe) return;
+  const finger=Array.from(event.changedTouches).find(touch=>touch.identifier===swipe.identifier);
+  const dx=finger ? finger.clientX-swipe.x : 0;
+  const dy=finger ? finger.clientY-swipe.y : 0;
   const current=navButtons.findIndex(button=>button.getAttribute("aria-current")==="page");
   const next=navButtons[current+(dx<0?1:-1)];
-  if (current<0 || !next) return;
+  const fast=performance.now()-swipe.time<300;
+  const commit=current>=0 && next && !next.hidden && !watchHold?.active &&
+    !document.querySelector("dialog[open]") && swipe.view===document.body.dataset.view &&
+    Math.abs(dx)>=(fast?42:Math.min(96,innerWidth*.22)) && Math.abs(dx)>Math.abs(dy)*1.4;
+  clearTabSwipe(!commit);
+  if (!commit) return;
   event.preventDefault();
   next.click();
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const view = next.dataset.view;
-  const panel = view === "account" && !login.hidden ? login : document.getElementById("tab-"+view);
-  if (!panel) return;
-  const targets = panel === login ? [login] : [...panel.children].filter(child=>child.id!=="home-search" && !child.hidden);
-  for (const target of targets) {
-    target.animate([{translate:(dx<0?"22px":"-22px")+" 0",opacity:.76},{translate:"0 0",opacity:1}],
-      {duration:280,easing:"cubic-bezier(.22,.74,.25,1)"});
+  if (reduceTabMotion.matches) return;
+  const distance=Math.max(36,Math.abs(swipe.offset ?? 0));
+  for (const target of tabMotionTargets(next.dataset.view)) {
+    target.animate([{translate:(dx<0?distance:-distance)+"px 0",opacity:.74},{translate:"0 0",opacity:1}],
+      {duration:310,easing:"cubic-bezier(.2,.78,.24,1)"});
   }
 },{capture:true,passive:false});
 
@@ -889,7 +933,7 @@ function labSymbols(){
 const lab=setupLab({readSymbols:labSymbols,
   loadChart,loadExecutions,canLoadChart,readStrategy,onSignIn(){returnToView="lab";selectView("account");}});
 const instrument = setupInstrument({
-  orders,strategy,isSignedIn:()=>Boolean(token),
+  orders,isSignedIn:()=>Boolean(token),
   async readPositionSnapshot(symbol) {
     const session = token;
     const balance = await valuationSnapshot;

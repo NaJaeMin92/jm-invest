@@ -43,6 +43,8 @@ function after(days, day) {
 }
 
 // Windows use (calendar start, calendar end], even if an endpoint is a weekend.
+export const windowsPerGroup = 20;
+
 export function planWindows(days, years, ready, random=Math.random) {
   const rolling=[], pool=[], chosen=new Set();
   function windowAt(end){
@@ -51,7 +53,7 @@ export function planWindows(days, years, ready, random=Math.random) {
     return {start,end,first,last};
   }
   if(!days.length)return {rolling,random:[]};
-  for(let offset=0;offset<10;offset++){
+  for(let offset=0;offset<windowsPerGroup;offset++){
     const w=windowAt(shiftMonth(days.at(-1),-offset));
     rolling.push(w && {...w,offset});
     if(w)chosen.add(w.first+"/"+w.last);
@@ -61,7 +63,7 @@ export function planWindows(days, years, ready, random=Math.random) {
     if(w && !chosen.has(w.first+"/"+w.last))pool.push(w);
   }
   const picked=[];
-  while(picked.length<10 && pool.length){
+  while(picked.length<windowsPerGroup && pool.length){
     const i=Math.floor(random()*pool.length);
     picked.push(pool[i]);pool[i]=pool.at(-1);pool.pop();
   }

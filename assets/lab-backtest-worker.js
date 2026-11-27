@@ -1,4 +1,4 @@
-import {runWindows} from "./lab-backtest.js?v=115";
+import {runWindows} from "./lab-backtest.js?v=146";
 self.onmessage=({data:{bars,years,rule}})=>{
   try{
     const results=runWindows(bars,years,rule,progress=>self.postMessage({progress}));

@@ -102,7 +102,22 @@ export function drawChart(canvas, chart, frame, start, options) {
   const priceText = value => value.toFixed(Math.abs(value)<1 ? 4 : 2);
   ctx.font="11px system-ui";
   const axisWidth=Math.max(45,Math.ceil(ctx.measureText(priceText(shown.reduce((v,b)=>Math.max(v,b[2]),0))).width)+12);
-  const pad = 8, top = 35, width = w-axisWidth;
+  const pad = 8, width = w-axisWidth;
+  const guideLegend = Object.entries(trendStyles).filter(([key])=>options.trends?.[key])
+    .map(([key,style])=>({key,...style,label:key==="support"?"지지선":key==="resistance"?"저항선":style.label}));
+  const guideRows = [];
+  let guideX = pad;
+  for (const guide of guideLegend) {
+    const size = 22 + ctx.measureText(guide.label).width;
+    if (guideX + size > w - 5) {
+      guideRows.push([]);
+      guideX = pad;
+    }
+    if (!guideRows.length) guideRows.push([]);
+    guideRows.at(-1).push({...guide,x:guideX});
+    guideX += size + 11;
+  }
+  const top = 35 + guideRows.length * 13;
   const isRsi = options.lower === "RSI";
   const indicatorAxis = isRsi ? h - Math.max(120, Math.min(165, w * .28)) : lower ? h * .73 : h - 19;
   const axis = indicatorAxis - 14;
@@ -211,7 +226,18 @@ export function drawChart(canvas, chart, frame, start, options) {
       legendX = pad;
       legendY += 12;
     }
-    if (legendY < top - 2) legendX += label(text, legendX, legendY, overlay.color) + 8;
+    if (legendY < 33) legendX += label(text, legendX, legendY, overlay.color) + 8;
+  }
+  for (const [row, guides] of guideRows.entries()) {
+    const baseline = (overlayLines.length ? Math.min(25, legendY) : 0) + 13 + row * 13;
+    for (const guide of guides) {
+      const y = baseline - 4;
+      ctx.save();
+      ctx.setLineDash(guide.key==="short" ? [5,3] : ["support","resistance"].includes(guide.key) ? [2,3] : []);
+      line([[guide.x,y],[guide.x+15,y]],guide.color,guide.key==="long"?1.8:1.25);
+      ctx.restore();
+      label(guide.label,guide.x+20,baseline,guide.color);
+    }
   }
   const bodyWidth = Math.min(10,Math.max(1,step * .55));
   const volumeMax = shown.reduce((max, bar) => Math.max(max,bar[5]),1);

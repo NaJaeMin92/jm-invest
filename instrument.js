@@ -1,7 +1,7 @@
 import {trendStyles} from "./assets/chart-trends.js?v=82";
-import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=103";
+import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=144";
 import {setupExecutionFlags} from "./chart-executions.js?v=143";
-import {calculateSigma, loadWeeklyBand, showSigmaPanel} from "./market-panels.js?v=104";
+import {calculateSigma, loadWeeklyBand} from "./market-panels.js?v=104";
 
 import {setupChartTools} from "./chart-tools.js?v=76";
 import {orderKinds, needsPrice, populateKinds} from "./orders.js?v=83";
@@ -70,12 +70,12 @@ function mergeDaily(oldBars, newBars) {
   return [...days.values()].sort((a,b) => a[0] - b[0]);
 }
 
-export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,saveList,orders,readPositionSnapshot,subscribeOrderBook,canLoadChart,loadChart,loadExecutions,signIn}) {
+export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,orders,readPositionSnapshot,subscribeOrderBook,canLoadChart,loadChart,loadExecutions,signIn}) {
   const dialog=get("stock-detail"), canvas=get("market-chart");
   const executions = setupExecutionFlags(loadExecutions);
   let current="", quote=null, frame="day", afterClose=null, quoteRequest=0;
   const fullHistory = new Map();
-  let historyAbort, historyState = "", weeklyBand;
+  let historyAbort, weeklyBand;
   const trade = get("trade-preview");
   const tradeForm = get("trade-preview-form"), tradeReview = get("trade-preview-review");
   const tradeStatus = get("trade-preview-status"), tradeNext = get("trade-preview-next");
@@ -529,12 +529,10 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
   const dateFormat = new Intl.DateTimeFormat("en-US", {
     month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York"
   });
-  const coverage = get("chart-coverage");
   const chartStatus = get("chart-status");
   const sessionDate = get("chart-session-date");
   sessionDate.onchange = () => setFrame(frame);
   const minuteCache = new Map();
-  const tabs = [...dialog.querySelectorAll("[data-panel]")];
   let chart = null, start = 0, lastStart = 0, windowSize = visibleBars, drag = null, requestId = 0;
   const touchPoints = new Map();
   let pinch;
@@ -574,23 +572,22 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     get("trend-controls").append(toggle);
   }
 
-  function selectPanel(panel) {
-    if (panel !== "chart") tools.pause();
-    for (const tab of tabs) {
-      const selected = tab.dataset.panel === panel;
-      get(tab.getAttribute("aria-controls")).hidden = !selected;
-      if (selected) tab.setAttribute("aria-current", "page");
-      else tab.removeAttribute("aria-current");
-    }
-    if (panel === "strategies") strategy.showStock(current);
-    if (panel === "sigma") showSigmaPanel(current, nameFor(current));
-  }
-  function refreshStockStrategy() {
-    if(dialog.open && !get("stock-strategy-panel").hidden)strategy.showStock(current);
-  }
-  get("strategy-sheet").addEventListener("close",refreshStockStrategy);
-  window.addEventListener("storage",refreshStockStrategy);
-  for (const tab of tabs) tab.addEventListener("click", () => selectPanel(tab.dataset.panel));
+  const executionKey = "jm-invest:chart-executions:v1";
+  let showExecutions = true;
+  try { showExecutions = localStorage.getItem(executionKey) !== "false"; } catch {}
+  const executionToggle = document.createElement("button");
+  executionToggle.type = "button";
+  executionToggle.setAttribute("role","switch");
+  executionToggle.setAttribute("aria-checked",String(showExecutions));
+  executionToggle.innerHTML = '<span aria-hidden="true" class="execution-menu-icon">B/S</span><span>매수·매도 체결 표시</span><span aria-hidden="true" class="guide-switch"></span>';
+  executionToggle.onclick = () => {
+    showExecutions = !showExecutions;
+    executionToggle.setAttribute("aria-checked",String(showExecutions));
+    try { localStorage.setItem(executionKey,String(showExecutions)); } catch {}
+    if (!showExecutions) executions.reset();
+    draw();
+  };
+  get("trend-controls").append(executionToggle);
 
   function draw() {
     area.classList.toggle("moving-drawing",tools.drawingOptions());
@@ -601,12 +598,10 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     clearInspector();
     geometry = drawChart(canvas, chart, frame, start, options);
     const end = Math.min(options.end ?? chart.bars.length, start + windowSize) - 1;
-    if (geometry && canLoadChart() && !["BZMAIN","CLMAIN","VIX"].includes(current)) {
+    if (geometry && showExecutions && canLoadChart() && !["BZMAIN","CLMAIN","VIX"].includes(current)) {
       executions.show(current,{bars:chart.bars,frame,start,end,geometry});
     }
     drawSecondary(start,end,options);
-    const dates = [start, end].map(i => dateFormat.format(chart.bars[i][0] * 1000));
-    get("chart-dates").textContent = dates.join(" – ");
   }
   function drawSecondary(start,end,options) {
     const secondary = tools.secondary();
@@ -779,18 +774,12 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
       const index = chart.bars.findIndex(bar => bar[0] >= anchor);
       if (index >= 0) start = Math.min(index,lastStart);
     }
-    get("chart-history").hidden = !chart;
     area.classList.toggle("pannable", lastStart > 0);
     area.classList.toggle("zoomable", Boolean(chart));
     if (anchor && chart) tools.extendSeries(chart);
     else tools.updateSeries(chart,current,frame);
-    if (chart) {
-      const startDate = dateFormat.format(source[0][0] * 1000);
-      const endDate = dateFormat.format(source.at(-1)[0] * 1000);
-      coverage.textContent = (isIntraday(frame) ? "Intraday history" : historyState || "Available history")
-        + " · " + startDate + " – " + endDate + " ET";
-      draw();
-    } else {
+    if (chart) draw();
+    else {
       canvas.hidden = true;
       executions.reset();
       get("dual-market-chart").hidden = true;
@@ -910,7 +899,6 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
         let before = cached?.asOf === asOf ? null : result.before;
         let bars = mergeDaily(cached?.asOf === asOf ? cached.bars : saved?.daily, result.daily);
         quote = {...saved, ...result, daily:bars, fromKiwoom:!result.source};
-        historyState = before ? "Loading earlier history…" : "";
         renderQuote(Boolean(chart));
         while (before) {
           const part = await loadChart(symbol, "day", before, signal);
@@ -920,7 +908,6 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
           bars = mergeDaily(bars, part.bars);
           quote.daily = bars;
           renderQuoteSigma();
-          historyState = before ? "Loading earlier history…" : "";
           if (!isIntraday(frame)) finishFrame(bars, Boolean(chart));
         }
         if (fullHistory.size >= 24) fullHistory.delete(fullHistory.keys().next().value);
@@ -931,7 +918,6 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     } catch (error) {
       message = error.message;
       if (id === quoteRequest && quote?.daily?.length) {
-        historyState = "Partial history";
         if (!isIntraday(frame)) finishFrame(quote.daily, Boolean(chart));
         return;
       }
@@ -946,9 +932,7 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     executions.reset();
     get("trend-menu").open=false;
     if (trade.open) trade.close();
-    if(dialog.contains(get("strategy-sheet")))strategy.close();
-    current=symbol;quote=null;weeklyBand=null;historyState="";sessionDate.value="";
-    selectPanel("chart");
+    current=symbol;quote=null;weeklyBand=null;sessionDate.value="";
     document.body.classList.add("instrument-open");
     if (!dialog.open) dialog.showModal();
     dialog.scrollTop=0;
@@ -984,7 +968,6 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     quoteRequest += 1;
     historyAbort?.abort();
     if (trade.open) trade.close();
-    if(dialog.contains(get("strategy-sheet")))strategy.close();
     executions.reset();
     current="";quote=null;chart=null;endDrag();
     tools.updateSeries(null,current,frame);
@@ -999,7 +982,10 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     if(history.state?.stockEntry) history.back();
     else {history.replaceState(null,"",location.pathname+location.search);sync();}
   }
-  get("stock-back").onclick=()=>back();
+  get("stock-back").onclick=()=>{
+    if (dialog.classList.contains("expanded")) setExpanded(false);
+    else back();
+  };
   dialog.addEventListener("cancel",e=>{e.preventDefault();back();});
   get("stock-search").onclick=()=>back(search);
   get("stock-chart-sign-in").onclick = () => {
@@ -1020,15 +1006,18 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     get("stock-intraday").querySelector("summary").focus({preventScroll:true});
   };
   dialog.addEventListener("click",e=>{
-    const intraday=get("stock-intraday");
-    if (intraday.open && !intraday.contains(e.target)) intraday.open=false;
+    for (const id of ["stock-intraday","trend-menu"]) {
+      const menu=get(id);
+      if (menu.open && !menu.contains(e.target)) menu.open=false;
+    }
   });
   get("stock-frames").onclick=e=>{if(e.target.dataset.frame)setFrame(e.target.dataset.frame);};
-  get("stock-expand").onclick=()=>{
-    const expanded=dialog.classList.toggle("expanded");
+  function setExpanded(expanded) {
+    dialog.classList.toggle("expanded",expanded);
     get("stock-expand").setAttribute("aria-pressed",String(expanded));
     dialog.scrollTop=0;draw();
-  };
+  }
+  get("stock-expand").onclick=()=>setExpanded(!dialog.classList.contains("expanded"));
   window.addEventListener("hashchange",sync);
   window.addEventListener("popstate",sync);
   sync();
