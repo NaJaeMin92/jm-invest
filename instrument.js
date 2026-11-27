@@ -816,7 +816,10 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     frame = value;
     get("chart-session-picker").hidden = !isIntraday(value) || !quote?.fromKiwoom;
     chartStatus.hidden = true;
-    get("stock-intraday").value = isIntraday(value) ? value : "";
+    const intraday = get("stock-intraday");
+    if (isIntraday(value)) get("stock-intraday-label").textContent = intraday.querySelector('[data-frame="'+value+'"]').textContent;
+    for (const item of intraday.querySelectorAll("button")) item.setAttribute("aria-pressed",String(item.dataset.frame===value));
+    intraday.open=false;
     for (const button of get("stock-frames").querySelectorAll("button")) {
       button.setAttribute("aria-pressed", String(button.dataset.frame === frame));
     }
@@ -1010,7 +1013,16 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     const items=readList();
     if(saveList(items.includes(current)?items.filter(v=>v!==current):[...items,current]))setFavorite();
   };
-  get("stock-intraday").onchange=e=>setFrame(e.target.value);
+  get("stock-intraday").onclick=e=>{
+    const item=e.target.closest("button[data-frame]");
+    if (!item) return;
+    setFrame(item.dataset.frame);
+    get("stock-intraday").querySelector("summary").focus({preventScroll:true});
+  };
+  dialog.addEventListener("click",e=>{
+    const intraday=get("stock-intraday");
+    if (intraday.open && !intraday.contains(e.target)) intraday.open=false;
+  });
   get("stock-frames").onclick=e=>{if(e.target.dataset.frame)setFrame(e.target.dataset.frame);};
   get("stock-expand").onclick=()=>{
     const expanded=dialog.classList.toggle("expanded");

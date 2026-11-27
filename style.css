@@ -1305,7 +1305,6 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 #stock-back { background:transparent; box-shadow:none; }
 .frame-bar { padding:0 6px; gap:0; position:relative; z-index:4; }
 #stock-frames { align-items:center; }
-#stock-intraday { background:#202b38; color:#dbe8f5; border:0; border-radius:8px; min-height:36px; padding:0 3px; font:600 12px system-ui; max-width:66px; }
 #stock-frames button { padding-inline:5px; font-size:12px; }
 .frame-bar #trend-menu { position:relative; flex:none; margin:0; }
 .frame-bar #trend-menu summary { min-height:44px; width:35px; justify-content:center; padding:0; }
@@ -1442,3 +1441,24 @@ a.position-identity { color:inherit; text-decoration:none; }
 #holding-columns { padding-top:10px; }
 #holdings-list > li:last-child { border-bottom:0; }
 #holdings-list summary { min-height:59px; }
+
+#stock-intraday { position:relative; flex:none; }
+#stock-intraday summary {
+  display:flex; align-items:center; gap:5px; min-height:36px; padding:0 6px; list-style:none;
+  border-radius:8px; background:#202b38; color:#dbe8f5; font:600 12px system-ui; cursor:pointer;
+}
+#stock-intraday summary::-webkit-details-marker { display:none; }
+#stock-intraday summary::after { content:""; width:4px; height:4px; border:solid currentColor; border-width:0 1px 1px 0; transform:rotate(45deg); }
+#stock-intraday .intraday-options {
+  position:absolute; bottom:calc(100% + 5px); left:0; display:grid; min-width:max-content;
+  padding:4px; border:1px solid #425267; border-radius:12px; background:#1b2735; box-shadow:0 8px 24px #0006;
+}
+#stock-intraday .intraday-options button { min-height:40px; padding:0 12px; text-align:left; font:600 13px system-ui; }
+#stock-intraday .intraday-options [aria-pressed=true] { background:#314454; border-radius:8px; }
+#stock-order-bar { bottom:calc(57px + max(5px,env(safe-area-inset-bottom))); padding-block:6px 3px; }
+@media(max-width:540px) {
+  #stock-detail .instrument { padding-top:calc(env(safe-area-inset-top) + 16px); }
+}
+@media (display-mode:standalone) and (max-width:540px) {
+  #stock-detail .instrument { padding-top:calc(max(52px,env(safe-area-inset-top)) + 16px); }
+}

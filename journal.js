@@ -3,7 +3,7 @@ import {setupLab} from "./assets/lab.js?v=119";
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=114";
 import {setupWatchEditor} from "./watch-editor.js?v=126";
 import {setupOrders} from "./orders.js?v=83";
-import { setupInstrument, sparkline } from "./instrument.js?v=136";
+import { setupInstrument, sparkline } from "./instrument.js?v=140";
 import {loadWatchSentiment} from "./market-panels.js?v=104";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
