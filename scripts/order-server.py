@@ -515,6 +515,47 @@ class Kiwoom:
                     records.append(record)
         return records
 
+    def realized_by_day(self, symbol, start, end):
+        if symbol in YAHOO_SYMBOLS:
+            return {}
+        token = self.access_token()
+        ticker = self.resolve_us_stock(token, symbol)["jmcode"]
+        result = {}
+        for mode, currency in (("0", "usd"), ("1", "krw")):
+            headers = {"api-id": "ust21530", "Authorization": "Bearer " + token}
+            params = {"strt_dt": start, "end_dt": end, "fc_krw_tp": mode}
+            seen, by_day = set(), {}
+            while True:
+                wait_for_kiwoom_read(self.read_schedule)
+                payload, page = read_page(KIWOOM + "/api/us/acnt", headers, params)
+                if str(payload.get("return_code")) != "0":
+                    raise Problem(502, "키움 실현손익을 조회하지 못했습니다.")
+                for row in payload.get("result_list") or []:
+                    day = str(row.get("sell_dt", ""))
+                    if str(row.get("stk_cd", "")).strip() != ticker or not (re.fullmatch(r"\d{8}", day) and start <= day <= end):
+                        continue
+                    profit = finite_quote(row.get("pl_amt"))
+                    if profit is None:
+                        continue
+                    by_day.setdefault(day, []).append((profit, finite_quote(row.get("buy_amt")), finite_quote(row.get("pl_rt"))))
+                if page.get("cont-yn") != "Y":
+                    break
+                key = page.get("next-key")
+                if not key or key in seen:
+                    raise Problem(502, "키움 실현손익의 다음 페이지를 조회하지 못했습니다.")
+                seen.add(key)
+                headers.update({"cont-yn": "Y", "next-key": key})
+            for day, rows in by_day.items():
+                entry = result.setdefault(f"{day[:4]}-{day[4:6]}-{day[6:]}", {})
+                profit = sum(row[0] for row in rows)
+                entry[currency] = profit
+                if currency == "usd":
+                    if len(rows) == 1:
+                        entry["return_pct"] = rows[0][2]
+                    elif all(row[1] is not None and row[1] > 0 and row[2] is not None for row in rows):
+                        entry["return_pct"] = sum(row[1] * row[2] for row in rows) / sum(row[1] for row in rows)
+        return result
+
     def pending(self, token):
         headers = {"api-id": "ust21050", "Authorization": "Bearer " + token}
         rows, seen = [], set()
@@ -1171,7 +1212,13 @@ class App(BaseHTTPRequestHandler):
                 span = -1
             if not 0 <= span < 84 or len(start) != 8 or len(end) != 8:
                 raise Problem(400, "체결 조회 기간을 확인하세요.")
-            self.write_json(200, {"executions": self.quote_broker.executions(symbol, start, end, grouped=query.get("grouped") == ["1"])})
+            payload = {"executions": self.quote_broker.executions(symbol, start, end, grouped=query.get("grouped") == ["1"])}
+            if query.get("realized") == ["1"]:
+                try:
+                    payload["realized"] = self.quote_broker.realized_by_day(symbol, start, end)
+                except (Problem, OSError, ValueError):
+                    payload["realized"] = None
+            self.write_json(200, payload)
         except Problem as error:
             self.write_json(error.status, {"message": str(error)})
         except (OSError, ValueError):

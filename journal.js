@@ -3,7 +3,7 @@ import {setupLab} from "./assets/lab.js?v=152";
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=114";
 import {setupWatchEditor} from "./watch-editor.js?v=146";
 import {setupOrders} from "./orders.js?v=83";
-import { setupInstrument, sparkline } from "./instrument.js?v=158";
+import { setupInstrument, sparkline } from "./instrument.js?v=159";
 import {loadWatchSentiment} from "./market-panels.js?v=104";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -922,13 +922,15 @@ async function loadChart(symbol, frame, before, signal, day) {
   if (!response.ok) throw new Error(payload.message || "Kiwoom chart unavailable.");
   return payload;
 }
-async function loadExecutions(symbol, from, to, signal, grouped = false) {
+async function loadExecutions(symbol, from, to, signal, grouped = false, realized = false) {
     const endpoint = new URL("executions", new URL(kiwoomEndpoint, location.href));
     endpoint.search = new URLSearchParams({symbol,from:from.replaceAll("-",""),to:to.replaceAll("-","")});
     if (grouped) endpoint.searchParams.set("grouped","1");
+    if (realized) endpoint.searchParams.set("realized","1");
     const response = await fetch(endpoint,{headers:quoteReadHeaders(endpoint),cache:"no-store",signal});
     if (!response.ok) throw new Error("체결 내역을 불러오지 못했습니다.");
-    return (await response.json()).executions;
+    const payload = await response.json();
+    return realized ? payload : payload.executions;
 }
 const canLoadChart=()=>Boolean(token && kiwoomEndpoint);
 const strategy=setupStrategy({loadChart,orders,canLoadChart,tickerIcon,subscribeOrderBook});

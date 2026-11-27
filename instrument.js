@@ -1,6 +1,6 @@
 import {trendStyles} from "./assets/chart-trends.js?v=82";
 import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=144";
-import {setupStockTrades} from "./assets/stock-trades.js?v=158";
+import {setupStockTrades} from "./assets/stock-trades.js?v=159";
 import {setupExecutionFlags} from "./chart-executions.js?v=143";
 import {calculateSigma, loadWeeklyBand} from "./market-panels.js?v=104";
 

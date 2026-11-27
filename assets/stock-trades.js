@@ -2,8 +2,32 @@ const dayMs = 86_400_000;
 const easternDay = new Intl.DateTimeFormat("en-CA", {timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit"});
 const easternTime = new Intl.DateTimeFormat("ko-KR", {timeZone:"America/New_York", hour:"2-digit", minute:"2-digit", hourCycle:"h23"});
 const dollars = new Intl.NumberFormat("en-US", {style:"currency", currency:"USD", maximumFractionDigits:4});
+const won = new Intl.NumberFormat("ko-KR", {style:"currency", currency:"KRW", signDisplay:"exceptZero"});
+const profitDollars = new Intl.NumberFormat("en-US", {style:"currency", currency:"USD", signDisplay:"exceptZero"});
+const percent = new Intl.NumberFormat("ko-KR", {style:"percent", signDisplay:"exceptZero", maximumFractionDigits:2});
 const shares = new Intl.NumberFormat("ko-KR", {maximumFractionDigits:8});
 const isoDay = value => new Date(value).toISOString().slice(0,10);
+
+function realizedRow(day, realized) {
+  const row = document.createElement("li");
+  const title = document.createElement("span"), totals = document.createElement("span");
+  const label = document.createElement("strong"), date = document.createElement("small");
+  const rate = document.createElement("strong"), amounts = document.createElement("small");
+  row.className = "stock-realized";
+  label.textContent = "매도 실현손익 · 일별";
+  date.textContent = day;
+  rate.textContent = Number.isFinite(realized.return_pct) ? percent.format(realized.return_pct/100) + " USD" : "—";
+  rate.title = "달러 기준 수익률";
+  rate.dataset.direction = realized.return_pct > 0 ? "up" : realized.return_pct < 0 ? "down" : "flat";
+  amounts.textContent = [
+    Number.isFinite(realized.usd) ? profitDollars.format(realized.usd) : "USD —",
+    Number.isFinite(realized.krw) ? won.format(realized.krw) : "KRW —"
+  ].join(" / ");
+  title.append(label,date);
+  totals.append(rate,amounts);
+  row.append(title,totals);
+  return row;
+}
 
 export function setupStockTrades({loadExecutions,canLoadChart,onSignIn,onShowChart,onShowTrades}) {
   const get = id => document.getElementById(id);
@@ -34,27 +58,38 @@ export function setupStockTrades({loadExecutions,canLoadChart,onSignIn,onShowCha
     status.textContent="체결 내역 불러오는 중…";
     more.hidden=true;
     try {
-      const records=await loadExecutions(symbol,isoDay(start),isoDay(end),controller.signal);
+      const {executions:records, realized}=await loadExecutions(symbol,isoDay(start),isoDay(end),controller.signal,false,true);
       if(request!==controller) return;
       if(!Array.isArray(records)) throw Error("조회 결과를 읽을 수 없습니다.");
-      for(const record of records.slice().sort((a,b)=>b.day.localeCompare(a.day)||(b.time??0)-(a.time??0))){
-        const row=document.createElement("li");
-        const trade=document.createElement("span"), amount=document.createElement("span");
-        const side=document.createElement("strong"), date=document.createElement("small");
-        const price=document.createElement("strong"), quantity=document.createElement("small");
-        side.dataset.side=record.side;
-        side.textContent=record.side==="buy"?"매수":"매도";
-        date.textContent=record.day+(Number.isFinite(record.time)?" · "+easternTime.format(record.time*1000):"");
-        price.textContent=dollars.format(record.price);
-        quantity.textContent=shares.format(record.quantity)+"주";
-        trade.append(side,date);
-        amount.append(price,quantity);
-        row.append(trade,amount);
-        list.append(row);
+      const byDay = new Map();
+      for (const record of records.slice().sort((a,b)=>(b.time??0)-(a.time??0))) {
+        if (!byDay.has(record.day)) byDay.set(record.day, []);
+        byDay.get(record.day).push(record);
+      }
+      const days = [...new Set([...byDay.keys(), ...Object.keys(realized ?? {})])].sort().reverse();
+      for (const day of days) {
+        if (realized?.[day]) list.append(realizedRow(day,realized[day]));
+        for (const record of byDay.get(day) ?? []) {
+          const row=document.createElement("li");
+          const trade=document.createElement("span"), amount=document.createElement("span");
+          const side=document.createElement("strong"), date=document.createElement("small");
+          const price=document.createElement("strong"), quantity=document.createElement("small");
+          side.dataset.side=record.side;
+          side.textContent=record.side==="buy"?"매수":"매도";
+          date.textContent=record.day+(Number.isFinite(record.time)?" · "+easternTime.format(record.time*1000):"");
+          price.textContent=dollars.format(record.price);
+          quantity.textContent=shares.format(record.quantity)+"주";
+          trade.append(side,date);
+          amount.append(price,quantity);
+          row.append(trade,amount);
+          list.append(row);
+        }
       }
       cursor=start-dayMs;
       loaded=true;
-      status.textContent=records.length?"":isoDay(start)+" ~ "+isoDay(end)+" 체결 내역 없음";
+      status.textContent=realized == null && records.some(row=>row.side==="sell")
+        ? "키움 실현손익을 불러오지 못했습니다."
+        : days.length?"":isoDay(start)+" ~ "+isoDay(end)+" 체결 내역 없음";
       more.textContent="이전 30일 보기";
     } catch {
       if(request!==controller) return;
