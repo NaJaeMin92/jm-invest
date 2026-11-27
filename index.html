@@ -6,12 +6,19 @@
 <meta name="theme-color" content="#101720">
 <meta name="kiwoom-quote-gateway" content="https://ccc1-211-51-11-36.ngrok-free.app/api/quotes/stream">
 <title>TradeInSight</title>
+<link rel="manifest" href="./assets/mobile/app.webmanifest?v=116">
+<link rel="apple-touch-icon" sizes="180x180" href="./assets/mobile/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TradeInSight">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script type="module" src="./assets/mobile/install.js?v=116"></script>
 <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://mfycpprqyaidoixytdim.supabase.co" crossorigin>
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=115">
+<link rel="stylesheet" href="./style.css?v=116">
 <script type="module" src="./journal.js?v=115"></script>
 </head>
 <body class="trade-page" data-view="home">
@@ -29,6 +36,7 @@
 <section id="tab-home" class="tab-panel" lang="en" aria-labelledby="watch-title">
 <div class="watch-heading">
 <div class="watch-title-group"><h1 id="watch-title">My Watchlist</h1></div>
+<button id="mobile-install" type="button" aria-label="앱 설치" title="앱 설치" hidden><svg aria-hidden="true" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11m-4-4 4 4 4-4M4.5 15v3.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V15"/></svg></button>
 <div class="watch-heading-actions"><button id="watch-login" type="button" data-shortcut="account" lang="en">Sign in</button><span id="watch-sentiment-rating" hidden></span></div>
 </div>
 <div class="watch-toolbar">
@@ -436,6 +444,11 @@
 <button type="submit">Apply</button></fieldset></form>
 </template>
 </div></dialog>
+<dialog id="mobile-install-help" lang="ko" aria-labelledby="install-heading">
+<img src="./assets/mobile/icon-180.png" width="46" height="46" alt="">
+<h2 id="install-heading">홈 화면에 설치</h2><p id="install-steps"></p>
+<form method="dialog"><button autofocus>확인</button></form>
+</dialog>
 <nav id="bottom-nav" lang="en" aria-label="Main navigation">
 <button type="button" data-view="home" aria-current="page"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4z"/><path d="m8.5 11.5 2.3-2.7 2.1 1.6 2.6-3.1"/></svg><span>Watchlists</span></button>
 <button type="button" data-view="radar"><svg aria-hidden="true" class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M8.1 15.9a5.5 5.5 0 0 1 7.8-7.8M12 12l6.1-6.1"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg><span>Radar</span></button>

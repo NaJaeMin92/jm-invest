@@ -1300,3 +1300,11 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 .lab-window-row small { grid-column:1/-1; color:var(--workspace-muted); font-size:12px }
 .lab-controls { grid-template-columns:repeat(2,minmax(0,1fr)) }
 #lab-run { grid-column:auto }
+
+#mobile-install { margin-left:auto; width:44px; min-height:44px; color:#b6cfca }
+#mobile-install-help { width:min(340px,calc(100% - 32px)); padding:22px; border:1px solid #364251; border-radius:20px; background:#17212c; color:#eef3f6 }
+#mobile-install-help::backdrop { background:#0009 }
+#mobile-install-help img { display:block; border-radius:11px }
+#mobile-install-help h2 { margin:14px 0 6px; font-size:20px }
+#mobile-install-help p { margin:0 0 18px; color:#bdc9d5 }
+#mobile-install-help form button { width:100%; background:#254037; color:#c6e6d8; border:0; font-weight:600 }
