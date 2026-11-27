@@ -1345,7 +1345,7 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 /* Floating controls above the watchlist, with clearance for the final row. */
 .trade-page[data-view="home"]:not(:has(dialog[open])) #bottom-nav {
   inset:auto 0 calc(7px + env(safe-area-inset-bottom));
-  width:min(560px,calc(100% - 24px));
+  width:min(560px,calc(100% - 40px));
   padding:3px;
   border:1px solid #a9c7dc38;
   border-radius:26px;
@@ -1362,7 +1362,7 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
   background:#a3e9cf18;
 }
 #home-search {
-  width:min(560px,calc(100% - 24px));
+  width:min(560px,calc(100% - 40px));
   justify-content:flex-start;
   bottom:calc(var(--nav-space) + 9px);
   padding-inline:16px;
