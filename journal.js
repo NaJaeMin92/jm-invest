@@ -275,6 +275,15 @@ document.addEventListener("touchend",event=>{
   if (current<0 || !next) return;
   event.preventDefault();
   next.click();
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const view = next.dataset.view;
+  const panel = view === "account" && !login.hidden ? login : document.getElementById("tab-"+view);
+  if (!panel) return;
+  const targets = panel === login ? [login] : [...panel.children].filter(child=>child.id!=="home-search" && !child.hidden);
+  for (const target of targets) {
+    target.animate([{translate:(dx<0?"22px":"-22px")+" 0",opacity:.76},{translate:"0 0",opacity:1}],
+      {duration:280,easing:"cubic-bezier(.22,.74,.25,1)"});
+  }
 },{capture:true,passive:false});
 
 for (const button of document.querySelectorAll("[data-shortcut]")) {
