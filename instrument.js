@@ -105,7 +105,6 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
   });
   const won = new Intl.NumberFormat("ko-KR", {style: "currency", currency: "KRW"});
   const sideName = {buy: "매수", sell: "매도"};
-  const nativeLink = get("trade-open-iphone");
   const onPhonePages = location.hostname === "najaemin92.github.io" && /iPhone/i.test(navigator.userAgent);
   const previewOnly = onPhonePages ? "실주문은 설치된 JM Invest 앱에서 확인하세요."
     : "미리보기 모드입니다. 실계좌 주문은 이 Mac의 비공개 서버에서 할 수 있습니다.";
@@ -173,9 +172,7 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     tradeSide = side;
     positionPanel.hidden = side !== "sell";
     trade.dataset.side = side;
-    tradeNext.textContent = sideName[side] + (onPhonePages ? " 미리보기" : " 주문 확인");
-    nativeLink.hidden = !onPhonePages;
-    if (onPhonePages) nativeLink.href = "jminvest://stock/" + encodeURIComponent(current) + "?side=" + side;
+    tradeNext.textContent = sideName[side] + " 주문 확인";
     for (const button of ticketSides) {
       button.setAttribute("aria-pressed", String(button.dataset.ticketSide === side));
     }
@@ -471,7 +468,7 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     if (version !== tradeVersion || !trade.open) return;
     reviewId = order.id ?? null;
     get("trade-review-title").textContent = "주문 확인";
-    tradeConfirm.textContent = sideName[order.side] + " 주문하기";
+    tradeConfirm.textContent = onPhonePages ? "JM Invest에서 계속" : sideName[order.side] + " 주문하기";
     get("trade-review-side").textContent = {buy:"Buy", sell:"Sell"}[order.side];
     get("trade-review-kind").textContent = orderKinds.get(order.kind);
     get("trade-review-quantity").textContent = Number(order.quantity).toLocaleString("ko-KR") + "주";
@@ -479,7 +476,7 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     get("trade-review-total").textContent = order.amount == null ? "체결 시 결정" : dollars.format(order.amount);
     tradeForm.hidden = true;
     tradeReview.hidden = false;
-    tradeConfirm.disabled = !reviewId;
+    tradeConfirm.disabled = !reviewId && !onPhonePages;
     tradeStatus.textContent = reviewId ? "" : previewOnly;
     get("trade-review-title").focus();
   });
@@ -495,7 +492,12 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
   };
 
   tradeConfirm.onclick = async () => {
-    if (tradeBusy || !reviewId) return;
+    if (tradeBusy) return;
+    if (onPhonePages) {
+      location.href = "jminvest://stock/" + encodeURIComponent(current) + "?side=" + tradeSide;
+      return;
+    }
+    if (!reviewId) return;
     const id = reviewId;
     reviewId = null;
     tradeBusy = true;
