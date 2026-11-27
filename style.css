@@ -1104,7 +1104,7 @@ body.instrument-open { overflow:hidden; }
 :root { --nav-space:calc(62px + env(safe-area-inset-bottom)) }
 .trade-page #bottom-nav {
   position:fixed; inset:auto 0 0; transform:none; width:min(680px,100%); box-sizing:border-box;
-  margin:0 auto; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:0;
+  margin:0 auto; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:0;
   padding:3px max(8px,env(safe-area-inset-right)) max(5px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));
   border:0; border-top:1px solid #303948; border-radius:0; background:#101722; z-index:100;
 }
@@ -1209,8 +1209,8 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 #strategy-state { white-space:pre-line }
 
 
-/* Shared calendar, signal review and radar surfaces. */
-.trade-page:is([data-view="calendar"],[data-view="lab"],[data-view="radar"]) .page-title { display:none }
+/* Shared calendar and signal review surfaces. */
+.trade-page:is([data-view="calendar"],[data-view="lab"]) .page-title { display:none }
 .workspace-tab { padding:0; --workspace-fill:#17212c; --workspace-edge:#2b3745; --workspace-muted:#a7b5c5; --workspace-mint:#b7dfce; --calendar-earnings:#e6b983 }
 .workspace-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:68px; margin:4px 0 10px }
 .workspace-heading h1 { margin:0; font-size:clamp(28px,7vw,38px); font-weight:680; line-height:1.12; letter-spacing:-.055em }
@@ -1219,13 +1219,13 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 .workspace-status { margin:10px 0 0; line-height:1.55; overflow-wrap:anywhere }
 .workspace-status:empty { display:none }
 .calendar-card { padding:6px clamp(6px,2.2vw,16px) 9px; border:1px solid var(--workspace-edge); border-radius:19px; background:linear-gradient(130deg,#1b2732,#17202b 70%) }
-.calendar-month-bar,.calendar-month-controls,.calendar-agenda-heading,.radar-toolbar,.lab-result-heading { display:flex; align-items:center; justify-content:space-between; gap:8px }
+.calendar-month-bar,.calendar-month-controls,.calendar-agenda-heading,.lab-result-heading { display:flex; align-items:center; justify-content:space-between; gap:8px }
 .calendar-month-bar { min-height:54px; padding-left:7px }
-#private .workspace-tab :is(.calendar-month-bar,.calendar-agenda-heading,.radar-toolbar,.lab-result-heading) h2 { margin:0 }
+#private .workspace-tab :is(.calendar-month-bar,.calendar-agenda-heading,.lab-result-heading) h2 { margin:0 }
 .calendar-month-bar h2,.lab-result-heading h2 { font-size:20px; font-weight:650; letter-spacing:-.04em }
 .calendar-month-controls { gap:0 }
-.calendar-month-controls button,#radar-refresh { display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; background:transparent; color:var(--workspace-mint) }
-.calendar-month-controls svg,#radar-refresh svg { width:20px; height:20px }
+.calendar-month-controls button { display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; background:transparent; color:var(--workspace-mint) }
+.calendar-month-controls svg { width:20px; height:20px }
 #calendar-today { width:auto; min-width:44px; font-size:13px; font-weight:600 }
 .calendar-weekdays,#calendar-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); text-align:center }
 .calendar-weekdays { border-top:1px solid #ffffff0c; padding:8px 0 3px; color:var(--workspace-muted); font-size:11px }
@@ -1238,14 +1238,14 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 .calendar-dots { position:absolute; bottom:1px; left:0; width:100%; display:flex; align-items:center; justify-content:center; gap:3px; height:4px }
 .calendar-dots i { width:4px; height:4px; border-radius:50%; background:var(--workspace-mint) }
 .calendar-dots i[data-kind=earnings] { background:var(--calendar-earnings) }
-.calendar-agenda-heading,.radar-toolbar { flex-wrap:wrap; margin:22px 0 6px }
+.calendar-agenda-heading { flex-wrap:wrap; margin:22px 0 6px }
 .workspace-list-title { font-size:17px; font-weight:650; letter-spacing:-.035em; margin:18px 0 6px }
-#calendar-filters,#radar-filters { display:flex; gap:1px; padding:3px; background:#1a2532; border-radius:12px }
-#calendar-filters button,#radar-filters button { min-height:34px; border:0; border-radius:9px; padding:0 11px; color:#b2c0cc; font:550 12px system-ui; background:transparent }
+#calendar-filters { display:flex; gap:1px; padding:3px; background:#1a2532; border-radius:12px }
+#calendar-filters button { min-height:34px; border:0; border-radius:9px; padding:0 11px; color:#b2c0cc; font:550 12px system-ui; background:transparent }
 #calendar-filters button:not([data-filter=all])::before { content:""; display:inline-block; width:5px; height:5px; margin-right:5px; vertical-align:.13em; border-radius:50%; background:var(--workspace-mint) }
 #calendar-filters button[data-filter=earnings]::before { background:var(--calendar-earnings) }
-#calendar-filters button[aria-pressed=true],#radar-filters button[aria-pressed=true] { background:#344251; color:#f2f5f8 }
-#calendar-agenda,#lab-events,#radar-list { margin:0; padding:0; list-style:none }
+#calendar-filters button[aria-pressed=true] { background:#344251; color:#f2f5f8 }
+#calendar-agenda,#lab-events { margin:0; padding:0; list-style:none }
 #private .calendar-event,#private #lab-events li { display:grid; grid-template-columns:minmax(56px,auto) minmax(0,1fr) auto; gap:12px; align-items:center; border-bottom:1px solid var(--workspace-edge); margin:0; padding:13px 2px; white-space:normal }
 .calendar-event time,#lab-events time { color:#c5d0dc; font-size:12px; font-weight:570; font-variant-numeric:tabular-nums }
 .calendar-event time { display:grid; gap:2px; line-height:1.22 }
@@ -1269,17 +1269,6 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 .lab-metrics dt { font-size:12px; color:var(--workspace-muted) }
 .lab-metrics dd { margin:4px 0 0; line-height:1.15; font-size:clamp(21px,5vw,30px); font-variant-numeric:tabular-nums; letter-spacing:-.04em }
 .lab-metrics div:last-child dd { color:var(--workspace-mint) }
-#radar-refresh { width:44px; border-radius:50%; background:#1b2733 }
-.radar-toolbar { margin:0 0 10px }
-#radar-refresh:not(:has(svg)) { width:auto; padding-inline:12px; border-radius:12px; font:600 13px system-ui }
-#private #radar-list li { margin:0; white-space:normal }
-.radar-card { display:grid; grid-template-columns:minmax(72px,auto) minmax(0,1fr); align-items:center; gap:3px 10px; width:100%; padding:14px 2px; text-align:left; border:0; border-bottom:1px solid var(--workspace-edge); border-radius:0; background:transparent }
-.radar-identity { grid-row:span 2; display:grid; gap:3px }
-.radar-identity strong { font-size:17px; letter-spacing:-.025em }
-.radar-identity small,.radar-note { color:var(--workspace-muted); font-size:12px }
-.radar-card[data-side=buy] .radar-identity small { color:#a9dac7 }
-.radar-card[data-side=sell] .radar-identity small { color:#e8b999 }
-.radar-evidence { color:#e0ebe7; font-size:14px; font-weight:570 }
 @media (max-width:420px) {
   .lab-controls { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; padding:12px }
   #lab-run { grid-column:1/-1 }

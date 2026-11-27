@@ -1,4 +1,3 @@
-import {setupRadar} from "./assets/radar.js?v=114";
 import {setupCalendar} from "./assets/calendar.js?v=114";
 import {setupLab} from "./assets/lab.js?v=115";
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=114";
@@ -59,11 +58,10 @@ const accountNavLabel=document.getElementById("account-nav-label");
 const navButtons = [...navigation.querySelectorAll("button")];
 function selectView(view) {
   if (!token && view !== "account") returnToStock = null;
-  const needsLogin = !["home","strategies","calendar","lab","radar"].includes(view) && !token;
+  const needsLogin = !["home","strategies","calendar","lab"].includes(view) && !token;
   document.getElementById("watch-login").hidden = Boolean(token);
   accountNavLabel.textContent=token ? "Account" : "Sign in";
   if (document.body.dataset.view === "lab" && view !== "lab") lab.close();
-  if (document.body.dataset.view === "radar" && view !== "radar") radar.close();
   if (view !== "account") returnToView = null;
   document.body.dataset.view = view;
   setDetail(view === "account" && !needsLogin);
@@ -80,13 +78,12 @@ function selectView(view) {
     else button.removeAttribute("aria-current");
   }
   document.querySelector("#page-heading").textContent = {
-    strategies:"Strategies", lab:"Lab", radar:"Radar", calendar:"Calendar", home:"My Watchlist", account:"계좌", profit:"Realized P&L", more:"Menu"
+    strategies:"Strategies", lab:"Lab", calendar:"Calendar", home:"My Watchlist", account:"계좌", profit:"Realized P&L", more:"Menu"
   }[view];
   document.querySelector("#page-heading").lang = view === "account" ? "ko" : "en";
   if(view==="strategies") renderStrategies();
   if(view==="calendar") calendar.refresh();
   if(view==="lab") lab.open();
-  if(view==="radar") radar.open();
   window.scrollTo(0, 0);
   if (view === "home") refreshWatchlistQuotes();
   else syncKiwoomQuotes();
@@ -775,9 +772,6 @@ async function loadExecutions(symbol, from, to, signal) {
 const canLoadChart=()=>Boolean(token && kiwoomEndpoint);
 const strategy=setupStrategy({loadChart,orders,canLoadChart,tickerIcon,subscribeOrderBook});
 const calendar=setupCalendar({getWatchlist:watchEditor.allSymbols,getHoldings:()=>heldWatchSymbols});
-const radar=setupRadar({getWatchlist:watchEditor.allSymbols,getHoldings:()=>heldWatchSymbols,
-  loadChart,canLoadChart,readStrategy,openStock:symbol=>instrument.open(symbol),
-  onSignIn(){returnToView="radar";selectView("account");}});
 function labSymbols(){
   const symbols=new Set([...watchEditor.allSymbols(),...heldWatchSymbols]);
   try{
@@ -1076,7 +1070,6 @@ async function loadValuation(accessToken) {
     renderWatchlist();
     if(document.body.dataset.view==="calendar") calendar.refresh();
     if(document.body.dataset.view==="lab") lab.open();
-    if(document.body.dataset.view==="radar") radar.open();
     if (!balance) {
       value.textContent = "잔고 동기화 대기";
       return;
@@ -1165,5 +1158,5 @@ async function restoreSession() {
 }
 
 const initialView=new URLSearchParams(location.search).get("view");
-selectView(["account","strategies","lab","calendar","radar"].includes(initialView) ? initialView : "home");
+selectView(["account","strategies","lab","calendar"].includes(initialView) ? initialView : "home");
 restoreSession();
