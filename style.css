@@ -1519,3 +1519,12 @@ a.position-identity { color:inherit; text-decoration:none; }
 .position-amounts > span { display:flex; align-items:baseline; gap:5px; min-width:0; white-space:nowrap; }
 .position-amounts small { color:var(--muted); font-size:clamp(9px,2.8vw,12px); }
 .position-amounts strong { font-variant-numeric:tabular-nums; font-size:clamp(10px,3.1vw,14px); }
+
+.measure-range {
+  position:absolute; top:var(--ct); height:calc(var(--cb) - var(--ct));
+  background:#a488ec22; border-inline:1px dashed #bba5ed;
+}
+.candle-readout { z-index:1; }
+.measure-value { margin-top:4px; font-weight:700; color:#dad0ff; }
+.measure-value[data-direction=up] { color:var(--up); }
+.measure-value[data-direction=down] { color:var(--down); }

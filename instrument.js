@@ -630,30 +630,46 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
     }
   }
   const inspector=get("candle-inspector"), readout=inspector.querySelector(".candle-readout");
+  const measureRange=inspector.querySelector(".measure-range");
+  const measureValue=inspector.querySelector(".measure-value");
+  const measureCurrency=new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",signDisplay:"exceptZero",maximumFractionDigits:4});
+  const measurePercent=new Intl.NumberFormat("en-US",{style:"percent",signDisplay:"exceptZero",maximumFractionDigits:2});
   const intradayStamp=new Intl.DateTimeFormat("ko-KR",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit",hourCycle:"h23"});
   let holdTimer;
   function clearInspector(){
     clearTimeout(holdTimer);
     inspector.hidden=true;
   }
-  function inspectAt(clientX,clientY){
+  function inspectAt(clientX,clientY,anchor){
     const hit=geometry?.inspect(clientX,clientY);
-    if(!hit || canvas.hidden){inspector.hidden=true;return false;}
+    if(!hit || canvas.hidden){if(!anchor)inspector.hidden=true;return null;}
     const [time,o,h,l,c,v]=hit.bar;
     const fmt=n=>n.toFixed(n<1 ? 4 : 2);
     inspector.style.cssText="--cx:"+hit.x+"px;--cy:"+hit.y+"px;--ct:"+hit.top+"px;--cb:"+hit.bottom+"px;--cw:"+hit.width+"px;--cp:"+hit.pad+"px";
     inspector.querySelector(".cross-price").textContent=hit.price;
     readout.style.top=(hit.y<(hit.top+hit.bottom)/2 ? Math.max(hit.top,hit.bottom-62) : hit.top+2)+"px";
     readout.firstElementChild.textContent=(isIntraday(frame)?intradayStamp:dateFormat).format(time*1000)+(isIntraday(frame)?" ET":"");
-    readout.lastElementChild.textContent="시 "+fmt(o)+"   고 "+fmt(h)+"   저 "+fmt(l)+"   종 "+fmt(c)+"   거래량 "+v.toLocaleString("ko-KR");
-    inspector.hidden=false;return true;
+    readout.querySelector("span").textContent="시 "+fmt(o)+"   고 "+fmt(h)+"   저 "+fmt(l)+"   종 "+fmt(c)+"   거래량 "+v.toLocaleString("ko-KR");
+    const measuring=Boolean(anchor && anchor.bar[0]!==time && anchor.bar[4]>0);
+    measureRange.hidden=measureValue.hidden=!measuring;
+    if(measuring){
+      const change=c-anchor.bar[4];
+      measureRange.style.left=Math.min(anchor.x,hit.x)+"px";
+      measureRange.style.width=Math.abs(hit.x-anchor.x)+"px";
+      measureValue.textContent=measureCurrency.format(change)+" · "+measurePercent.format(change/anchor.bar[4])+" (종가 기준)";
+      measureValue.dataset.direction=change>0?"up":change<0?"down":"flat";
+      readout.style.top=(hit.y<(hit.top+hit.bottom)/2 ? Math.max(hit.top,hit.bottom-84) : hit.top+2)+"px";
+    }
+    inspector.hidden=false;
+    return hit;
   }
   area.addEventListener("pointerleave",e=>{if(e.pointerType==="mouse")clearInspector();});
   area.addEventListener("contextmenu",e=>{if(!inspector.hidden)e.preventDefault();});
-  function endDrag() {
-    clearInspector();
-    if (drag && area.hasPointerCapture(drag.id)) area.releasePointerCapture(drag.id);
+  function endDrag(keepMeasurement = false) {
+    const id=drag?.id;
     drag = null;
+    if (!keepMeasurement) clearInspector();
+    if (id!=null && area.hasPointerCapture(id)) area.releasePointerCapture(id);
     area.classList.remove("dragging");
   }
   function pinchGeometry() {
@@ -705,7 +721,7 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
     if(event.pointerType==="touch" && !flag){
       const id=event.pointerId;
       holdTimer=setTimeout(()=>{
-        if(drag?.id===id && !drag.moved && !pinch && inspectAt(drag.x,drag.y))drag.inspect=true;
+        if(drag?.id===id && !drag.moved && !pinch)drag.inspect=inspectAt(drag.x,drag.y);
       },400);
     }
     area.classList.add("dragging");
@@ -715,7 +731,7 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
       if(event.target===canvas)inspectAt(event.clientX,event.clientY);else clearInspector();
       return;
     }
-    if(drag?.inspect && drag.id===event.pointerId){inspectAt(event.clientX,event.clientY);return;}
+    if(drag?.inspect && drag.id===event.pointerId){inspectAt(event.clientX,event.clientY,drag.inspect);return;}
     if (touchPoints.has(event.pointerId)) {
       touchPoints.set(event.pointerId, {x:event.clientX, y:event.clientY});
       if (pinch && chart && touchPoints.size === 2) {
@@ -748,7 +764,7 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
     area.addEventListener(type, event => {
       if (touchPoints.delete(event.pointerId)) pinch = null;
       if (drag?.id !== event.pointerId) return;
-      if(drag.inspect){endDrag();return;}
+      if(drag.inspect){endDrag(type==="pointerup" && !measureValue.hidden);return;}
       if (drag.freehand) tools.finishFreehand();
       else if (drag.points) tools.finishMove();
       else if (type === "pointerup" && !drag.moved && drag.flag?.isConnected) drag.flag.click();
