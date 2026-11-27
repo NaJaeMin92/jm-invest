@@ -25,7 +25,14 @@ final class Kiwoom {
             if (response == null) throw new IllegalStateException();
             JSONObject result;
             try (response) {
-                result = new JSONObject(new String(response.readNBytes(1000000), StandardCharsets.UTF_8));
+                var contents = new java.io.ByteArrayOutputStream();
+                byte[] buffer = new byte[8192];
+                int count;
+                while ((count = response.read(buffer)) != -1) {
+                    if (contents.size() + count > 1000000) throw new IllegalStateException();
+                    contents.write(buffer, 0, count);
+                }
+                result = new JSONObject(new String(contents.toByteArray(), StandardCharsets.UTF_8));
             }
             int code = result.optInt("return_code", Integer.MIN_VALUE);
             if (code != 0 && code != Integer.MIN_VALUE) throw new Rejected();
