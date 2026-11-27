@@ -429,7 +429,6 @@ body.instrument-open { overflow:hidden; }
 .frame-bar > button { font-size:21px; color:#b5bfd5; margin-left:auto; }
 #stock-detail.expanded :is(.instrument-quote,.quote-time,.instrument-tabs) { display:none; }
 #stock-detail.expanded #chart-area { max-width:900px; margin:auto; }
-#stock-detail.expanded canvas { height:calc(100dvh - 120px); aspect-ratio:auto; }
 
 /* Shared mobile surfaces for the owner workspace. */
 .trade-page:not([data-view="home"]) {
@@ -1107,8 +1106,6 @@ body.instrument-open { overflow:hidden; }
 @media (min-width:1000px) {
   .trade-page #account {margin-inline:auto}
 }
-#stock-order-bar {bottom:var(--nav-space)}
-.instrument {padding-bottom:calc(var(--nav-space) + 90px)}
 #watch-editor .watch-editor-shell {padding-bottom:var(--nav-space)}
 #chart-tool-dialog {bottom:calc(var(--nav-space) + 6px);max-height:min(65dvh,calc(100dvh - var(--nav-space) - 10px))}
 dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(--nav-space) - 10px)}
@@ -1308,7 +1305,6 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 .frame-bar #trend-controls { position:absolute; top:100%; right:0; width:min(260px,calc(100vw - 70px)); }
 @media(max-width:540px) {
   .instrument-tabs { margin-bottom:2px; }
-  #stock-detail:not(.expanded) #market-chart.with-rsi { aspect-ratio:1/1.02; max-height:calc(100dvh - var(--nav-space) - env(safe-area-inset-top) - 258px); }
   .frame-bar :is(#chart-type,#chart-tools,#stock-expand),.frame-bar #trend-menu summary { min-width:29px; width:29px; }
 }
 
@@ -1393,9 +1389,6 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 .frame-bar #trend-controls { top:auto; bottom:100%; }
 @media (display-mode:standalone) and (max-width:540px) {
   #stock-detail .instrument { padding-top:calc(max(44px,env(safe-area-inset-top)) + 8px); }
-  #stock-detail:not(.expanded) #market-chart.with-rsi {
-    max-height:calc(100dvh - var(--nav-space) - max(44px,env(safe-area-inset-top)) - 266px);
-  }
 }
 
 #asset-updated { color:var(--muted); font-size:11px; }
@@ -1452,7 +1445,6 @@ a.position-identity { color:inherit; text-decoration:none; }
 }
 #stock-intraday .intraday-options button { min-height:40px; padding:0 12px; text-align:left; font:600 13px system-ui; }
 #stock-intraday .intraday-options [aria-pressed=true] { background:#314454; border-radius:8px; }
-#stock-order-bar { bottom:calc(57px + max(5px,env(safe-area-inset-bottom))); padding-block:6px 3px; }
 @media(max-width:540px) {
   #stock-detail .instrument { padding-top:calc(env(safe-area-inset-top) + 16px); }
 }
@@ -1533,3 +1525,35 @@ a.position-identity { color:inherit; text-decoration:none; }
   flex:none; display:grid; align-items:center; justify-items:center; overflow:hidden;
   color:#afc3d1; font-size:12px; white-space:nowrap; pointer-events:none;
 }
+
+#stock-detail {
+  --stock-order-bottom:calc(var(--nav-space) + 7px);
+  --stock-order-height:63px;
+}
+#stock-detail .instrument {
+  box-sizing:border-box;
+  display:flex;
+  flex-direction:column;
+  min-height:100dvh;
+  padding-bottom:calc(var(--stock-order-bottom) + var(--stock-order-height));
+}
+#stock-order-bar {
+  bottom:var(--stock-order-bottom);
+  padding-block:6px 8px;
+}
+#chart-panel:has(#market-chart:not([hidden])) {
+  flex:1;
+  display:flex;
+  flex-direction:column;
+}
+#chart-area:has(#market-chart:not([hidden])) {
+  flex:1;
+  display:flex;
+  flex-direction:column;
+}
+#stock-detail #market-chart:not([hidden]) {
+  flex:1 0 auto;
+  height:clamp(220px,56vw,320px);
+  aspect-ratio:auto;
+}
+#stock-detail.expanded #chart-area { width:100%; margin:0 auto; }
