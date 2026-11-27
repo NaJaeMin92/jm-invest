@@ -33,9 +33,9 @@ export function setupWatchEditor({watchKey, nameFor, tickerIcon, refresh}) {
     const title = allGroups().find(group => group.id === active())?.title || "My Watchlist";
     get("watch-title").lastChild.textContent = title;
   }
-  function saveList(symbols, id = active()) {
+  function saveList(symbols, id = active(), manualOrder = false) {
     try {
-      localStorage.setItem(groupsKey,JSON.stringify(allGroups().map(group => group.id === id ? {...group,symbols} : group)));
+      localStorage.setItem(groupsKey,JSON.stringify(allGroups().map(group => group.id === id ? {...group,symbols,manualOrder:manualOrder || group.manualOrder} : group)));
       refresh();
       if (editor.open) render();
       return true;
@@ -224,5 +224,6 @@ export function setupWatchEditor({watchKey, nameFor, tickerIcon, refresh}) {
     } catch { notice.textContent="Unable to move symbols."; }
   };
   const allSymbols = () => [...new Set(allGroups().flatMap(group => readList(group.id)))];
-  return {readList,allSymbols,saveList,renameHeading,open};
+  const hasManualOrder = () => Boolean(allGroups().find(group=>group.id===active())?.manualOrder);
+  return {readList,allSymbols,saveList,hasManualOrder,renameHeading,open};
 }

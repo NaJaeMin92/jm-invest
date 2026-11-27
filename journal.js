@@ -1,7 +1,7 @@
 import {setupCalendar} from "./assets/calendar.js?v=114";
 import {setupLab} from "./assets/lab.js?v=119";
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=114";
-import {setupWatchEditor} from "./watch-editor.js?v=114";
+import {setupWatchEditor} from "./watch-editor.js?v=120";
 import {setupOrders} from "./orders.js?v=83";
 import { setupInstrument, sparkline } from "./instrument.js?v=112";
 import {loadWatchSentiment} from "./market-panels.js?v=104";
@@ -497,6 +497,8 @@ const marketSymbols = [
   {symbol: "CLMAIN", name: "WTI Crude Oil Futures"},
 ];
 let sortDirection = 0;
+let watchHold, watchOrderFrame;
+let suppressWatchClickUntil = 0;
 document.querySelector("#watch-sort").addEventListener("click", (event) => {
   sortDirection = sortDirection === 0 ? -1 : sortDirection === -1 ? 1 : 0;
   event.currentTarget.dataset.direction = String(sortDirection);
@@ -860,12 +862,14 @@ function renderWatchlist(changed) {
     }
     return;
   }
+  if (watchHold?.active) return;
   watchEditor.renameHeading();
   const symbols = readWatchlist();
   const quotes = new Map(symbols.map(symbol => [symbol, watchMarket(symbol, session)]));
   symbols.sort((a, b) => {
     const vixFirst = Number(b === "VIX") - Number(a === "VIX");
     if (vixFirst) return vixFirst;
+    if (!sortDirection && watchEditor.hasManualOrder()) return 0;
     const heldFirst = Number(heldWatchSymbols.has(watchSymbolKey(b))) - Number(heldWatchSymbols.has(watchSymbolKey(a)));
     if (heldFirst || !sortDirection) return heldFirst;
     const left = quotes.get(a)?.change, right = quotes.get(b)?.change;
@@ -886,6 +890,86 @@ function renderWatchlist(changed) {
   });
   for (const symbol of removed) { watchRows.get(symbol).remove(); watchRows.delete(symbol); }
 }
+
+function moveWatchRow() {
+  if (!watchHold?.active) return;
+  const {row, y} = watchHold;
+  const bounds = watchList.getBoundingClientRect();
+  if (y > bounds.bottom - 30) watchList.scrollTop += 8;
+  if (y < bounds.top + 30) watchList.scrollTop -= 8;
+  for (const target of watchList.children) {
+    if (target === row || target.dataset.symbol === "VIX") continue;
+    const box = target.getBoundingClientRect();
+    if (y < box.top + box.height/2) {
+      if (row.nextElementSibling !== target) watchList.insertBefore(row,target);
+      return;
+    }
+  }
+  if (row !== watchList.lastElementChild) watchList.append(row);
+}
+watchList.addEventListener("touchstart",event=>{
+  const row=event.target.closest("li[data-symbol]");
+  if (watchHold || !row || row.dataset.symbol==="VIX" || event.target.closest("button") || event.touches.length!==1) return;
+  suppressWatchClickUntil=0;
+  const {clientX:x,clientY:y,identifier}=event.touches[0];
+  const hold={row,x,y,identifier};
+  watchHold=hold;
+  hold.timer=setTimeout(()=>{
+    hold.active=true;
+    hold.original=[...watchList.children].map(item=>item.dataset.symbol);
+    row.classList.add("watch-reordering");
+    const frame=()=>{
+      moveWatchRow();
+      watchOrderFrame=requestAnimationFrame(frame);
+    };
+    watchOrderFrame=requestAnimationFrame(frame);
+  },420);
+},{passive:true});
+watchList.addEventListener("touchmove",event=>{
+  if (!watchHold) return;
+  const touch=[...event.touches].find(item=>item.identifier===watchHold.identifier);
+  if (!touch) return;
+  if (!watchHold.active) {
+    if (Math.hypot(touch.clientX-watchHold.x,touch.clientY-watchHold.y)>8) finishWatchOrder(false);
+    return;
+  }
+  event.preventDefault();
+  watchHold.y=touch.clientY;
+  moveWatchRow();
+},{passive:false});
+function finishWatchOrder(save) {
+  if (!watchHold) return;
+  const {active,row,timer,original}=watchHold;
+  watchHold=undefined;
+  clearTimeout(timer);
+  cancelAnimationFrame(watchOrderFrame);
+  if (!active) return;
+  row.classList.remove("watch-reordering");
+  suppressWatchClickUntil=Date.now()+450;
+  const symbols=[...watchList.children].map(item=>item.dataset.symbol);
+  if (save && symbols.some((symbol,index)=>symbol!==original[index])) {
+    if (watchEditor.saveList(symbols,undefined,true)) {
+      sortDirection=0;
+      document.getElementById("watch-sort").dataset.direction="0";
+      document.getElementById("watch-sort").setAttribute("aria-label","Sort by percentage change");
+    }
+  }
+  renderWatchlist();
+}
+watchList.addEventListener("touchend",event=>{
+  if (!watchHold || ![...event.changedTouches].some(t=>t.identifier===watchHold.identifier)) return;
+  if (watchHold.active) event.preventDefault();
+  finishWatchOrder(true);
+},{passive:false});
+watchList.addEventListener("touchcancel",()=>finishWatchOrder(false));
+watchList.addEventListener("click",event=>{
+  if (Date.now()>=suppressWatchClickUntil) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+},true);
+watchList.addEventListener("contextmenu",event=>{
+  if (watchHold || Date.now()<suppressWatchClickUntil) event.preventDefault();
+});
 
 function tickerIcon(symbol) {
   const badge = document.createElement("span");

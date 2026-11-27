@@ -1301,3 +1301,6 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 
 #tab-strategies { margin-top:24px; border-top:1px solid var(--workspace-edge); }
 #tab-strategies > summary { padding:14px 0; cursor:pointer; font-weight:600; }
+
+#home-holdings .symbol-link { -webkit-touch-callout:none; user-select:none; }
+#private #home-holdings li.watch-reordering { background:#263b46; border-radius:10px; box-shadow:inset 0 0 0 1px #80a99e; }
