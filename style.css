@@ -295,7 +295,8 @@ button.broker-row:hover { background:#2a2c31; }
   font-family:-apple-system,BlinkMacSystemFont,"Geist",sans-serif;
 }
 #tab-home :is(.watch-heading,.watch-toolbar) { flex:none; }
-#home-holdings { flex:1; min-height:0; overflow-y:auto; overscroll-behavior-y:contain; }
+#home-holdings { flex:1; min-height:0; overflow-y:auto; overscroll-behavior-y:contain; scrollbar-width:none; }
+#home-holdings::-webkit-scrollbar { display:none; }
 .watch-heading,.watch-toolbar,.watch-toolbar button,.watch-caption { display:flex; align-items:center; }
 .watch-heading { justify-content:space-between; gap:8px; margin:8px 0 16px; }
 .watch-title-group { min-width:0; }
