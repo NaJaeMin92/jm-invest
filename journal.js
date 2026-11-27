@@ -610,6 +610,7 @@ function stopKiwoomQuotes() {
   lastKiwoomPrices.clear();
   kiwoomDaily.clear();
   externalPrices.clear();
+  showHeadlineIndex();
   unavailableSymbols.clear();
 }
 
@@ -620,7 +621,8 @@ async function syncKiwoomQuotes() {
   if (!kiwoomEndpoint) return;
   const active = token && !document.hidden && (activeOrderBook || document.body.dataset.view === "home");
   const book = active && activeOrderBook?.symbol;
-  const symbols = active ? [...new Set(book ? [book, ...readWatchlist()] : readWatchlist())].slice(0, 200) : [];
+  const requestSymbols = book ? [book, ...readWatchlist()] : [...headlineIndices.keys(), ...readWatchlist()];
+  const symbols = active ? [...new Set(requestSymbols)].slice(0, 200) : [];
   const key = JSON.stringify(book ? {symbols, book} : symbols);
   if (kiwoomStream?.key === key && kiwoomStream.token === token) return;
   stopKiwoomQuotes();
@@ -681,6 +683,7 @@ async function syncKiwoomQuotes() {
           } else if (Number.isFinite(update.price)) {
             if (update.marketType) {
               externalPrices.set(update.symbol, {...update, receivedAt:Date.now()/1000});
+              if (headlineIndices.has(update.symbol)) showHeadlineIndex();
             } else if (update.snapshot) {
               const previous = lastKiwoomPrices.get(update.symbol);
               if (previous?.sampledAt > update.sampledAt) continue;
@@ -729,6 +732,30 @@ async function syncKiwoomQuotes() {
     }
   }
 }
+
+const headlineIndices = new Map([["SPX","S&P 500"],["IXIC","Nasdaq Composite"],["DJI","Dow Jones"]]);
+const indexFormatter = new Intl.NumberFormat("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+let headlineSymbol;
+function showHeadlineIndex(advance=false) {
+  const available=[...headlineIndices.keys()].filter(symbol=>{
+    const quote=externalPrices.get(symbol);
+    return Number.isFinite(quote?.price) && Number.isFinite(quote.change);
+  });
+  if (!available.length) headlineSymbol=undefined;
+  else if (advance || !available.includes(headlineSymbol)) {
+    headlineSymbol=available[(available.indexOf(headlineSymbol)+1)%available.length];
+  }
+  const quote=externalPrices.get(headlineSymbol);
+  const value=document.getElementById("home-index-value");
+  document.getElementById("home-search-label").textContent=headlineIndices.get(headlineSymbol) || "Find a symbol";
+  value.hidden=!quote;
+  if (!quote) return;
+  value.dataset.direction=quote.change<0?"down":quote.change>0?"up":"flat";
+  value.textContent=indexFormatter.format(quote.price)+" "+signedWatchPercent(quote.change);
+}
+setInterval(()=>{
+  if (!document.hidden && document.body.dataset.view==="home") showHeadlineIndex(true);
+},4500);
 
 let lastWatchSession;
 function refreshWatchlistQuotes() {

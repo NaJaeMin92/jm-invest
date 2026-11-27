@@ -1373,3 +1373,9 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
   #home-holdings { container-type:size; }
   #private #home-holdings > li { min-height:max(44px,calc((100cqh - 2px) / 9)); padding-block:2px; }
 }
+
+#home-search-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#home-index-value { flex:none; white-space:nowrap; font-variant-numeric:tabular-nums; }
+#home-index-value[data-direction=down] { color:var(--down); }
+#home-index-value[data-direction=up] { color:var(--up); }
+@media(max-width:350px) { #home-search { font-size:13px; } }

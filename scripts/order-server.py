@@ -34,6 +34,7 @@ PUBLIC_KEY = "sb_publishable_KIxbzozNkk50oEZ9GehtZA_E484E5Lr"
 PAGES_ORIGIN = "https://najaemin92.github.io"
 OWNER = "9fc22c69-b253-406a-be2b-eb8ad9526a3c"
 YAHOO_SYMBOLS = {
+    "SPX": ("%5EGSPC", "Index"), "IXIC": ("%5EIXIC", "Index"), "DJI": ("%5EDJI", "Index"),
     "BZMAIN": ("BZ%3DF", "Futures"), "CLMAIN": ("CL%3DF", "Futures"), "VIX": ("%5EVIX", "Index"),
 }
 STATIC = {
