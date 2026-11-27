@@ -18,8 +18,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://mfycpprqyaidoixytdim.supabase.co" crossorigin>
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=150">
-<script type="module" src="./journal.js?v=151"></script>
+<link rel="stylesheet" href="./style.css?v=152">
+<script type="module" src="./journal.js?v=152"></script>
 </head>
 <body class="trade-page" data-view="home">
 <main id="account">
@@ -51,7 +51,8 @@
 <div class="workspace-heading"><h1 id="lab-title" lang="en">Lab</h1></div>
 <form id="lab-form" class="lab-controls">
 <label for="lab-symbol">종목<select id="lab-symbol"></select></label>
-<label for="lab-strategy">전략<select id="lab-strategy"></select></label>
+<label for="lab-strategy"><span id="lab-entry-label">매수 조건</span><select id="lab-strategy"></select></label>
+<label for="lab-exit" id="lab-exit-label" hidden>매도 조건<select id="lab-exit"></select></label>
 <label for="lab-period">검증 기간<select id="lab-period"><optgroup label="구간 백테스트" id="lab-years"></optgroup><optgroup label="실제 체결 복기"><option value="30">30거래일</option><option value="60" selected>60거래일</option><option value="120">120거래일</option></optgroup></select></label>
 <button type="submit" id="lab-run">전략 검증</button>
 <button type="button" id="lab-run-all" hidden>전체 전략 백테스트</button>

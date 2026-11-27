@@ -1,4 +1,4 @@
-import {runWindows} from "./lab-backtest.js?v=150";
+import {runWindows} from "./lab-backtest.js?v=152";
 self.onmessage=({data:{bars,years,rule,seed}})=>{
   try{
     let state=seed;

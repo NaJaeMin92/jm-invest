@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {planWindows,shiftMonth,simulateWindow,runWindows} from "../assets/lab-backtest.js";
+import {planWindows,shiftMonth,simulateWindow,simulatePairedWindow,runWindows} from "../assets/lab-backtest.js";
 const day=86400000;
 const date=i=>new Date(Date.UTC(2015,0,1)+i*day);
 const days=Array.from({length:4600},(_,i)=>date(i)).filter(d=>d.getUTCDay()!==0 && d.getUTCDay()!==6).map(d=>d.toISOString().slice(0,10));
@@ -44,4 +44,14 @@ test("weekly and monthly rules see only completed frames and the worker produces
     const {rolling,random}=runWindows(data,1,rule);
     assert.equal(random.length,20);assert(rolling.every(r=>r.qty===2 && typeof r.filled==="string"));
   }
+});
+
+test("paired backtests reuse sale proceeds for reentry and value remaining shares",()=>{
+  const bars=[10,12,8,11,10].map((price,index)=>[index,price,price,price,price]);
+  const result=simulatePairedWindow(bars,{first:0,last:4},{},{},()=>true,()=>true);
+  assert.equal(result.buys,3);
+  assert.equal(result.sells,2);
+  assert.equal(result.closed,2);
+  assert.equal(result.openShares,1650);
+  assert.ok(Math.abs(result.profit-.65)<1e-9);
 });

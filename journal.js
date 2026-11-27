@@ -1,5 +1,5 @@
 import {setupCalendar} from "./assets/calendar.js?v=114";
-import {setupLab} from "./assets/lab.js?v=151";
+import {setupLab} from "./assets/lab.js?v=152";
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=114";
 import {setupWatchEditor} from "./watch-editor.js?v=146";
 import {setupOrders} from "./orders.js?v=83";
@@ -507,7 +507,17 @@ function showHoldings(balance) {
     prices.className = performance.className = "position-pair";
     prices.append(costPrice,currentPrice);
     performance.append(profit,rate);
-    head.append(quantity,prices,performance);
+    const amountsLine = document.createElement("span");
+    const costAmount = document.createElement("strong"), marketValue = document.createElement("strong");
+    amountsLine.className = "position-amounts";
+    amountsLine.setAttribute("aria-hidden","true");
+    for (const [label, amount] of [["매입금액",costAmount],["평가금액",marketValue]]) {
+      const cell = document.createElement("span"), caption = document.createElement("small");
+      caption.textContent = label;
+      cell.append(caption,amount);
+      amountsLine.append(cell);
+    }
+    head.append(quantity,prices,performance,amountsLine);
 
     const metrics = document.createElement("dl");
     metrics.className = "holding-values";
@@ -516,8 +526,7 @@ function showHoldings(balance) {
     const moneyCells = {};
     for (const [label, value, field] of [
       ["보유수량", numeric(holding.quantity) ? Number(holding.quantity).toLocaleString("ko-KR", {maximumFractionDigits:8}) + "주" : "—"],
-      ["주식 내 비중", weight], ["매입가", "", "costPrice"], ["매입금액", "", "cost"],
-      ["현재가", "", "price"], ["평가금액", "", "value"]
+      ["주식 내 비중", weight], ["매입가", "", "costPrice"], ["현재가", "", "price"]
     ]) {
       const cell = document.createElement("div"), term = document.createElement("dt"), data = document.createElement("dd");
       term.textContent = label;
@@ -531,8 +540,10 @@ function showHoldings(balance) {
       for (const [field, cell] of Object.entries(moneyCells)) cell.textContent = amounts[field];
       costPrice.textContent = amounts.costPrice;
       currentPrice.textContent = amounts.price;
+      costAmount.textContent = amounts.cost;
+      marketValue.textContent = amounts.value;
       showPerformance(profit, amounts.profitValue, () => amounts.profit);
-      head.setAttribute("aria-label", [symbol.textContent, company.textContent, "보유수량 " + quantityText, "매입가 " + amounts.costPrice, "현재가 " + amounts.price, "평가손익 " + profit.textContent, "수익률 " + rate.textContent].filter(Boolean).join(", "));
+      head.setAttribute("aria-label", [symbol.textContent, company.textContent, "보유수량 " + quantityText, "매입가 " + amounts.costPrice, "현재가 " + amounts.price, "평가손익 " + profit.textContent, "수익률 " + rate.textContent, "매입금액 " + amounts.cost, "평가금액 " + amounts.value].filter(Boolean).join(", "));
     }
     moneyRenderers.push(renderMoney);
     renderMoney();

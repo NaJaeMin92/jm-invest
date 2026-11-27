@@ -2,7 +2,7 @@ import {usMarketSession} from "../watch-quotes.js?v=64";
 import {publicQuote} from "../instrument.js?v=112";
 import {metrics, metricsAt, matches, factors} from "./strategy.js?v=115";
 import {prepareChart} from "../instrument-chart.js?v=103";
-import {touchCandidate, windowsPerGroup} from "./lab-backtest.js?v=146";
+import {touchCandidate, windowsPerGroup} from "./lab-backtest.js?v=152";
 import {firstTouchLevels} from "./first-touch.js?v=113";
 
 const dayMs = 86400000;
@@ -66,7 +66,7 @@ export function executionWindows(first, last) {
   return ranges;
 }
 
-export {touchCandidate} from "./lab-backtest.js?v=146";
+export {touchCandidate} from "./lab-backtest.js?v=152";
 
 function replayIssue(rule) {
   if (rule.preset === "firstTouch") return rule.touch ? "" : "터치 설정이 없습니다.";
@@ -172,12 +172,13 @@ function appendEvents(container, events) {
 
 export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, readStrategy, onSignIn}) {
   const symbolInput=get("symbol"), period=get("period"), status=get("status"), result=get("results"), login=get("login");
-  const strategies=get("strategy"), windows=get("windows"), all=get("all-results");
+  const strategies=get("strategy"), exits=get("exit"), windows=get("windows"), all=get("all-results");
   for(let y=1;y<=30;y++) get("years").append(new Option(y+"년","y"+y));
   let controller, lastAccess, history;
   let rules=new Map();
   const annual=()=>period.value.startsWith("y");
   function selectRules(preferred){
+    const previousExit=exits.value;
     const active=readStrategy(symbolInput.value);
     rules=new Map(Object.entries(active?.variants || {}).filter(([,r])=>Array.isArray(r?.conditions)));
     const key=active?.preset || "custom";
@@ -198,9 +199,23 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
     }
     strategies.append(group);
     strategies.value=rules.has(preferred)?preferred:active?key:templates[0][0];
-    strategies.disabled=rules.size<2;
+    exits.replaceChildren(...[...strategies.options].filter(option=>rules.get(option.value)?.side==="sell")
+      .map(option=>new Option(option.textContent,option.value)));
+    exits.value=[...exits.options].some(option=>option.value===previousExit)?previousExit:"builtin-rsi-high";
+    filterEntryOptions();
+  }
+  function filterEntryOptions(){
+    get("exit-label").hidden=!annual();
+    get("entry-label").textContent=annual()?"매수 조건":"전략";
+    for(const option of strategies.options){
+      option.disabled=annual() && rules.get(option.value)?.side!=="buy";
+      option.hidden=option.disabled;
+    }
+    if(strategies.selectedOptions[0]?.disabled)strategies.value="builtin-rsi";
+
   }
   function changed(){
+    filterEntryOptions();
     controller?.abort();controller=null;result.hidden=true;windows.hidden=true;all.hidden=true;
     login.hidden=canLoadChart();
     get("infer").hidden=!canLoadChart() || !symbolInput.value;
@@ -229,6 +244,11 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
       if(annual()){
         if(!runAll && !saved)throw Error("Strategies에서 이 종목의 전략을 먼저 저장하세요.");
         if(!runAll && issue)throw Error(issue);
+        const exit=rules.get(exits.value);
+        if(exit?.side!=="sell")throw Error("매도 조건을 선택하세요.");
+        const exitIssue=replayIssue(exit);
+        if(exitIssue)throw Error(exitIssue);
+        const pair=entry=>({entry,exit,nickname:entry.nickname+" → "+exit.nickname});
         const years=Number(period.value.slice(1));
         const key=[symbol,canRead,nyDay.format(new Date()),new Date().getUTCHours()].join("/");
         if(history?.key!==key){
@@ -239,10 +259,10 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
         const {bars,source,partial}=history;
         if(!bars.length)throw Error("조회할 수 있는 완료 일봉이 없습니다.");
         if (runAll) {
-          const entries=[...rules.values()];
+          const entries=[...rules.values()].filter(rule=>rule.side==="buy");
           const seed=Math.floor(Math.random()*2**32);
           get("all-title").textContent=symbol+" · "+years+"년 전체 전략 백테스트";
-          get("all-source").textContent=source+" · 월별 / 무작위 구간 중앙 수익률";
+          get("all-source").textContent=source+" · 공통 매도 "+exit.nickname+" · 월별 / 무작위 중앙 수익률";
           const list=get("all-list");
           list.replaceChildren();
           all.hidden=false;
@@ -258,11 +278,11 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
             try {
               const limitation=replayIssue(strategy);
               if (limitation) throw Error(limitation);
-              const groups=await calculateWindows(bars,years,strategy,signal,()=>{},seed);
+              const groups=await calculateWindows(bars,years,pair(strategy),signal,()=>{},seed);
               signal.throwIfAborted();
-              summary.textContent=[groups.rolling,groups.random].map(group=>{
+              summary.textContent=[["월별",groups.rolling],["무작위",groups.random]].map(([label,group])=>{
                 const rows=group.filter(Boolean);
-                return rows.length ? percent(medianProfit(rows))+" ("+rows.length+"/"+windowsPerGroup+"구간 · 체결 "+rows.filter(r=>r.filled).length+")" : "계산 가능 구간 없음";
+                return label+" "+(rows.length ? percent(medianProfit(rows))+" ("+rows.length+"/"+windowsPerGroup+"구간 · 청산 "+rows.filter(r=>r.closed>0).length+")" : "계산 가능 구간 없음");
               }).join(" / ");
             } catch(error) {
               signal.throwIfAborted();
@@ -273,9 +293,10 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
           return;
         }
         status.textContent="백테스트 구간을 구성하는 중…";
-        const groups=await calculateWindows(bars,years,saved,signal,n=>{status.textContent="구간 "+n+" 계산 중…";});
+        const paired=pair(saved);
+        const groups=await calculateWindows(bars,years,paired,signal,n=>{status.textContent="구간 "+n+" 계산 중…";});
         signal.throwIfAborted();
-        renderWindows(groups,years,rule,symbol,bars,source);
+        renderWindows(groups,years,paired,symbol,bars,source);
         windows.hidden=false;
         const completed=groups.rolling.filter(Boolean).length+groups.random.length;
         status.textContent=[completed+"/"+(2*windowsPerGroup)+"구간 계산 완료",completed<2*windowsPerGroup?"완전한 검증 기간과 지표 준비 이력이 있는 구간만 계산했습니다.":"",
@@ -387,7 +408,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
   get("run-all").addEventListener("click",()=>review(true));
   get("form")?.addEventListener("submit",e=>{e.preventDefault();review();});
   symbolInput.addEventListener("change",()=>{selectRules(null);changed();});
-  for (const control of [period,strategies])control.addEventListener("change",changed);
+  for (const control of [period,strategies,exits])control.addEventListener("change",changed);
   login.addEventListener("click",()=>onSignIn());
   return {open,refreshRules(){selectRules(strategies.value);}};
 }
@@ -395,7 +416,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
 function calculateWindows(bars,years,rule,signal,progress,seed){
   return new Promise((resolve,reject)=>{
     signal.throwIfAborted();
-    const worker=new Worker(new URL("./lab-backtest-worker.js?v=150",import.meta.url),{type:"module"});
+    const worker=new Worker(new URL("./lab-backtest-worker.js?v=152",import.meta.url),{type:"module"});
     const finish=()=>{worker.terminate();signal.removeEventListener("abort",abort);};
     const abort=()=>{finish();reject(signal.reason);};
     signal.addEventListener("abort",abort,{once:true});
@@ -419,13 +440,8 @@ function medianProfit(rows) {
 function renderWindows(groups,years,rule,symbol,bars,source){
   get("window-title").textContent=(rule.nickname || "저장 전략")+" · "+years+"년 백테스트";
   get("window-source").textContent=symbol+" · "+source+" · "+dateKey(bars[0][0]*1000)+" – "+dateKey(bars.at(-1)[0]*1000);
-  const budget=Number(rule.allocation?.amount)||10000;
-  const order=Number(rule.price)>0 ? "$"+rule.price+" 당일 지정가" : "시가 모의 체결";
-  const qty=rule.allocation?"첫 회차 예산":Number(rule.quantity)>0?rule.quantity+"주":"가용 전량";
-  get("model").textContent="각 구간에서 $"+budget.toLocaleString()+"로 독립 시작 · "+(rule.side==="buy"?"현금 시작":"첫날 시가에 보유 가능한 정수 주식으로 시작")+
-    ". 첫 신호에 한 번 주문합니다 ("+qty+", "+order+"). "+
-    (rule.preset==="firstTouch"?"일봉에서 터치 후보가 나온 다음 거래일에 주문합니다. ":"직전 완료 봉의 신호로 해당 거래일에 주문합니다. ")+
-    "수익률과 최대낙폭은 종가 평가 기준이며 수수료·슬리피지·배당 현금흐름은 별도 반영하지 않습니다.";
+  const budget=Number(rule.entry.allocation?.amount)||10000;
+  get("model").textContent="각 구간에서 현금 $"+budget.toLocaleString()+"로 시작합니다. 매수 후 매도 조건을 확인하고, 전량 매도 후 다시 진입할 수 있습니다. 마지막 날 남은 주식은 종가로 평가합니다. 수수료·슬리피지·배당 현금흐름은 별도 반영하지 않습니다.";
   const root=get("window-groups");root.replaceChildren();
   for(const [key,title] of [["rolling","월별 슬라이딩"],["random","무작위 구간"]]){
     const rows=groups[key].filter(Boolean),section=document.createElement("section"),h=document.createElement("h3"),summary=document.createElement("p");
@@ -442,7 +458,7 @@ function renderWindows(groups,years,rule,symbol,bars,source){
       label.textContent=name+" · "+r.start+" ~ "+r.end;
       value.textContent=percent(r.profit);value.toggleAttribute("data-negative",r.profit<0);
       detail.textContent="최대낙폭 "+percent(r.drawdown)+" · 단순보유 "+percent(r.benchmark)+" · "+
-        (r.filled?r.filled+" "+r.qty+"주 체결":r.signalDay?"신호 발생 · 체결 없음":"신호 없음");
+        "매수 "+r.buys+"회 · 매도 "+r.sells+"회 · 전량 청산 "+r.closed+"회"+(r.openShares?" · 잔여 "+r.openShares+"주":"");
       item.append(label,value,detail);section.append(item);
     }
     root.append(section);

@@ -135,15 +135,58 @@ export function simulateWindow(bars,w,rule,signal) {
     benchmark:bars[w.last][4]/opening-1,signalDay,filled,qty};
 }
 
+export function simulatePairedWindow(bars, w, entry, exit, entrySignal, exitSignal) {
+  const capital = Number(entry.allocation?.amount) || 10000;
+  const opening = bars[w.first][1];
+  let cash = capital, shares = 0, peak = capital, drawdown = 0;
+  let buys = 0, sells = 0, closed = 0, firstBuy = null;
+  for (let i = w.first; i <= w.last; i++) {
+    const rule = shares === 0 ? entry : exit;
+    const buying = shares === 0;
+    const trigger = rule.preset === "firstTouch" ? i - 1 : i;
+    const signal = buying ? entrySignal : exitSignal;
+    const [, open, high, low, close] = bars[i];
+    const limit = Number(rule.price) || 0;
+    if (trigger >= w.first && signal(trigger) && (!limit || (buying ? low <= limit : high >= limit))) {
+      const price = limit ? (buying ? Math.min(open,limit) : Math.max(open,limit)) : open;
+      if (buying) {
+        const affordable = Math.floor(cash/price);
+        const planned = rule.allocation
+          ? firstBuyQuantity(rule.allocation,limit ? rule.price : (Math.ceil(price*10000)/10000).toFixed(4))
+          : Number(rule.quantity) || affordable;
+        shares = Math.min(affordable,planned);
+        if (shares > 0) {
+          cash -= shares*price;
+          buys++;
+          firstBuy ??= i;
+        }
+      } else {
+        const quantity = Math.min(shares,Number(rule.quantity) || shares);
+        shares -= quantity;
+        cash += quantity*price;
+        sells++;
+        if (shares === 0) closed++;
+      }
+    }
+    const equity = cash + shares*close;
+    peak = Math.max(peak,equity);
+    drawdown = Math.min(drawdown,equity/peak-1);
+  }
+  return {...w,profit:(cash+shares*bars[w.last][4])/capital-1,drawdown,
+    benchmark:bars[w.last][4]/opening-1,filled:firstBuy,buys,sells,closed,openShares:shares};
+}
+
 export function runWindows(bars,years,rule,progress=()=>{},random=Math.random) {
   const days=bars.map(b=>iso(new Date(b[0]*1000)));
-  const {signal,ready}=strategyHistory(bars,rule);
-  const groups=planWindows(days,years,ready,random);
+  const entry=rule.entry || rule;
+  const {signal,ready}=strategyHistory(bars,entry);
+  const exit=rule.exit && strategyHistory(bars,rule.exit);
+  const groups=planWindows(days,years,Math.max(ready,exit?.ready ?? 0),random);
   let n=0;
   function evaluate(w){
     if(!w)return null;
     progress(++n);
-    const r=simulateWindow(bars,w,rule,signal);
+    const r=exit ? simulatePairedWindow(bars,w,entry,rule.exit,signal,exit.signal) : simulateWindow(bars,w,rule,signal);
     return {...r,signalDay:days[r.signalDay] || null,filled:days[r.filled] || null};
   }
   return {rolling:groups.rolling.map(evaluate),random:groups.random.map(evaluate)};
