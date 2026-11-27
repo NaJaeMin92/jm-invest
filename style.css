@@ -819,7 +819,7 @@ body.instrument-open { overflow:hidden; }
 }
 .order-notice { margin:0; padding:8px 22px 12px; background:var(--inset); color:var(--secondary); font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
 .order-notice:empty { display:none; }
-#trade-preview:has(#trade-preview-review:not([hidden])) { height:auto; max-height:calc(100dvh - 24px); grid-template-rows:auto auto minmax(0,auto) auto; }
+
 #trade-preview-review,#pending-action { min-height:0; overflow-y:auto; padding:4px 24px 22px; }
 #trade-review-title,#pending-action-title { margin:3px 0 13px; font-size:21px; letter-spacing:-.04em; line-height:1.4; }
 .order-facts { display:grid; grid-template-columns:auto 1fr; gap:12px; margin:0; padding:16px; border:0; border-radius:14px; background:var(--inner); }
@@ -1323,3 +1323,15 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
     max-height:calc(100dvh - var(--nav-space) - max(12px,env(safe-area-inset-top)) - 8px);
   }
 }
+
+#trade-preview[open]:has(#trade-preview-review:not([hidden])) {
+  inset:max(12px,env(safe-area-inset-top)) 0 calc(var(--nav-space) + 12px);
+  margin:auto; width:min(360px,calc(100% - 32px)); height:fit-content;
+  max-height:calc(100dvh - var(--nav-space) - max(12px,env(safe-area-inset-top)) - 12px);
+  grid-template-rows:auto minmax(0,1fr) auto; border:1px solid var(--separator); border-radius:22px; padding:0;
+}
+#trade-preview:has(#trade-preview-review:not([hidden])) :is(.ticket-instrument,#trade-pending) { display:none; }
+#trade-preview:has(#trade-preview-review:not([hidden])) .order-sheet-head { padding:6px 12px 0 18px; }
+#trade-preview-review { padding:0 18px 16px; }
+#trade-preview-review .order-facts { gap:8px 12px; padding:12px; }
+#trade-preview-review .trade-review-actions { margin-top:12px; }

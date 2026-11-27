@@ -467,7 +467,7 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     }
     if (version !== tradeVersion || !trade.open) return;
     reviewId = order.id ?? null;
-    get("trade-review-title").textContent = "주문 확인";
+    get("trade-review-title").textContent = current + " " + sideName[order.side] + " 확인";
     tradeConfirm.textContent = onPhonePages ? "JM Invest에서 계속" : sideName[order.side] + " 주문하기";
     get("trade-review-side").textContent = {buy:"Buy", sell:"Sell"}[order.side];
     get("trade-review-kind").textContent = orderKinds.get(order.kind);
