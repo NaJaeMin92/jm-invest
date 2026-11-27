@@ -81,6 +81,7 @@ function selectView(view) {
   }[view];
   document.querySelector("#page-heading").lang = view === "account" ? "ko" : "en";
 
+  if(view==="account") refreshValuation();
   if(view==="calendar") calendar.refresh();
   if(view==="lab") {renderStrategies();lab.open();}
   window.scrollTo(0, 0);
@@ -417,10 +418,23 @@ function showHoldings(balance) {
     symbol.textContent = holding.symbol || holding.name || "—";
     company.textContent = holding.name !== symbol.textContent ? holding.name || "" : "";
     identity.append(symbol,company);
+    const ticker = watchSymbolKey(typeof holding.symbol==="string" ? holding.symbol : "");
+    if (/^[A-Z][A-Z0-9.-]{0,11}$/.test(ticker)) {
+      const link = document.createElement("a");
+      link.className = "position-identity";
+      link.href = "#stock=" + encodeURIComponent(ticker);
+      link.append(symbol,company);
+      link.addEventListener("click",event=>{
+        if(event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        instrument.open(ticker);
+      });
+      head.append(link);
+    } else head.append(identity);
     const profit = document.createElement("span"), rate = document.createElement("strong");
     rate.className = "position-rate";
     showPerformance(rate,holding.return_pct,signedWatchPercent);
-    head.append(identity,profit,rate);
+    head.append(profit,rate);
 
     const metrics = document.createElement("dl");
     metrics.className = "holding-values";
@@ -1187,13 +1201,31 @@ watchForm.addEventListener("submit", async (event) => {
 renderWatchlist();
 loadDirectory().catch(() => {});
 
+let valuationRefresh;
+function refreshValuation() {
+  if (!token || valuationRefresh) return;
+  const request = loadValuation(token);
+  valuationRefresh = request;
+  valuationSnapshot = request;
+  request.finally(()=>{ if(valuationRefresh===request) valuationRefresh=null; });
+}
+setInterval(()=>{
+  if (!document.hidden && document.body.dataset.view==="account") refreshValuation();
+},30000);
+document.addEventListener("visibilitychange",()=>{
+  if (!document.hidden && document.body.dataset.view==="account") refreshValuation();
+});
+
 async function loadValuation(accessToken) {
   const value = document.querySelector("#portfolio-value");
   const metrics = document.getElementById("asset-metrics");
-  metrics.hidden = true;
-  delete value.dataset.loaded;
-  value.textContent = "조회 중…";
-  showHoldings(null);
+  if (!value.hasAttribute("data-loaded")) {
+    metrics.hidden = true;
+    value.textContent = "조회 중…";
+    showHoldings(null);
+  }
+  const prior = valuationSnapshot;
+  const stamp = document.getElementById("asset-updated");
   try {
     const [balance] = await request("/rest/v1/kiwoom_valuation?select=*&limit=1", { accessToken });
     if (token !== accessToken) return;
@@ -1211,6 +1243,9 @@ async function loadValuation(accessToken) {
       value.textContent = "잔고 동기화 대기";
       return;
     }
+    const previous = await prior;
+    if (token !== accessToken) return;
+    if (previous && balance.observed_at && previous.observed_at===balance.observed_at) return previous;
     const stocks = Number(balance.value_krw);
     const hasCash = balance.cash_domestic_krw != null && balance.cash_foreign_krw != null;
     const cash = hasCash ? Number(balance.cash_domestic_krw) + Number(balance.cash_foreign_krw) : 0;
@@ -1220,6 +1255,10 @@ async function loadValuation(accessToken) {
     const total = rp == null ? stocks + cash : Number(estimate);
     if(!numeric(balance.value_krw) || !Number.isFinite(total))throw new Error("Invalid valuation");
     value.dataset.loaded="true";
+    const updated = Date.parse(balance.observed_at);
+    stamp.textContent = Number.isFinite(updated) ? "잔고 기준 "+new Intl.DateTimeFormat("ko-KR", {
+      timeZone:"Asia/Seoul",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",hourCycle:"h23"
+    }).format(updated)+" KST" : "";
     value.replaceChildren(...holdingKRW.formatToParts(total).map(part=>{
       if(part.type!=="currency")return part.value;
       const currency=document.createElement("small");
@@ -1233,7 +1272,9 @@ async function loadValuation(accessToken) {
     showProfit(balance.realized_profit);
     return balance;
   } catch (error) {
-    if (token === accessToken) value.textContent = error.code === "PGRST205" ? "잔고 설정 대기" : "잔고를 불러오지 못했습니다";
+    if (token === accessToken && !value.hasAttribute("data-loaded"))
+      value.textContent = error.code === "PGRST205" ? "잔고 설정 대기" : "잔고를 불러오지 못했습니다";
+    return prior;
   }
 }
 
@@ -1261,7 +1302,7 @@ async function openWorkspace(session, remember) {
     selectView(document.body.dataset.view || "home");
     instrument.refresh();
   }
-  valuationSnapshot = loadValuation(token);
+  refreshValuation();
   message.textContent = remember && !stored ? "This browser could not save your session." : "";
 }
 

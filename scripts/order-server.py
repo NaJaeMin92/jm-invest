@@ -489,7 +489,7 @@ class Kiwoom:
                     if "조회내역이 없습니다" in str(result.get("return_msg", "")).replace("조회 내역", "조회내역"):
                         return
                     raise Problem(502, "키움 체결 내역을 조회하지 못했습니다.")
-                yield from result.get("result_list") or []
+                yield from result.get("result_list") or result.get("result_lsit") or []
                 if page.get("cont-yn") != "Y":
                     return
                 key = page.get("next-key")
