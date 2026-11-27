@@ -900,7 +900,6 @@ body.instrument-open { overflow:hidden; }
 .holdings-heading h3 { margin:0; letter-spacing:-.035em; }
 .holding-controls { display:flex; align-items:center; gap:6px; }
 .holdings-heading:has(#open-kiwoom[aria-expanded="false"]) .holding-controls { display:none }
-#holding-currency { min-height:44px; padding:0 2px; background:transparent; color:#d3e0ec; border:0; font:550 13px system-ui; }
 @media(max-width:360px) { .holdings-heading { flex-wrap:wrap; gap:0 4px } .holding-controls { margin-left:auto; gap:3px } }
 @media (min-width:1000px) {
   .trade-page { --workspace-left:max(32px,calc((100vw - 940px) / 2)); }
@@ -1407,9 +1406,6 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 #asset-updated:empty { display:none; }
 a.position-identity { color:inherit; text-decoration:none; }
 
-#holding-currency { display:inline-flex; align-items:center; gap:2px; padding:2px; border-radius:10px; background:#182431; }
-#holding-currency button { min-height:40px; padding:0 9px; border:0; background:transparent; color:#b4c3d1; font:600 12px system-ui; }
-#holding-currency button[aria-pressed=true] { background:#314250; color:#eff6fc; border-radius:8px; }
 .position-pair { display:grid; gap:2px; min-width:0; overflow-wrap:anywhere; line-height:1.2; }
 #holding-columns .position-pair { display:block; }
 .position-pair > span:first-child { color:var(--muted); }
@@ -1421,3 +1417,28 @@ a.position-identity { color:inherit; text-decoration:none; }
   .position-identity strong { font-size:14px; }
   .position-identity small { font-size:10px; }
 }
+
+#account-home .asset-overview {
+  margin:10px 0 16px; padding:16px;
+  border:1px solid #9cb7cf28; border-radius:20px;
+  background:linear-gradient(145deg,#202d38,#16212f 75%);
+  gap:6px;
+}
+#account-home .asset-overview .portfolio-value[data-loaded] {
+  font-size:clamp(26px,7vw,36px); line-height:1.12;
+}
+#asset-metrics { gap:3px; padding-top:8px; border-top:1px solid #9ab4cf26; margin-top:6px; }
+#asset-metrics p { display:flex; justify-content:space-between; align-items:baseline; gap:7px; }
+#asset-metrics strong { text-align:right; }
+#asset-updated { color:#a3b5c6; }
+#holding-currency {
+  display:inline-flex; align-items:center; gap:6px; justify-content:center; min-width:61px;
+  min-height:44px; padding:0 8px; border:1px solid #9cb7cf30; border-radius:12px;
+  background:#1e2b39; color:#eaf2fa; font:600 12px system-ui; white-space:nowrap;
+}
+#holding-currency [aria-hidden=true]:last-child { color:#a9c9c3; }
+#holding-currency[aria-pressed=true] { border-color:#8ad5bd65; background:#203832; }
+#account-holdings { padding:0 6px; border:1px solid #8daac323; border-radius:16px; background:#17212d; }
+#holding-columns { padding-top:10px; }
+#holdings-list > li:last-child { border-bottom:0; }
+#holdings-list summary { min-height:59px; }

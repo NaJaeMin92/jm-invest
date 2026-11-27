@@ -327,16 +327,18 @@ const currencyKey = "jm-invest:holdings-currency:v1";
 let selectedHoldingCurrency = "KRW";
 try { if (localStorage.getItem(currencyKey) === "USD") selectedHoldingCurrency = "USD"; } catch {}
 const moneyRenderers = [];
-for (const button of holdingCurrency.querySelectorAll("button")) {
-  button.setAttribute("aria-pressed",String(button.dataset.currency===selectedHoldingCurrency));
-  button.onclick=()=>{
-    selectedHoldingCurrency=button.dataset.currency;
-    try { localStorage.setItem(currencyKey,selectedHoldingCurrency); } catch {}
-    for (const option of holdingCurrency.querySelectorAll("button"))
-      option.setAttribute("aria-pressed",String(option===button));
-    for (const render of moneyRenderers) render();
-  };
+function renderHoldingCurrency() {
+  const isDollar = selectedHoldingCurrency === "USD";
+  holdingCurrency.setAttribute("aria-pressed", String(isDollar));
+  document.getElementById("holding-currency-label").textContent = isDollar ? "달러" : "원화";
 }
+renderHoldingCurrency();
+holdingCurrency.onclick = () => {
+  selectedHoldingCurrency = selectedHoldingCurrency === "USD" ? "KRW" : "USD";
+  try { localStorage.setItem(currencyKey, selectedHoldingCurrency); } catch {}
+  renderHoldingCurrency();
+  for (const render of moneyRenderers) render();
+};
 
 function holdingMoney(holding, currency) {
   const usd = currency === "USD";
