@@ -556,9 +556,8 @@ const watchEditor = setupWatchEditor({watchKey, nameFor, tickerIcon, refresh() {
   refreshWatchlistQuotes();
   if(document.body.dataset.view==="calendar") calendar.refresh();
 }});
-document.getElementById("home-search").onclick = () => {
-  watchEditor.open(true);
-};
+function openWatchSearch() { watchEditor.open(true); }
+document.getElementById("home-search").onclick = openWatchSearch;
 const readWatchlist = watchEditor.readList;
 const kiwoomTicks = new Map();
 const lastKiwoomPrices = new Map();
@@ -860,7 +859,7 @@ const instrument = setupInstrument({
   },
   search() {
     selectView("home");
-    watchEditor.open(true);
+    openWatchSearch();
   },
   nameFor,
   readList: readWatchlist,

@@ -18,8 +18,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://mfycpprqyaidoixytdim.supabase.co" crossorigin>
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=132">
-<script type="module" src="./journal.js?v=133"></script>
+<link rel="stylesheet" href="./style.css?v=134">
+<script type="module" src="./journal.js?v=134"></script>
 </head>
 <body class="trade-page" data-view="home">
 <main id="account">
@@ -246,7 +246,7 @@
 <div class="instrument">
 <div class="instrument-head">
 <button id="stock-back" aria-label="Back to watchlist"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button>
-<div><h2 id="stock-symbol"></h2><small id="stock-name"></small></div>
+<div><h2 id="stock-symbol" tabindex="-1" autofocus></h2><small id="stock-name"></small></div>
 <button id="stock-search" aria-label="Search symbols"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="8"/><path d="m16 16 6 6"/></svg></button>
 <button id="stock-star" aria-label="Save to watchlist" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4z"/></svg></button>
 </div>
@@ -257,17 +257,6 @@
 <button type="button" id="chart-tab" data-panel="chart" aria-current="page" aria-controls="chart-panel">Chart</button><button type="button" data-panel="sigma" aria-controls="sigma-panel">Sigma</button><button type="button" data-panel="strategies" aria-controls="stock-strategy-panel">Strategies</button>
 </nav>
 <section id="chart-panel">
-<div class="frame-bar"><div id="stock-frames" aria-label="Chart interval">
-<select id="stock-intraday" aria-label="Intraday interval"><option value="" disabled>Intra</option><option value="minute">1 min</option><option value="five">5 min</option><option value="hour">1 hour</option></select><button data-frame="day" aria-pressed="true">Daily</button><button data-frame="week">Weekly</button><button data-frame="month" aria-label="Monthly">Month</button><button data-frame="quarter" aria-label="Quarterly">Qtr</button>
-</div><button type="button" id="chart-type" aria-label="Chart type" aria-haspopup="dialog">
-<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2v20m12-20v20" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="6" width="6" height="8" rx="1.5" fill="currentColor"/><rect x="15" y="10" width="6" height="8" rx="1.5" fill="currentColor"/></svg></button>
-<button type="button" id="chart-tools" aria-label="Chart Toolbox" aria-haspopup="dialog">
-<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
-<details id="trend-menu" hidden>
-<summary aria-label="분석선" title="분석선"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M3 7h6m4 0h8M3 17h10m4 0h4"/><circle cx="11" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></svg></summary>
-<div id="trend-controls" role="group" aria-label="차트 분석선 표시"></div></details>
-<button id="stock-expand" aria-pressed="false" aria-label="Expand chart">⛶</button></div>
-<label id="chart-session-picker" hidden>Trading date (ET)<input type="date" id="chart-session-date"></label>
 <div id="chart-area"><div id="drawing-actions" hidden aria-label="Selected drawing">
 <button id="drawing-move" type="button" aria-label="Move drawing" title="Move drawing" aria-pressed="false">✥</button>
 <button id="drawing-color" type="button" aria-label="Drawing color" title="Drawing color" aria-expanded="false">●</button>
@@ -289,6 +278,17 @@
 <div id="execution-flags" role="group" aria-label="내 체결 내역"></div>
 <div id="external-chart" hidden></div><p id="chart-status" role="status" hidden></p></div>
 
+<div class="frame-bar"><div id="stock-frames" aria-label="Chart interval">
+<select id="stock-intraday" aria-label="Intraday interval"><option value="" disabled>Intra</option><option value="minute">1 min</option><option value="five">5 min</option><option value="hour">1 hour</option></select><button data-frame="day" aria-pressed="true">Daily</button><button data-frame="week">Weekly</button><button data-frame="month" aria-label="Monthly">Month</button><button data-frame="quarter" aria-label="Quarterly">Qtr</button>
+</div><button type="button" id="chart-type" aria-label="Chart type" aria-haspopup="dialog">
+<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2v20m12-20v20" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="6" width="6" height="8" rx="1.5" fill="currentColor"/><rect x="15" y="10" width="6" height="8" rx="1.5" fill="currentColor"/></svg></button>
+<button type="button" id="chart-tools" aria-label="Chart Toolbox" aria-haspopup="dialog">
+<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
+<details id="trend-menu" hidden>
+<summary aria-label="분석선" title="분석선"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M3 7h6m4 0h8M3 17h10m4 0h4"/><circle cx="11" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></svg></summary>
+<div id="trend-controls" role="group" aria-label="차트 분석선 표시"></div></details>
+<button id="stock-expand" aria-pressed="false" aria-label="Expand chart">⛶</button></div>
+<label id="chart-session-picker" hidden>Trading date (ET)<input type="date" id="chart-session-date"></label>
 <dialog id="execution-detail" class="order-sheet" aria-labelledby="execution-title" lang="ko">
 <header class="order-sheet-head"><h3 id="execution-title"></h3><button type="button" class="sheet-icon" id="execution-close" aria-label="체결 내역 닫기">×</button></header>
 <ul id="execution-list"></ul>

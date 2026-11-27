@@ -1389,3 +1389,16 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
     padding-top:calc(max(44px,env(safe-area-inset-top)) + 16px);
   }
 }
+
+#stock-back { flex-basis:36px; width:36px; min-width:36px; border-radius:10px; }
+#stock-back svg { width:18px; height:18px; }
+#stock-back:focus-visible { outline-offset:-4px; }
+#stock-symbol:focus { outline:none; }
+#stock-detail .instrument { padding-top:calc(env(safe-area-inset-top) + 8px); }
+.frame-bar #trend-controls { top:auto; bottom:100%; }
+@media (display-mode:standalone) and (max-width:540px) {
+  #stock-detail .instrument { padding-top:calc(max(44px,env(safe-area-inset-top)) + 8px); }
+  #stock-detail:not(.expanded) #market-chart.with-rsi {
+    max-height:calc(100dvh - var(--nav-space) - max(44px,env(safe-area-inset-top)) - 266px);
+  }
+}
