@@ -1007,7 +1007,7 @@ class App(BaseHTTPRequestHandler):
         self.send_response(204)
         self.quote_headers()
         self.send_header("Access-Control-Allow-Methods", method)
-        self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type, ngrok-skip-browser-warning")
         self.end_headers()
 
     def quote_headers(self):

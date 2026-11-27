@@ -843,13 +843,18 @@ document.addEventListener("visibilitychange", refreshWatchlistQuotes);
 window.addEventListener("online", refreshWatchlistQuotes);
 
 const orders = setupOrders(() => token, kiwoomEndpoint);
+function quoteReadHeaders(endpoint) {
+  const headers = {Authorization:"Bearer " + token};
+  if (endpoint.origin !== location.origin) headers["ngrok-skip-browser-warning"] = "1";
+  return headers;
+}
 async function loadChart(symbol, frame, before, signal, day) {
   if (!token || !kiwoomEndpoint) return null;
   const endpoint = new URL("instrument", new URL(kiwoomEndpoint, location.href));
   endpoint.search = new URLSearchParams({symbol, frame});
   if (before) endpoint.searchParams.set("before", before);
   if (day) endpoint.searchParams.set("date", day.replaceAll("-",""));
-  const response = await fetch(endpoint, {headers: {Authorization: "Bearer " + token}, cache: "no-store", signal});
+  const response = await fetch(endpoint, {headers: quoteReadHeaders(endpoint), cache: "no-store", signal});
   const payload = await response.json();
   if (!response.ok) throw new Error(payload.message || "Kiwoom chart unavailable.");
   return payload;
@@ -857,7 +862,7 @@ async function loadChart(symbol, frame, before, signal, day) {
 async function loadExecutions(symbol, from, to, signal) {
     const endpoint = new URL("executions", new URL(kiwoomEndpoint, location.href));
     endpoint.search = new URLSearchParams({symbol,from:from.replaceAll("-",""),to:to.replaceAll("-","")});
-    const response = await fetch(endpoint,{headers:{Authorization:"Bearer "+token},cache:"no-store",signal});
+    const response = await fetch(endpoint,{headers:quoteReadHeaders(endpoint),cache:"no-store",signal});
     if (!response.ok) throw new Error("체결 내역을 불러오지 못했습니다.");
     return (await response.json()).executions;
 }
