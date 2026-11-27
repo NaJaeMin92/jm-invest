@@ -135,10 +135,10 @@ export function simulateWindow(bars,w,rule,signal) {
     benchmark:bars[w.last][4]/opening-1,signalDay,filled,qty};
 }
 
-export function runWindows(bars,years,rule,progress=()=>{}) {
+export function runWindows(bars,years,rule,progress=()=>{},random=Math.random) {
   const days=bars.map(b=>iso(new Date(b[0]*1000)));
   const {signal,ready}=strategyHistory(bars,rule);
-  const groups=planWindows(days,years,ready);
+  const groups=planWindows(days,years,ready,random);
   let n=0;
   function evaluate(w){
     if(!w)return null;

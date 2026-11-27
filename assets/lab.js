@@ -172,7 +172,7 @@ function appendEvents(container, events) {
 
 export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, readStrategy, onSignIn}) {
   const symbolInput=get("symbol"), period=get("period"), status=get("status"), result=get("results"), login=get("login");
-  const strategies=get("strategy"), windows=get("windows");
+  const strategies=get("strategy"), windows=get("windows"), all=get("all-results");
   for(let y=1;y<=30;y++) get("years").append(new Option(y+"년","y"+y));
   let controller, lastAccess, history;
   let rules=new Map();
@@ -201,22 +201,23 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
     strategies.disabled=rules.size<2;
   }
   function changed(){
-    controller?.abort();controller=null;result.hidden=true;windows.hidden=true;
+    controller?.abort();controller=null;result.hidden=true;windows.hidden=true;all.hidden=true;
     login.hidden=canLoadChart();
     get("infer").hidden=!canLoadChart() || !symbolInput.value;
     const sample=rules.get(strategies.value)?.sample;
     get("inference").textContent=sample ? `학습 구간 신호 ${sample.train}일 중 ${sample.trainHits}일 일치 · 검증 구간 신호 ${sample.test}일 중 ${sample.testHits}일 일치` : "";
+    get("run-all").hidden=!annual();
     get("run").textContent=annual()?"백테스트 실행":"전략 검증";
     if(!annual())return review();
     status.textContent=rules.size ? `최근 일봉 기준 월별 ${windowsPerGroup}구간과 무작위 ${windowsPerGroup}구간을 비교합니다.` : "Strategies에서 이 종목의 전략을 먼저 저장하세요.";
   }
 
-  async function review() {
+  async function review(runAll = false) {
     controller?.abort();
     const task = new AbortController(), {signal}=task;
     controller=task;
     const symbol=symbolInput.value;
-    result.hidden=true;windows.hidden=true;
+    result.hidden=true;windows.hidden=true;all.hidden=true;
     if (!symbol) {status.textContent="관심종목에 종목을 추가하세요.";return;}
     const count=Number(period.value);
     const canRead=canLoadChart(), saved=rules.get(strategies.value);
@@ -226,8 +227,8 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
     status.textContent="일봉을 불러오는 중…";
     try {
       if(annual()){
-        if(!saved)throw Error("Strategies에서 이 종목의 전략을 먼저 저장하세요.");
-        if(issue)throw Error(issue);
+        if(!runAll && !saved)throw Error("Strategies에서 이 종목의 전략을 먼저 저장하세요.");
+        if(!runAll && issue)throw Error(issue);
         const years=Number(period.value.slice(1));
         const key=[symbol,canRead,nyDay.format(new Date()),new Date().getUTCHours()].join("/");
         if(history?.key!==key){
@@ -237,6 +238,40 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
         }
         const {bars,source,partial}=history;
         if(!bars.length)throw Error("조회할 수 있는 완료 일봉이 없습니다.");
+        if (runAll) {
+          const entries=[...rules.values()];
+          const seed=Math.floor(Math.random()*2**32);
+          get("all-title").textContent=symbol+" · "+years+"년 전체 전략 백테스트";
+          get("all-source").textContent=source+" · 월별 / 무작위 구간 중앙 수익률";
+          const list=get("all-list");
+          list.replaceChildren();
+          all.hidden=false;
+          for (const [index,strategy] of entries.entries()) {
+            signal.throwIfAborted();
+            const name=strategy.nickname || "저장 전략";
+            const row=document.createElement("li");
+            const title=document.createElement("strong"), summary=document.createElement("small");
+            title.textContent=name;
+            row.append(title,summary);
+            list.append(row);
+            status.textContent=(index+1)+"/"+entries.length+" · "+name+" 계산 중…";
+            try {
+              const limitation=replayIssue(strategy);
+              if (limitation) throw Error(limitation);
+              const groups=await calculateWindows(bars,years,strategy,signal,()=>{},seed);
+              signal.throwIfAborted();
+              summary.textContent=[groups.rolling,groups.random].map(group=>{
+                const rows=group.filter(Boolean);
+                return rows.length ? percent(medianProfit(rows))+" ("+rows.length+"/"+windowsPerGroup+"구간 · 체결 "+rows.filter(r=>r.filled).length+")" : "계산 가능 구간 없음";
+              }).join(" / ");
+            } catch(error) {
+              signal.throwIfAborted();
+              summary.textContent=error.message;
+            }
+          }
+          status.textContent=entries.length+"개 전략 비교 완료"+(partial?" · 시세 일부만 조회됨":"");
+          return;
+        }
         status.textContent="백테스트 구간을 구성하는 중…";
         const groups=await calculateWindows(bars,years,saved,signal,n=>{status.textContent="구간 "+n+" 계산 중…";});
         signal.throwIfAborted();
@@ -349,17 +384,18 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
     return changed();
   }
   get("run").addEventListener("click",e=>{e.preventDefault();review();});
+  get("run-all").addEventListener("click",()=>review(true));
   get("form")?.addEventListener("submit",e=>{e.preventDefault();review();});
   symbolInput.addEventListener("change",()=>{selectRules(null);changed();});
   for (const control of [period,strategies])control.addEventListener("change",changed);
   login.addEventListener("click",()=>onSignIn());
-  return {open,refreshRules(){selectRules(strategies.value);},close(){controller?.abort();controller=null; windows.hidden=true; result.hidden=true; get("events").replaceChildren();}};
+  return {open,refreshRules(){selectRules(strategies.value);},close(){controller?.abort();controller=null; windows.hidden=true; result.hidden=true; all.hidden=true; get("events").replaceChildren();}};
 }
 
-function calculateWindows(bars,years,rule,signal,progress){
+function calculateWindows(bars,years,rule,signal,progress,seed){
   return new Promise((resolve,reject)=>{
     signal.throwIfAborted();
-    const worker=new Worker(new URL("./lab-backtest-worker.js?v=146",import.meta.url),{type:"module"});
+    const worker=new Worker(new URL("./lab-backtest-worker.js?v=150",import.meta.url),{type:"module"});
     const finish=()=>{worker.terminate();signal.removeEventListener("abort",abort);};
     const abort=()=>{finish();reject(signal.reason);};
     signal.addEventListener("abort",abort,{once:true});
@@ -370,11 +406,16 @@ function calculateWindows(bars,years,rule,signal,progress){
     };
     worker.onerror=()=>{finish();reject(Error("백테스트 계산을 완료하지 못했습니다."));};
     const {variants,...selected}=rule;
-    worker.postMessage({bars,years,rule:selected});
+    worker.postMessage({bars,years,rule:selected,seed});
   });
 }
 
 const percent=value=>(value>0?"+":"")+(value*100).toFixed(2)+"%";
+function medianProfit(rows) {
+  const sorted=rows.map(row=>row.profit).sort((a,b)=>a-b);
+  const mid=sorted.length/2;
+  return (sorted[Math.floor(mid)]+sorted[Math.ceil(mid)-1])/2;
+}
 function renderWindows(groups,years,rule,symbol,bars,source){
   get("window-title").textContent=(rule.nickname || "저장 전략")+" · "+years+"년 백테스트";
   get("window-source").textContent=symbol+" · "+source+" · "+dateKey(bars[0][0]*1000)+" – "+dateKey(bars.at(-1)[0]*1000);
@@ -391,9 +432,7 @@ function renderWindows(groups,years,rule,symbol,bars,source){
     section.className="lab-window-group";h.textContent=title+" · "+rows.length+"/"+windowsPerGroup;
     summary.className="lab-window-summary";
     if(rows.length){
-      const sorted=rows.map(r=>r.profit).sort((a,b)=>a-b),mid=sorted.length/2;
-      const median=(sorted[Math.floor(mid)]+sorted[Math.ceil(mid)-1])/2;
-      summary.textContent="중앙 수익률 "+percent(median)+" · 체결 발생 "+rows.filter(r=>r.filled).length+"구간";
+      summary.textContent="중앙 수익률 "+percent(medianProfit(rows))+" · 체결 발생 "+rows.filter(r=>r.filled).length+"구간";
     }else summary.textContent="계산 가능한 구간이 없습니다.";
     section.append(h,summary);
     for(const [index,r] of rows.entries()){

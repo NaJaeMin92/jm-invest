@@ -18,8 +18,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://mfycpprqyaidoixytdim.supabase.co" crossorigin>
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=149">
-<script type="module" src="./journal.js?v=149"></script>
+<link rel="stylesheet" href="./style.css?v=150">
+<script type="module" src="./journal.js?v=150"></script>
 </head>
 <body class="trade-page" data-view="home">
 <main id="account">
@@ -54,11 +54,13 @@
 <label for="lab-strategy">전략<select id="lab-strategy"></select></label>
 <label for="lab-period">검증 기간<select id="lab-period"><optgroup label="구간 백테스트" id="lab-years"></optgroup><optgroup label="실제 체결 복기"><option value="30">30거래일</option><option value="60" selected>60거래일</option><option value="120">120거래일</option></optgroup></select></label>
 <button type="submit" id="lab-run">전략 검증</button>
+<button type="button" id="lab-run-all" hidden>전체 전략 백테스트</button>
 </form>
 <p id="lab-status" class="workspace-status" role="status"></p>
 <button id="lab-infer" class="lab-signin" type="button" hidden>체결 기록으로 전략 만들기</button><p id="lab-inference" class="workspace-status"></p>
 <button id="lab-login" class="lab-signin" type="button" hidden>계좌 로그인</button>
 <section id="lab-windows" hidden aria-labelledby="lab-window-title"><div class="lab-result-heading"><h2 id="lab-window-title"></h2><span id="lab-window-source"></span></div><p id="lab-model"></p><div id="lab-window-groups"></div></section>
+<section id="lab-all-results" hidden aria-labelledby="lab-all-title"><div class="lab-result-heading"><h2 id="lab-all-title"></h2><span id="lab-all-source"></span></div><ul id="lab-all-list"></ul></section>
 <section id="lab-results" aria-labelledby="lab-rule" hidden>
 <div class="lab-result-heading"><h2 id="lab-rule"></h2><span id="lab-range"></span></div>
 <dl class="lab-metrics"><div><dt>신호 발생일</dt><dd id="lab-signals"></dd></div><div><dt>실제 매매일</dt><dd id="lab-fills"></dd></div><div><dt>같은 방향 일치일</dt><dd id="lab-matches"></dd></div></dl>
