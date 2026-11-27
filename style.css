@@ -1304,3 +1304,19 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
 
 #home-holdings .symbol-link { -webkit-touch-callout:none; user-select:none; }
 #private #home-holdings li.watch-reordering { background:#263b46; border-radius:10px; box-shadow:inset 0 0 0 1px #80a99e; }
+
+.instrument-head button { flex:0 0 44px; width:44px; }
+#stock-name { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#stock-back { background:transparent; box-shadow:none; }
+.frame-bar { padding:0 6px; gap:0; position:relative; z-index:4; }
+#stock-frames { align-items:center; }
+#stock-intraday { background:#202b38; color:#dbe8f5; border:0; border-radius:8px; min-height:36px; padding:0 3px; font:600 12px system-ui; max-width:66px; }
+#stock-frames button { padding-inline:5px; font-size:12px; }
+.frame-bar #trend-menu { position:relative; flex:none; margin:0; }
+.frame-bar #trend-menu summary { min-height:44px; width:35px; justify-content:center; padding:0; }
+.frame-bar #trend-controls { position:absolute; top:100%; right:0; width:min(260px,calc(100vw - 70px)); }
+@media(max-width:540px) {
+  .instrument-tabs { margin-bottom:2px; }
+  #stock-detail:not(.expanded) #market-chart.with-rsi { aspect-ratio:1/1.02; max-height:calc(100dvh - var(--nav-space) - env(safe-area-inset-top) - 258px); }
+  .frame-bar :is(#chart-type,#chart-tools,#stock-expand),.frame-bar #trend-menu summary { min-width:29px; width:29px; }
+}

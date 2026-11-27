@@ -815,7 +815,8 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     frame = value;
     get("chart-session-picker").hidden = !isIntraday(value) || !quote?.fromKiwoom;
     chartStatus.hidden = true;
-    for (const button of get("stock-frames").children) {
+    get("stock-intraday").value = isIntraday(value) ? value : "";
+    for (const button of get("stock-frames").querySelectorAll("button")) {
       button.setAttribute("aria-pressed", String(button.dataset.frame === frame));
     }
     if (!quote || !isIntraday(value) || value === "hour" && !quote.fromKiwoom) {
@@ -1008,6 +1009,7 @@ export function setupInstrument({strategy,isSignedIn,search,nameFor,readList,sav
     const items=readList();
     if(saveList(items.includes(current)?items.filter(v=>v!==current):[...items,current]))setFavorite();
   };
+  get("stock-intraday").onchange=e=>setFrame(e.target.value);
   get("stock-frames").onclick=e=>{if(e.target.dataset.frame)setFrame(e.target.dataset.frame);};
   get("stock-expand").onclick=()=>{
     const expanded=dialog.classList.toggle("expanded");

@@ -18,8 +18,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://mfycpprqyaidoixytdim.supabase.co" crossorigin>
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..850&amp;display=swap">
-<link rel="stylesheet" href="./style.css?v=122">
-<script type="module" src="./journal.js?v=120"></script>
+<link rel="stylesheet" href="./style.css?v=123">
+<script type="module" src="./journal.js?v=123"></script>
 </head>
 <body class="trade-page" data-view="home">
 <main id="account">
@@ -257,9 +257,17 @@
 <button type="button" id="chart-tab" data-panel="chart" aria-current="page" aria-controls="chart-panel">Chart</button><button type="button" data-panel="sigma" aria-controls="sigma-panel">Sigma</button><button type="button" data-panel="strategies" aria-controls="stock-strategy-panel">Strategies</button>
 </nav>
 <section id="chart-panel">
+<div class="frame-bar"><div id="stock-frames" aria-label="Chart interval">
+<select id="stock-intraday" aria-label="Intraday interval"><option value="" disabled>Intra</option><option value="minute">1 min</option><option value="five">5 min</option><option value="hour">1 hour</option></select><button data-frame="day" aria-pressed="true">Daily</button><button data-frame="week">Weekly</button><button data-frame="month" aria-label="Monthly">Month</button><button data-frame="quarter" aria-label="Quarterly">Qtr</button>
+</div><button type="button" id="chart-type" aria-label="Chart type" aria-haspopup="dialog">
+<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2v20m12-20v20" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="6" width="6" height="8" rx="1.5" fill="currentColor"/><rect x="15" y="10" width="6" height="8" rx="1.5" fill="currentColor"/></svg></button>
+<button type="button" id="chart-tools" aria-label="Chart Toolbox" aria-haspopup="dialog">
+<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
 <details id="trend-menu" hidden>
-<summary><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M3 7h6m4 0h8M3 17h10m4 0h4"/><circle cx="11" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></svg>분석선<span class="trend-chevron" aria-hidden="true"></span></summary>
+<summary aria-label="분석선" title="분석선"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M3 7h6m4 0h8M3 17h10m4 0h4"/><circle cx="11" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></svg></summary>
 <div id="trend-controls" role="group" aria-label="차트 분석선 표시"></div></details>
+<button id="stock-expand" aria-pressed="false" aria-label="Expand chart">⛶</button></div>
+<label id="chart-session-picker" hidden>Trading date (ET)<input type="date" id="chart-session-date"></label>
 <div id="chart-area"><div id="drawing-actions" hidden aria-label="Selected drawing">
 <button id="drawing-move" type="button" aria-label="Move drawing" title="Move drawing" aria-pressed="false">✥</button>
 <button id="drawing-color" type="button" aria-label="Drawing color" title="Drawing color" aria-expanded="false">●</button>
@@ -290,14 +298,6 @@
 <span id="chart-dates"></span>
 <small id="chart-coverage"></small>
 </div>
-<div class="frame-bar"><div id="stock-frames" aria-label="Chart interval">
-<button data-frame="minute">1 min</button><button data-frame="five">5 min</button><button data-frame="hour">1 hour</button><button data-frame="day" aria-pressed="true">Daily</button><button data-frame="week">Weekly</button><button data-frame="month">Monthly</button><button data-frame="quarter">Quarterly</button>
-</div><button type="button" id="chart-type" aria-label="Chart type" aria-haspopup="dialog">
-<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2v20m12-20v20" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="6" width="6" height="8" rx="1.5" fill="currentColor"/><rect x="15" y="10" width="6" height="8" rx="1.5" fill="currentColor"/></svg></button>
-<button type="button" id="chart-tools" aria-label="Chart Toolbox" aria-haspopup="dialog">
-<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
-<button id="stock-expand" aria-pressed="false" aria-label="Expand chart">⛶</button></div>
-<label id="chart-session-picker" hidden>Trading date (ET)<input type="date" id="chart-session-date"></label>
 <div id="chart-task" hidden>
 <p id="chart-tool-status" role="status"></p>
 <button type="button" id="chart-finish">Finish</button>
