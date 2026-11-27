@@ -746,7 +746,9 @@ function showHeadlineIndex(advance=false) {
   }
   const quote=externalPrices.get(headlineSymbol);
   const value=document.getElementById("home-index-value");
-  document.getElementById("home-search-label").textContent=headlineIndices.get(headlineSymbol) || "Find a symbol";
+  const label=document.getElementById("home-search-label");
+  label.textContent=headlineIndices.get(headlineSymbol) || "";
+  label.hidden=!quote;
   value.hidden=!quote;
   if (!quote) return;
   value.dataset.direction=quote.change<0?"down":quote.change>0?"up":"flat";

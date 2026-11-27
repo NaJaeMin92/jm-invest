@@ -1361,10 +1361,12 @@ dialog.order-sheet[open] {bottom:var(--nav-space);max-height:calc(100dvh - var(-
   background:#a3e9cf18;
 }
 #home-search {
-  width:min(560px,calc(100% - 40px));
+  width:max-content;
+  max-width:min(520px,calc(100% - 64px));
+  min-width:44px;
   justify-content:flex-start;
   bottom:calc(var(--nav-space) + 9px);
-  padding-inline:16px;
+  padding-inline:12px;
   border-color:#a9c7dc38;
 }
 
