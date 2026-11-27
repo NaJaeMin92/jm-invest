@@ -1121,6 +1121,62 @@ watchList.addEventListener("touchend",event=>{
   finishWatchOrder(true);
 },{passive:false});
 watchList.addEventListener("touchcancel",()=>finishWatchOrder(false));
+const watchRefresh = document.getElementById("watch-refresh");
+const pullThreshold = 72;
+let watchPull;
+function resetWatchPull() {
+  watchPull = undefined;
+  watchRefresh.hidden = true;
+}
+watchList.addEventListener("touchstart", event => {
+  resetWatchPull();
+  if (watchList.scrollTop > 1 || event.touches.length !== 1) return;
+  const {identifier, clientX, clientY} = event.touches[0];
+  watchPull = {identifier, clientX, clientY, distance:0};
+}, {passive:true});
+watchList.addEventListener("touchmove", event => {
+  const pull = watchPull;
+  if (!pull) return;
+  const finger = event.touches[0];
+  if (event.touches.length !== 1 || finger.identifier !== pull.identifier || watchHold?.active) {
+    resetWatchPull();
+    return;
+  }
+  const dy = finger.clientY - pull.clientY;
+  const dx = Math.abs(finger.clientX - pull.clientX);
+  if (!pull.claimed) {
+    if (dy < -8 || dx > 8 && dx >= dy || watchList.scrollTop > 1) {
+      resetWatchPull();
+      return;
+    }
+    if (dy < 8 || !event.cancelable) return;
+    pull.claimed = true;
+    finishWatchOrder(false);
+    clearTabSwipe();
+  }
+  event.preventDefault();
+  pull.distance = Math.max(0, dy);
+  watchRefresh.style.height = Math.min(46, pull.distance * .58) + "px";
+  const message = pull.distance >= pullThreshold ? "Release to refresh" : "Pull to refresh";
+  if (watchRefresh.textContent !== message) watchRefresh.textContent = message;
+  watchRefresh.hidden = false;
+}, {passive:false});
+watchList.addEventListener("touchend", event => {
+  const pull = watchPull;
+  if (!pull || !Array.from(event.changedTouches).some(finger => finger.identifier === pull.identifier)) return;
+  if (pull.claimed) {
+    event.preventDefault();
+    suppressWatchClickUntil = Date.now() + 450;
+  }
+  if (pull.claimed && pull.distance >= pullThreshold) {
+    watchPull = undefined;
+    watchRefresh.textContent = "Refreshing…";
+    location.reload();
+    return;
+  }
+  resetWatchPull();
+}, {passive:false});
+watchList.addEventListener("touchcancel", resetWatchPull);
 watchList.addEventListener("click",event=>{
   if (Date.now()>=suppressWatchClickUntil) return;
   event.preventDefault();
