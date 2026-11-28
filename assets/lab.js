@@ -1,3 +1,4 @@
+import {savedTime} from "./device-cache.js?v=162";
 import {usMarketSession} from "../watch-quotes.js?v=64";
 import {publicQuote} from "../instrument.js?v=112";
 import {metrics, metricsAt, matches, factors} from "./strategy.js?v=115";
@@ -170,11 +171,11 @@ function appendEvents(container, events) {
   container.replaceChildren(fragment);
 }
 
-export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, readStrategy, onSignIn}) {
+export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, readStrategy, deviceCache, onSignIn}) {
   const symbolInput=get("symbol"), period=get("period"), status=get("status"), result=get("results"), login=get("login");
   const strategies=get("strategy"), exits=get("exit"), windows=get("windows"), all=get("all-results");
   for(let y=1;y<=30;y++) get("years").append(new Option(y+"년","y"+y));
-  let controller, lastAccess, history;
+  let controller, lastAccess, history, restored=false, selectionVersion=0;
   let rules=new Map();
   const annual=()=>period.value.startsWith("y");
   const canUseAs=(id,side)=>id.startsWith("builtin-") || rules.get(id)?.side===side;
@@ -216,6 +217,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
 
   }
   function changed(){
+    selectionVersion++;
     filterEntryOptions();
     controller?.abort();controller=null;result.hidden=true;windows.hidden=true;all.hidden=true;
     login.hidden=canLoadChart();
@@ -228,8 +230,113 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
     status.textContent=rules.size ? `최근 일봉 기준 월별 ${windowsPerGroup}구간과 무작위 ${windowsPerGroup}구간을 비교합니다.` : "Strategies에서 이 종목의 전략을 먼저 저장하세요.";
   }
 
+  async function cachedBars(symbol,needed) {
+    const lab=await deviceCache.read("lab/bars/"+symbol);
+    const chart=await deviceCache.read("stock/"+symbol+"/chart");
+    const chartBars=chart?.data?.daily;
+    const saved=(lab?.bars.length ?? 0)>=(chartBars?.length ?? 0) ? lab : {bars:chartBars,at:chart.at};
+    if (!saved?.bars?.length) return null;
+    return {bars:saved.bars.slice(-needed),source:"저장 시세 · "+savedTime(saved.at),partial:false,saved:true};
+  }
+
+  async function labBars(symbol,needed,canRead,signal,progress) {
+    const key="lab/bars/"+symbol;
+    let data, failure;
+    try {
+      data=await loadBars(symbol,needed,loadChart,canRead,signal,progress);
+    } catch(error) {
+      signal.throwIfAborted();
+      failure=error;
+    }
+    if (canRead && data && data.source!=="저장 시세") {
+      const previous=await deviceCache.read(key);
+      signal.throwIfAborted();
+      if (data.bars.length>=(previous?.bars.length ?? 0)) {
+        void deviceCache.write(key,{...data,at:Date.now()});
+      }
+      if (!data.partial) return data;
+    }
+    const cached=canRead && await cachedBars(symbol,needed);
+    signal.throwIfAborted();
+    if (cached && cached.bars.length>(data?.bars.length ?? 0)) return cached;
+    if (data) return data;
+    throw failure;
+  }
+
+  async function labExecutions(symbol,from,to,signal,grouped=false) {
+    const key="lab/fills/"+[symbol,from,to,grouped].join("/");
+    try {
+      const records=await loadExecutions(symbol,from,to,signal,grouped);
+      signal.throwIfAborted();
+      if (Array.isArray(records)) void deviceCache.write(key,{records,at:Date.now()});
+      return {records};
+    } catch(error) {
+      signal.throwIfAborted();
+      const cached=await deviceCache.read(key);
+      signal.throwIfAborted();
+      if (!cached) throw error;
+      return {records:cached.records,savedAt:cached.at};
+    }
+  }
+
+  function saveResult(data) {
+    void deviceCache.write("lab/result",{
+      at:Date.now(),symbol:symbolInput.value,entry:strategies.value,exit:exits.value,
+      period:period.value,status:status.textContent,...data
+    });
+  }
+
+  function showReplay({symbol,rule,issue,days,source,comparison}) {
+    get("rule").textContent=rule.nickname || (rule.side==="buy"?"저장된 매수 전략":"저장된 매도 전략");
+    get("range").textContent=symbol+" · "+days[0]+" – "+days.at(-1)+" · "+source;
+    get("signals").textContent=issue ? "—" : String(comparison.signalDays);
+    get("signals").previousElementSibling.textContent=rule.preset==="firstTouch"?"매수 후보일":"신호 발생일";
+    get("fills").textContent=comparison.fillDays ?? "—";
+    get("matches").textContent=issue ? "—" : comparison.matchDays ?? "—";
+    appendEvents(get("events"),comparison.events);
+    result.hidden=false;
+  }
+
+  function appendBatchRow(title,summary="") {
+    const row=document.createElement("li"), label=document.createElement("strong"), detail=document.createElement("small");
+    label.textContent=title;
+    detail.textContent=summary;
+    row.append(label,detail);
+    get("all-list").append(row);
+    return detail;
+  }
+
+  async function restoreResult() {
+    if (restored || !canLoadChart()) return;
+    const version=selectionVersion;
+    const saved=await deviceCache.read("lab/result");
+    if (!saved) {restored=true;return;}
+    if (restored || version!==selectionVersion || ![...symbolInput.options].some(option=>option.value===saved.symbol)) return;
+    restored=true;
+    symbolInput.value=saved.symbol;
+    period.value=saved.period;
+    selectRules(saved.entry);
+    if ([...exits.options].some(option=>option.value===saved.exit)) exits.value=saved.exit;
+    filterEntryOptions();
+    get("run-all").hidden=!annual();
+    get("run").textContent=annual()?"백테스트 실행":"전략 검증";
+    if (saved.kind==="windows") {
+      renderWindows(saved.groups,saved.years,saved.rule,saved.symbol,saved.bounds,saved.source);
+      windows.hidden=false;
+    } else if (saved.kind==="batch") {
+      get("all-title").textContent=saved.title;
+      get("all-source").textContent=saved.source;
+      get("all-list").replaceChildren();
+      for (const {name,summary} of saved.rows) appendBatchRow(name,summary);
+      all.hidden=false;
+    } else if (saved.kind==="replay") showReplay(saved);
+    status.textContent="저장 결과 · "+savedTime(saved.at)+" · "+saved.status;
+  }
+
   async function review(runAll = false) {
     controller?.abort();
+    selectionVersion++;
+    restored=true;
     const task = new AbortController(), {signal}=task;
     controller=task;
     const symbol=symbolInput.value;
@@ -254,9 +361,9 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
         const years=Number(period.value.slice(1));
         const key=[symbol,canRead,nyDay.format(new Date()),new Date().getUTCHours()].join("/");
         if(history?.key!==key){
-          const loaded=await loadBars(symbol,Infinity,loadChart,canRead,signal,n=>{if(!signal.aborted)status.textContent="일봉 "+n.toLocaleString()+"개 조회 중…";});
+          const loaded=await labBars(symbol,Infinity,canRead,signal,n=>{if(!signal.aborted)status.textContent="일봉 "+n.toLocaleString()+"개 조회 중…";});
           signal.throwIfAborted();
-          history={...loaded,key:loaded.partial?null:key};
+          history={...loaded,key:loaded.partial || loaded.saved?null:key};
         }
         const {bars,source,partial}=history;
         if(!bars.length)throw Error("조회할 수 있는 완료 일봉이 없습니다.");
@@ -268,14 +375,11 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
           const list=get("all-list");
           list.replaceChildren();
           all.hidden=false;
+          const rows=[];
           for (const [index,strategy] of entries.entries()) {
             signal.throwIfAborted();
             const name=strategy.nickname || "저장 전략";
-            const row=document.createElement("li");
-            const title=document.createElement("strong"), summary=document.createElement("small");
-            title.textContent=name;
-            row.append(title,summary);
-            list.append(row);
+            const summary=appendBatchRow(name);
             status.textContent=(index+1)+"/"+entries.length+" · "+name+" 계산 중…";
             try {
               const limitation=replayIssue(strategy);
@@ -290,23 +394,27 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
               signal.throwIfAborted();
               summary.textContent=error.message;
             }
+            rows.push({name,summary:summary.textContent});
           }
           status.textContent=entries.length+"개 전략 비교 완료"+(partial?" · 시세 일부만 조회됨":"");
+          saveResult({kind:"batch",rows,title:get("all-title").textContent,source:get("all-source").textContent});
           return;
         }
         status.textContent="백테스트 구간을 구성하는 중…";
         const paired=pair(saved);
         const groups=await calculateWindows(bars,years,paired,signal,n=>{status.textContent="구간 "+n+" 계산 중…";});
         signal.throwIfAborted();
-        renderWindows(groups,years,paired,symbol,bars,source);
+        const bounds=[bars[0],bars.at(-1)];
+        renderWindows(groups,years,paired,symbol,bounds,source);
         windows.hidden=false;
         const completed=groups.rolling.filter(Boolean).length+groups.random.length;
         status.textContent=[completed+"/"+(2*windowsPerGroup)+"구간 계산 완료",completed<2*windowsPerGroup?"완전한 검증 기간과 지표 준비 이력이 있는 구간만 계산했습니다.":"",
-          partial?"시세 일부만 조회되었습니다. 다시 실행하면 재조회합니다.":""].filter(Boolean).join(" · ");
+          partial?"시세 일부만 조회되었습니다. 다시 실행하면 재조회합니다.":"",history.saved?source:""].filter(Boolean).join(" · ");
+        saveResult({kind:"windows",groups,years,rule:paired,bounds,source});
         return;
       }
       const warmup=rule.frame==="month" ? 1400 : rule.frame==="week" ? 600 : 400;
-      const {bars,source,partial}=await loadBars(symbol, count+warmup, loadChart, canRead, signal);
+      const {bars,source,partial}=await labBars(symbol,count+warmup,canRead,signal);
       signal.throwIfAborted();
       const start=Math.max(0,bars.length-count);
       const days=bars.slice(start).map(b => dateKey(b[0]*1000));
@@ -326,16 +434,10 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
       const notes=[issue, partial && "이전 일봉 일부를 불러오지 못했습니다."].filter(Boolean);
       if (rule.preset==="firstTouch") notes.push("시가가 지지 구간 위에서 시작해 일중 저가가 닿은 날을 후보로 표시합니다. 장중 체결 순서는 일봉으로 확인할 수 없습니다.");
       else if (!issue) notes.push("직전 완료 봉 기준으로 조건을 충족한 거래일을 집계합니다.");
+      let replay;
       function show(fills) {
-        const comparison=compareSessions(days,signals,fills);
-        get("rule").textContent = rule.nickname || (rule.side==="buy"?"저장된 매수 전략":"저장된 매도 전략");
-        get("range").textContent=symbol+" · "+days[0]+" – "+days.at(-1)+" · "+source;
-        get("signals").textContent=issue ? "—" : String(comparison.signalDays);
-        get("signals").previousElementSibling.textContent=rule.preset==="firstTouch"?"매수 후보일":"신호 발생일";
-        get("fills").textContent=comparison.fillDays ?? "—";
-        get("matches").textContent=issue ? "—" : comparison.matchDays ?? "—";
-        appendEvents(get("events"),comparison.events);
-        result.hidden=false;
+        replay={kind:"replay",symbol,rule,issue,days,source,comparison:compareSessions(days,signals,fills)};
+        showReplay(replay);
       }
       show(null);
       if (canRead) {
@@ -343,7 +445,8 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
         try {
           const fills=[];
           for (const [from,to] of executionWindows(days[0],days.at(-1))) {
-            const records=await loadExecutions(symbol,from,to,signal);
+            const {records,savedAt}=await labExecutions(symbol,from,to,signal);
+            if(savedAt) notes.push("저장 체결 내역 · "+savedTime(savedAt));
             signal.throwIfAborted();
             if (!Array.isArray(records)) throw Error();
             fills.push(...records);
@@ -352,6 +455,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
         } catch { signal.throwIfAborted(); notes.push("계좌 체결 내역을 불러오지 못했습니다."); }
       } else notes.push("계좌에 로그인하면 실제 체결일과 비교할 수 있습니다.");
       status.textContent=notes.join(" ");
+      saveResult(replay);
     } catch(error) {
       if (!signal.aborted) status.textContent=error.message || "조회에 실패했습니다. 다시 시도하세요.";
     }
@@ -361,6 +465,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
     const symbol=symbolInput.value;
     if(!symbol || !canLoadChart())return;
     controller?.abort();
+    selectionVersion++;
     const task=new AbortController(), {signal}=task;
     controller=task;
     const button=get("infer");
@@ -400,11 +505,17 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
       const preferred = symbols.find(s=>readStrategy(s)) || symbols.find(s=>!["VIX","CLMAIN","BZMAIN"].includes(s));
       if (preferred) symbolInput.value=preferred;
     }
-    if(controller && prev===symbolInput.value && lastAccess===canLoadChart())return;
+    if (strategies.options.length && prev===symbolInput.value && lastAccess===canLoadChart()) {
+      void restoreResult();
+      return;
+    }
+    lastAccess=canLoadChart();
     const initial=!strategies.options.length;
     selectRules(prev===symbolInput.value?strategies.value:null);
     if(initial)period.value="y1";
-    return changed();
+    const updated=changed();
+    void restoreResult();
+    return updated;
   }
   get("run").addEventListener("click",e=>{e.preventDefault();review();});
   get("run-all").addEventListener("click",()=>review(true));

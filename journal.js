@@ -1,9 +1,10 @@
-import {setupCalendar} from "./assets/calendar.js?v=114";
-import {setupLab} from "./assets/lab.js?v=160";
+import {createDeviceCache,savedTime} from "./assets/device-cache.js?v=162";
+import {setupCalendar} from "./assets/calendar.js?v=162";
+import {setupLab} from "./assets/lab.js?v=162";
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=114";
 import {setupWatchEditor} from "./watch-editor.js?v=146";
 import {setupOrders} from "./orders.js?v=83";
-import { setupInstrument, sparkline } from "./instrument.js?v=160";
+import { setupInstrument, sparkline } from "./instrument.js?v=162";
 import {loadWatchSentiment} from "./market-panels.js?v=104";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -14,6 +15,7 @@ const workspace = document.querySelector("#private");
 const message = document.querySelector("#status");
 let token = null;
 let valuationSnapshot = null;
+const deviceCache = createDeviceCache();
 let returnToStock = null;
 let returnToView = null;
 const heldWatchSymbols = new Set();
@@ -704,7 +706,6 @@ const unavailableSymbols = new Set();
 // Display-only quotes. Read them after owner authentication, never in the order ticket.
 const savedWatchQuotes = new Map();
 const watchCacheKey = "jm-invest:watch-prices:v1";
-const watchCacheAge = 30 * 60 * 1000;
 let watchStorage, watchCacheTimer;
 function openWatchCache(remember) {
   savedWatchQuotes.clear();
@@ -712,7 +713,7 @@ function openWatchCache(remember) {
     watchStorage = remember ? localStorage : sessionStorage;
     const entries = JSON.parse(watchStorage.getItem(watchCacheKey) || "[]");
     for (const [symbol, entry] of entries) {
-      if (Number.isFinite(entry?.price) && entry.price > 0 && entry.at > Date.now() - watchCacheAge) savedWatchQuotes.set(symbol, entry);
+      if (Number.isFinite(entry?.price) && entry.price > 0 && Number.isFinite(entry.at)) savedWatchQuotes.set(symbol, entry);
     }
   } catch {}
 }
@@ -725,10 +726,11 @@ function flushWatchCache() {
 function saveWatchQuote(symbol, market, at) {
   if (!Number.isFinite(at) || !(market.price > 0)) return;
   const previous = savedWatchQuotes.get(symbol);
-  if (previous && (previous.at > at || previous.at === at && previous.change === market.change && previous.price === market.price && previous.extendedChange === market.extendedChange && previous.label === market.label)) return;
+  const series=minuteHistory.get(symbol) ?? previous?.series;
+  if (previous && (previous.at > at || previous.at === at && previous.change === market.change && previous.price === market.price && previous.extendedChange === market.extendedChange && previous.label === market.label && previous.series === series)) return;
   savedWatchQuotes.delete(symbol);
   savedWatchQuotes.set(symbol, {at, price:market.price, change:market.change, marketType:market.marketType,
-    label:market.label, extendedChange:market.extendedChange});
+    label:market.label, extendedChange:market.extendedChange, series});
   if (savedWatchQuotes.size > 200) savedWatchQuotes.delete(savedWatchQuotes.keys().next().value);
   watchCacheTimer ??= setTimeout(flushWatchCache, 1500);
 }
@@ -842,7 +844,10 @@ async function syncKiwoomQuotes() {
           } else if (Number.isFinite(update.price)) {
             if (update.marketType) {
               externalPrices.set(update.symbol, {...update, receivedAt:Date.now()/1000});
-              if (headlineIndices.has(update.symbol)) showHeadlineIndex();
+              if (headlineIndices.has(update.symbol)) {
+                saveWatchQuote(update.symbol,{...update,label:update.marketType},Date.now());
+                showHeadlineIndex();
+              }
             } else if (update.snapshot) {
               const previous = lastKiwoomPrices.get(update.symbol);
               if (previous?.sampledAt > update.sampledAt) continue;
@@ -897,19 +902,20 @@ const indexFormatter = new Intl.NumberFormat("en-US",{minimumFractionDigits:2,ma
 let headlineSymbol;
 function showHeadlineIndex(advance=false) {
   const available=[...headlineIndices.keys()].filter(symbol=>{
-    const quote=externalPrices.get(symbol);
+    const quote=externalPrices.get(symbol) ?? savedWatchQuotes.get(symbol);
     return Number.isFinite(quote?.price) && Number.isFinite(quote.change);
   });
   if (!available.length) headlineSymbol=undefined;
   else if (advance || !available.includes(headlineSymbol)) {
     headlineSymbol=available[(available.indexOf(headlineSymbol)+1)%available.length];
   }
-  const quote=externalPrices.get(headlineSymbol);
+  const quote=externalPrices.get(headlineSymbol) ?? savedWatchQuotes.get(headlineSymbol);
   const value=document.getElementById("home-index-value");
   const label=document.getElementById("home-search-label");
   label.textContent=headlineIndices.get(headlineSymbol) || "";
   label.hidden=!quote;
   value.hidden=!quote;
+  value.title=quote && !externalPrices.has(headlineSymbol) ? "Saved · "+savedTime(quote.at) : "";
   if (!quote) return;
   value.dataset.direction=quote.change<0?"down":quote.change>0?"up":"flat";
   value.textContent=indexFormatter.format(quote.price)+" "+signedWatchPercent(quote.change);
@@ -969,7 +975,7 @@ async function loadExecutions(symbol, from, to, signal, grouped = false, realize
 }
 const canLoadChart=()=>Boolean(token && kiwoomEndpoint);
 const strategy=setupStrategy({loadChart,orders,canLoadChart,tickerIcon,subscribeOrderBook});
-const calendar=setupCalendar({getWatchlist:watchEditor.allSymbols,getHoldings:()=>heldWatchSymbols});
+const calendar=setupCalendar({getWatchlist:watchEditor.allSymbols,getHoldings:()=>heldWatchSymbols,deviceCache});
 function labSymbols(){
   const symbols=new Set([...watchEditor.allSymbols(),...heldWatchSymbols]);
   try{
@@ -978,22 +984,24 @@ function labSymbols(){
   return [...symbols];
 }
 const lab=setupLab({readSymbols:labSymbols,
-  loadChart,loadExecutions,canLoadChart,readStrategy,onSignIn(){returnToView="lab";selectView("account");}});
+  loadChart,loadExecutions,canLoadChart,readStrategy,deviceCache,onSignIn(){returnToView="lab";selectView("account");}});
 const instrument = setupInstrument({
   orders,isSignedIn:()=>Boolean(token),
-  readSnapshot(symbol,key) {
-    if (!token || symbol!=="SOXL") return null;
+  async readSnapshot(symbol,key) {
+    if (!token) return null;
+    const snapshot=await deviceCache.read("stock/"+symbol+"/"+key);
+    if (snapshot || symbol!=="SOXL") return snapshot;
     try { return JSON.parse(watchStorage?.getItem("jm-invest:SOXL:v1:"+key) || "null"); }
     catch { return null; }
   },
   writeSnapshot(symbol,key,snapshot) {
-    if (!token || symbol!=="SOXL") return;
-    try { watchStorage?.setItem("jm-invest:SOXL:v1:"+key,JSON.stringify(snapshot)); } catch {}
+    if (token) return deviceCache.write("stock/"+symbol+"/"+key,snapshot);
   },
   async readPositionSnapshot(symbol) {
     const session = token;
+    if (!document.querySelector("#portfolio-value").hasAttribute("data-live-balance")) return null;
     const balance = await valuationSnapshot;
-    if (!session || token !== session || !balance?.observed_at || !Array.isArray(balance.holdings)) return null;
+    if (!session || token !== session || !document.querySelector("#portfolio-value").hasAttribute("data-live-balance") || !balance?.observed_at || !Array.isArray(balance.holdings)) return null;
     const row = balance.holdings.find(h => h.currency === "USD" && typeof h.symbol === "string" &&
       watchSymbolKey(h.symbol) === watchSymbolKey(symbol));
     const observed = Date.parse(balance.observed_at);
@@ -1052,7 +1060,7 @@ function watchMarket(symbol, session) {
     return market;
   }
   const saved = savedWatchQuotes.get(symbol);
-  return !unavailableSymbols.has(symbol) && saved?.at > Date.now() - watchCacheAge ? {...saved, saved:true} : null;
+  return saved ? {...saved, saved:true} : null;
 }
 function renderWatchlist(changed) {
   const session = usMarketSession();
@@ -1299,11 +1307,11 @@ function paintWatchRow(row, symbol, market, session) {
   tag.hidden = !market;
   tag.textContent = market?.saved ? "Saved" : market?.label || "";
   tag.className = market?.marketType ? "session-tag futures" : "session-tag";
-  tag.title = market?.saved ? new Date(market.at).toLocaleString() : market && !market.marketType && ["Pre", "After"].includes(session.phase) && market.label !== session.phase
+  tag.title = market?.saved ? savedTime(market.at) : market && !market.marketType && ["Pre", "After"].includes(session.phase) && market.label !== session.phase
     ? session.phase + " quote pending" : "";
 
   const chart = row.querySelector(".mini-chart");
-  const points = new Map(token ? minuteHistory.get(symbol) : []);
+  const points = new Map(token ? minuteHistory.get(symbol) ?? market?.series : []);
   if (token) for (const [stamp, price] of liveMinutes.get(symbol) ?? []) points.set(stamp, price);
   const samples = [...points].sort((a, b) => a[0] - b[0]);
   if (samples.length > 1) {
@@ -1411,71 +1419,95 @@ document.addEventListener("visibilitychange",()=>{
   if (!document.hidden && document.body.dataset.view==="account") refreshValuation();
 });
 
-async function loadValuation(accessToken) {
+let shownValuation, shownValuationSaved;
+function displayValuation(balance,saved=false) {
   const value = document.querySelector("#portfolio-value");
   const metrics = document.getElementById("asset-metrics");
-  if (!value.hasAttribute("data-loaded")) {
-    metrics.hidden = true;
-    value.textContent = "조회 중…";
-    showHoldings(null);
-  }
-  const prior = valuationSnapshot;
   const stamp = document.getElementById("asset-updated");
+  const stocks = Number(balance.value_krw);
+  const hasCash = balance.cash_domestic_krw != null && balance.cash_foreign_krw != null;
+  const cash = hasCash ? Number(balance.cash_domestic_krw) + Number(balance.cash_foreign_krw) : 0;
+  const estimate = balance.estimated_assets_krw;
+  const candidate = estimate == null || !hasCash ? null : Number(estimate) - stocks - cash;
+  const rp = candidate != null && Number.isFinite(candidate) && candidate >= 0 ? candidate : null;
+  const excluded = Array.isArray(balance.holdings) ? balance.holdings.filter(excludedFromAccount) : [];
+  if (excluded.some(holding=>!numeric(holding.value_krw))) throw new Error("Missing excluded valuation");
+  const excludedValue = excluded.reduce((sum,holding)=>sum+Number(holding.value_krw),0);
+  const total = (rp == null ? stocks + cash : Number(estimate)) - excludedValue;
+  if(!numeric(balance.value_krw) || !Number.isFinite(total))throw new Error("Invalid valuation");
+  value.dataset.loaded="true";
+  document.getElementById("asset-title").textContent = excluded.length ? "총 투자 자산 · NBIS 제외" : "총 투자 자산";
+  const updated = Date.parse(balance.observed_at);
+  stamp.textContent = Number.isFinite(updated) ? (saved ? "저장 잔고 · " : "잔고 기준 ") + savedTime(updated)
+    : saved ? "저장 잔고" : "";
+  value.replaceChildren(...holdingKRW.formatToParts(total).map(part=>{
+    if(part.type!=="currency")return part.value;
+    const currency=document.createElement("small");
+    currency.textContent=part.value;
+    return currency;
+  }));
+  if (!shownValuation || shownValuation.return_pct !== balance.return_pct ||
+      JSON.stringify(shownValuation.holdings) !== JSON.stringify(balance.holdings)) showHoldings(balance);
+  shownValuation=balance;
+  shownValuationSaved=saved;
+  metrics.hidden = false;
+
+  showProfit(balance.realized_profit);
+  heldWatchSymbols.clear();
+  for (const holding of Array.isArray(balance?.holdings) ? balance.holdings : []) {
+    const quantity = Number(holding?.quantity);
+    const symbol = typeof holding?.symbol === "string" ? watchSymbolKey(holding.symbol) : "";
+    if (/^[A-Z][A-Z0-9-]{0,11}$/.test(symbol) && quantity > 0) {
+      heldWatchSymbols.add(symbol);
+    }
+  }
+  renderWatchlist();
+  syncKiwoomQuotes();
+  if(document.body.dataset.view==="calendar") calendar.refresh();
+  if(document.body.dataset.view==="lab") lab.open();
+}
+
+async function loadValuation(accessToken) {
+  const value = document.querySelector("#portfolio-value");
+  const previous = valuationSnapshot;
+  if (!shownValuation) {
+    const cached = await deviceCache.read("valuation");
+    if (token !== accessToken) return;
+    if (cached) {
+      try { displayValuation(cached,true); } catch {}
+    }
+    if (!shownValuation) {
+      document.getElementById("asset-metrics").hidden = true;
+      value.textContent = "조회 중…";
+      showHoldings(null);
+    }
+  }
   try {
     const [balance] = await request("/rest/v1/kiwoom_valuation?select=*&limit=1", { accessToken });
     if (token !== accessToken) return;
-    heldWatchSymbols.clear();
-    for (const holding of Array.isArray(balance?.holdings) ? balance.holdings : []) {
-      const quantity = Number(holding?.quantity);
-      const symbol = typeof holding?.symbol === "string" ? watchSymbolKey(holding.symbol) : "";
-      if (/^[A-Z][A-Z0-9-]{0,11}$/.test(symbol) && quantity > 0) {
-        heldWatchSymbols.add(symbol);
-      }
-    }
-    renderWatchlist();
-    syncKiwoomQuotes();
-    if(document.body.dataset.view==="calendar") calendar.refresh();
-    if(document.body.dataset.view==="lab") lab.open();
     if (!balance) {
-      value.textContent = "잔고 동기화 대기";
-      return;
+      value.removeAttribute("data-live-balance");
+      if (shownValuation && !shownValuationSaved) displayValuation(shownValuation,true);
+      if (!shownValuation) value.textContent = "잔고 동기화 대기";
+      return previous;
     }
-    const previous = await prior;
-    if (token !== accessToken) return;
-    if (previous && balance.observed_at && previous.observed_at===balance.observed_at) return previous;
-    const stocks = Number(balance.value_krw);
-    const hasCash = balance.cash_domestic_krw != null && balance.cash_foreign_krw != null;
-    const cash = hasCash ? Number(balance.cash_domestic_krw) + Number(balance.cash_foreign_krw) : 0;
-    const estimate = balance.estimated_assets_krw;
-    const candidate = estimate == null || !hasCash ? null : Number(estimate) - stocks - cash;
-    const rp = candidate != null && Number.isFinite(candidate) && candidate >= 0 ? candidate : null;
-    const excluded = Array.isArray(balance.holdings) ? balance.holdings.filter(excludedFromAccount) : [];
-    if (excluded.some(holding=>!numeric(holding.value_krw))) throw new Error("Missing excluded valuation");
-    const excludedValue = excluded.reduce((sum,holding)=>sum+Number(holding.value_krw),0);
-    const total = (rp == null ? stocks + cash : Number(estimate)) - excludedValue;
-    if(!numeric(balance.value_krw) || !Number.isFinite(total))throw new Error("Invalid valuation");
-    value.dataset.loaded="true";
-    document.getElementById("asset-title").textContent = excluded.length ? "총 투자 자산 · NBIS 제외" : "총 투자 자산";
-    const updated = Date.parse(balance.observed_at);
-    stamp.textContent = Number.isFinite(updated) ? "잔고 기준 "+new Intl.DateTimeFormat("ko-KR", {
-      timeZone:"Asia/Seoul",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"
-    }).format(updated)+" KST" : "";
-    value.replaceChildren(...holdingKRW.formatToParts(total).map(part=>{
-      if(part.type!=="currency")return part.value;
-      const currency=document.createElement("small");
-      currency.textContent=part.value;
-      return currency;
-    }));
-    if (!previous || previous.return_pct !== balance.return_pct ||
-        JSON.stringify(previous.holdings) !== JSON.stringify(balance.holdings)) showHoldings(balance);
-    metrics.hidden = false;
-
-    showProfit(balance.realized_profit);
+    const saved = Date.now()-Date.parse(balance.observed_at)>60_000;
+    if (!balance.observed_at || balance.observed_at !== shownValuation?.observed_at || saved !== shownValuationSaved || !value.hasAttribute("data-live-balance")) {
+      displayValuation(balance,saved);
+      value.setAttribute("data-live-balance","");
+      void deviceCache.write("valuation",balance);
+    }
     return balance;
   } catch (error) {
-    if (token === accessToken && !value.hasAttribute("data-loaded"))
-      value.textContent = error.code === "PGRST205" ? "잔고 설정 대기" : "잔고를 불러오지 못했습니다";
-    return prior;
+    if (token === accessToken) {
+      if (value.hasAttribute("data-live-balance") && shownValuation) {
+        value.removeAttribute("data-live-balance");
+        displayValuation(shownValuation,true);
+      } else if (!shownValuation) {
+        value.textContent = error.code === "PGRST205" ? "잔고 설정 대기" : "잔고를 불러오지 못했습니다";
+      }
+    }
+    return previous;
   }
 }
 
@@ -1487,7 +1519,9 @@ async function openWorkspace(session, remember) {
   }
   const stored = saveSession(remember ? session.refresh_token : null);
   token = session.access_token;
+  deviceCache.setAccount(session.user.id,remember);
   openWatchCache(remember);
+  showHeadlineIndex();
   renderWatchlist();
   login.hidden = true;
   setDetail(false);

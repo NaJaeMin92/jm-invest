@@ -1,3 +1,4 @@
+import {savedTime} from "./device-cache.js?v=162";
 const kst = new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Seoul", year:"numeric", month:"2-digit", day:"2-digit"});
 const clock = new Intl.DateTimeFormat("ko-KR", {timeZone:"Asia/Seoul", hourCycle:"h23", hour:"2-digit", minute:"2-digit"});
 const monthTitle = new Intl.DateTimeFormat("ko-KR", {timeZone:"UTC", year:"numeric", month:"long"});
@@ -62,11 +63,11 @@ async function feed(url) {
   return data;
 }
 
-export function setupCalendar({getWatchlist, getHoldings}) {
+export function setupCalendar({getWatchlist, getHoldings, deviceCache}) {
   const get = id => document.getElementById("calendar-"+id);
   const grid = get("grid"), agenda = get("agenda"), filters = get("filters");
   const data = {macro:null, earnings:null};
-  const failed = new Set();
+  const failed = new Set(), restored = new Set();
   let month = kst.format(Date.now()).slice(0,7), selected = null, filter = "all", upcoming = true;
   let request = null, checked = 0;
 
@@ -144,6 +145,7 @@ export function setupCalendar({getWatchlist, getHoldings}) {
       if(!snapshot){if(failed.has(kind))messages.push(name+" 일정 조회 실패"); continue;}
       if(kind==="earnings" && snapshot.coverage?.from && snapshot.coverage?.through)
         messages.push("실적 제공 기간 "+shortDay(snapshot.coverage.from)+"–"+shortDay(snapshot.coverage.through)+" (미국 날짜)");
+      if(restored.has(kind)) messages.push(name+" 저장 일정 · "+savedTime(Date.parse(snapshot.updatedAt)));
       const oldest=kind==="macro" ? Math.min(...events.filter(e=>e.kind==="macro" && e.checkedAt).map(e=>Date.parse(e.checkedAt)), Date.parse(snapshot.updatedAt)) : Date.parse(snapshot.lastSuccessfulAt || snapshot.updatedAt);
       if (Date.now()-oldest>7*86400000 || failed.has(kind)) messages.push(name+" 일정 확인일 "+kst.format(oldest));
     }
@@ -168,11 +170,20 @@ export function setupCalendar({getWatchlist, getHoldings}) {
     render();
     if(request || Date.now()-checked<15*60000)return request;
     const work=["macro","earnings"].map(async kind=>{
+      if (!data[kind]) {
+        const saved=await deviceCache.read("calendar/"+kind,true);
+        if (saved?.events) {data[kind]=saved;restored.add(kind);render();}
+      }
       const name="calendar-"+kind+".json";
       const local=new URL("./market/"+name,import.meta.url);
       const results=await Promise.allSettled([local, rawBranch+name].map(async url=>{
         const result=await feed(url);
-        if(!data[kind] || Date.parse(result.updatedAt)>Date.parse(data[kind].updatedAt)){data[kind]=result;render();}
+        if(!data[kind] || Date.parse(result.updatedAt)>=Date.parse(data[kind].updatedAt)){
+          data[kind]=result;
+          restored.delete(kind);
+          void deviceCache.write("calendar/"+kind,result,true);
+          render();
+        }
       }));
       if(results.every(r=>r.status==="rejected"))failed.add(kind);else failed.delete(kind);
     });

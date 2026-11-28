@@ -1,6 +1,7 @@
+import {savedTime} from "./assets/device-cache.js?v=162";
 import {trendStyles} from "./assets/chart-trends.js?v=82";
 import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=144";
-import {setupStockTrades} from "./assets/stock-trades.js?v=160";
+import {setupStockTrades} from "./assets/stock-trades.js?v=162";
 import {setupExecutionFlags} from "./chart-executions.js?v=143";
 import {calculateSigma, loadWeeklyBand} from "./market-panels.js?v=104";
 
@@ -74,11 +75,22 @@ function mergeDaily(oldBars, newBars) {
 export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,orders,readPositionSnapshot,subscribeOrderBook,canLoadChart,loadChart,loadExecutions,readSnapshot,writeSnapshot,signIn}) {
   const dialog=get("stock-detail"), canvas=get("market-chart");
   const executions = setupExecutionFlags(async (symbol,from,to,signal,grouped)=>{
+    const key="flags/"+[from,to,grouped].join("/");
+    let failure;
     if (!quote?.cachedAt || symbol!==current) {
-      try { return await loadExecutions(symbol,from,to,signal,grouped); }
-      catch(error) { if (signal.aborted || symbol!=="SOXL") throw error; }
+      try {
+        const records=await loadExecutions(symbol,from,to,signal,grouped);
+        if (!signal.aborted && Array.isArray(records)) void writeSnapshot(symbol,key,records);
+        return records;
+      } catch(error) {
+        if (signal.aborted) throw error;
+        failure=error;
+      }
     }
-    const pages=readSnapshot(symbol,"trades") ?? [];
+    const cached=await readSnapshot(symbol,key);
+    if (Array.isArray(cached)) return cached;
+    const pages=(await readSnapshot(symbol,"trades")) ?? [];
+    if (!pages.length && failure) throw failure;
     const records=[];
     const seen=new Set();
     for (const {payload} of pages) {
@@ -851,6 +863,7 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
       button.setAttribute("aria-pressed", String(button.dataset.frame === frame));
     }
     if (!quote || !isIntraday(value) || value === "hour" && !quote.fromKiwoom) {
+      if (quote) get("stock-time").textContent = quote.cachedAt ? "저장 시세 · "+savedTime(quote.cachedAt) : "";
       finishFrame(quote && (value === "hour" ? quote.hourly : quote.daily));
       return;
     }
@@ -860,17 +873,17 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
     try {
       const symbol=current;
       const day=sessionDate.value;
-      const key="intraday:"+value;
+      const key="intraday:"+value+(day ? "/"+day : "");
       let source;
       if (quote.fromKiwoom) {
         try {
           source=(await loadChart(symbol,value,null,historyAbort?.signal,day))?.bars;
-          if (source?.length) writeSnapshot(symbol,key,{at:Date.now(),day,bars:source});
+          if (source?.length) void writeSnapshot(symbol,key,{at:Date.now(),day,bars:source});
         } catch (error) {
-          const saved=readSnapshot(symbol,key);
+          const saved=await readSnapshot(symbol,key);
           if (!saved?.bars?.length || day && saved.day!==day) throw error;
           source=saved.bars;
-          if (id===requestId) get("stock-time").textContent="저장된 분봉 · "+new Date(saved.at).toLocaleString("ko-KR",{timeZone:"Asia/Seoul"})+" KST";
+          if (id===requestId) get("stock-time").textContent="저장된 분봉 · "+savedTime(saved.at);
         }
       } else source=await minuteBars(symbol);
       if (id !== requestId) return;
@@ -923,7 +936,7 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
     get("stock-name").textContent = [quote.name || nameFor(current), quote.exchange === "NasdaqGS" ? "NASDAQ" : quote.exchange].filter(Boolean).join("  ");
     get("stock-chart-sign-in").hidden = isSignedIn();
     get("stock-time").textContent = quote.cachedAt
-      ? "저장 시세 · "+new Date(quote.cachedAt).toLocaleString("ko-KR",{timeZone:"Asia/Seoul"})+" KST"
+      ? "저장 시세 · "+savedTime(quote.cachedAt)
       : "";
     const when = !quote.fromKiwoom && Number.isFinite(quote.asOf) ? dateFormat.format(quote.asOf * 1000) + " ET" : "";
     get("stock-price").title = [quote.fromKiwoom ? "Kiwoom" : quote.source || "Snapshot", when].filter(Boolean).join(" · ");
@@ -939,8 +952,9 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
     const signal = historyAbort.signal;
     let message = "Chart unavailable";
     try {
-      const snapshot = readSnapshot(symbol,"chart");
-      if (snapshot?.data?.daily?.length && !quote) {
+      const snapshot = await readSnapshot(symbol,"chart");
+      if (id !== quoteRequest) return;
+      if (snapshot?.data?.daily?.length && (!quote || !quote.fromKiwoom && !quote.cachedAt)) {
         quote = {...snapshot.data,cachedAt:snapshot.at};
         renderQuote();
       }
@@ -970,10 +984,10 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
           before = part.before;
           bars = mergeDaily(bars, part.bars);
           quote.daily = bars;
-          writeSnapshot(symbol,"chart",{at,data:quote});
           renderQuoteSigma();
           if (!isIntraday(frame)) finishFrame(bars, Boolean(chart));
         }
+        if (bars.length) void writeSnapshot(symbol,"chart",{at,data:quote});
         if (fullHistory.size >= 24) fullHistory.delete(fullHistory.keys().next().value);
         fullHistory.set(symbol, {asOf,bars});
         return;
