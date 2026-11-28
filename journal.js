@@ -462,19 +462,28 @@ function sortHoldings() {
 }
 holdingSort.onchange = sortHoldings;
 
+const excludedFromAccount = holding => typeof holding?.symbol === "string" && watchSymbolKey(holding.symbol) === "NBIS";
 const weightPercent = new Intl.NumberFormat("ko-KR",{style:"percent",maximumFractionDigits:2});
 
 function showHoldings(balance) {
   const expanded = new Set([...holdingsList.querySelectorAll("details[open]")].map(row=>row.dataset.symbol));
   moneyRenderers.length = 0;
   holdingsList.replaceChildren();
-  const holdings = balance?.holdings;
+  const allHoldings = balance?.holdings;
+  const holdings = Array.isArray(allHoldings) ? allHoldings.filter(holding=>!excludedFromAccount(holding)) : null;
+  const hasExclusions = holdings && holdings.length !== allHoldings.length;
   const totalProfit = Array.isArray(holdings) && holdings.every(h => numeric(h.profit_krw))
     ? holdings.reduce((sum, h) => sum + Number(h.profit_krw), 0) : null;
   const profitAmount = document.getElementById("kiwoom-holdings-profit");
   showPerformance(profitAmount, totalProfit, signedWon.format);
-  if (numeric(totalProfit) && numeric(balance?.return_pct)) {
-    profitAmount.append(" (" + signedWatchPercent(Number(balance.return_pct)) + ")");
+  let returnPct = balance?.return_pct;
+  if (hasExclusions) {
+    const basis = holdings.every(holding=>numeric(holding.cost_krw))
+      ? holdings.reduce((sum,holding)=>sum+Number(holding.cost_krw),0) : 0;
+    returnPct = basis > 0 && totalProfit !== null ? 100*totalProfit/basis : null;
+  }
+  if (numeric(totalProfit) && numeric(returnPct)) {
+    profitAmount.append(" (" + signedWatchPercent(Number(returnPct)) + ")");
   }
   const hasRows = Array.isArray(holdings) && holdings.length > 0;
   document.getElementById("holding-count").textContent = Array.isArray(holdings) ? holdings.length : "";
@@ -1440,9 +1449,13 @@ async function loadValuation(accessToken) {
     const estimate = balance.estimated_assets_krw;
     const candidate = estimate == null || !hasCash ? null : Number(estimate) - stocks - cash;
     const rp = candidate != null && Number.isFinite(candidate) && candidate >= 0 ? candidate : null;
-    const total = rp == null ? stocks + cash : Number(estimate);
+    const excluded = Array.isArray(balance.holdings) ? balance.holdings.filter(excludedFromAccount) : [];
+    if (excluded.some(holding=>!numeric(holding.value_krw))) throw new Error("Missing excluded valuation");
+    const excludedValue = excluded.reduce((sum,holding)=>sum+Number(holding.value_krw),0);
+    const total = (rp == null ? stocks + cash : Number(estimate)) - excludedValue;
     if(!numeric(balance.value_krw) || !Number.isFinite(total))throw new Error("Invalid valuation");
     value.dataset.loaded="true";
+    document.getElementById("asset-title").textContent = excluded.length ? "총 투자 자산 · NBIS 제외" : "총 투자 자산";
     const updated = Date.parse(balance.observed_at);
     stamp.textContent = Number.isFinite(updated) ? "잔고 기준 "+new Intl.DateTimeFormat("ko-KR", {
       timeZone:"Asia/Seoul",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"
