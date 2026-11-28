@@ -177,6 +177,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
   let controller, lastAccess, history;
   let rules=new Map();
   const annual=()=>period.value.startsWith("y");
+  const canUseAs=(id,side)=>id.startsWith("builtin-") || rules.get(id)?.side===side;
   function selectRules(preferred){
     const previousExit=exits.value;
     const active=readStrategy(symbolInput.value);
@@ -199,7 +200,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
     }
     strategies.append(group);
     strategies.value=rules.has(preferred)?preferred:active?key:templates[0][0];
-    exits.replaceChildren(...[...strategies.options].filter(option=>rules.get(option.value)?.side==="sell")
+    exits.replaceChildren(...[...strategies.options].filter(option=>canUseAs(option.value,"sell"))
       .map(option=>new Option(option.textContent,option.value)));
     exits.value=[...exits.options].some(option=>option.value===previousExit)?previousExit:"builtin-rsi-high";
     filterEntryOptions();
@@ -208,7 +209,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
     get("exit-label").hidden=!annual();
     get("entry-label").textContent=annual()?"매수 조건":"전략";
     for(const option of strategies.options){
-      option.disabled=annual() && rules.get(option.value)?.side!=="buy";
+      option.disabled=annual() && !canUseAs(option.value,"buy");
       option.hidden=option.disabled;
     }
     if(strategies.selectedOptions[0]?.disabled)strategies.value="builtin-rsi";
@@ -244,11 +245,12 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
       if(annual()){
         if(!runAll && !saved)throw Error("Strategies에서 이 종목의 전략을 먼저 저장하세요.");
         if(!runAll && issue)throw Error(issue);
-        const exit=rules.get(exits.value);
-        if(exit?.side!=="sell")throw Error("매도 조건을 선택하세요.");
+        const selectedExit=rules.get(exits.value);
+        if(!selectedExit || !canUseAs(exits.value,"sell"))throw Error("매도 조건을 선택하세요.");
+        const exit={...selectedExit,side:"sell"};
         const exitIssue=replayIssue(exit);
         if(exitIssue)throw Error(exitIssue);
-        const pair=entry=>({entry,exit,nickname:entry.nickname+" → "+exit.nickname});
+        const pair=entry=>({entry:{...entry,side:"buy"},exit,nickname:entry.nickname+" → "+exit.nickname});
         const years=Number(period.value.slice(1));
         const key=[symbol,canRead,nyDay.format(new Date()),new Date().getUTCHours()].join("/");
         if(history?.key!==key){
@@ -259,7 +261,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
         const {bars,source,partial}=history;
         if(!bars.length)throw Error("조회할 수 있는 완료 일봉이 없습니다.");
         if (runAll) {
-          const entries=[...rules.values()].filter(rule=>rule.side==="buy");
+          const entries=[...rules].filter(([id])=>canUseAs(id,"buy")).map(([,rule])=>rule);
           const seed=Math.floor(Math.random()*2**32);
           get("all-title").textContent=symbol+" · "+years+"년 전체 전략 백테스트";
           get("all-source").textContent=source+" · 공통 매도 "+exit.nickname+" · 월별 / 무작위 중앙 수익률";

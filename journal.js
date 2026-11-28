@@ -1,9 +1,9 @@
 import {setupCalendar} from "./assets/calendar.js?v=114";
-import {setupLab} from "./assets/lab.js?v=152";
+import {setupLab} from "./assets/lab.js?v=160";
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=114";
 import {setupWatchEditor} from "./watch-editor.js?v=146";
 import {setupOrders} from "./orders.js?v=83";
-import { setupInstrument, sparkline } from "./instrument.js?v=159";
+import { setupInstrument, sparkline } from "./instrument.js?v=160";
 import {loadWatchSentiment} from "./market-panels.js?v=104";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -54,6 +54,26 @@ async function request(path, { method = "GET", body, accessToken = token } = {})
 const holdingsPanel = document.querySelector("#account-holdings");
 const holdingsToggle = document.querySelector("#open-kiwoom");
 const navigation = document.querySelector("#bottom-nav");
+const viewport = window.visualViewport;
+let keyboardFocused = false;
+function updateNavigationViewport() {
+  if (!viewport) return;
+  const keyboardSpace = innerHeight - viewport.height;
+  const keyboardVisible = Math.abs(viewport.scale-1)<.02 && keyboardSpace>120 &&
+    (keyboardFocused || document.body.hasAttribute("data-keyboard-open"));
+  document.body.toggleAttribute("data-keyboard-open",keyboardVisible);
+}
+document.addEventListener("focusin",event=>{
+  keyboardFocused=event.target.matches("textarea,input:not([type]),input:is([type=text],[type=search],[type=email],[type=password],[type=number],[type=tel],[type=url]),[contenteditable=true]");
+  updateNavigationViewport();
+});
+document.addEventListener("focusout",()=>{
+  keyboardFocused=false;
+  updateNavigationViewport();
+});
+viewport?.addEventListener("resize",updateNavigationViewport);
+window.addEventListener("resize",updateNavigationViewport);
+window.addEventListener("pageshow",updateNavigationViewport);
 const accountNavLabel=document.getElementById("account-nav-label");
 const navButtons = [...navigation.querySelectorAll("button")];
 function selectView(view) {
@@ -659,6 +679,12 @@ const watchEditor = setupWatchEditor({watchKey, nameFor, tickerIcon, refresh() {
 function openWatchSearch() { watchEditor.open(true); }
 document.getElementById("home-search").onclick = openWatchSearch;
 const readWatchlist = watchEditor.readList;
+function visibleWatchSymbols() {
+  const symbols = readWatchlist();
+  const keys = new Set(symbols.map(watchSymbolKey));
+  for (const symbol of heldWatchSymbols) if (!keys.has(symbol)) symbols.push(symbol);
+  return symbols;
+}
 const kiwoomTicks = new Map();
 const lastKiwoomPrices = new Map();
 const kiwoomDaily = new Map();
@@ -745,7 +771,7 @@ async function syncKiwoomQuotes() {
   if (!kiwoomEndpoint) return;
   const active = token && !document.hidden && (activeOrderBook || document.body.dataset.view === "home");
   const book = active && activeOrderBook?.symbol;
-  const requestSymbols = book ? [book, ...readWatchlist()] : [...headlineIndices.keys(), ...readWatchlist()];
+  const requestSymbols = book ? [book, ...visibleWatchSymbols()] : [...headlineIndices.keys(), ...visibleWatchSymbols()];
   const symbols = active ? [...new Set(requestSymbols)].slice(0, 200) : [];
   const key = JSON.stringify(book ? {symbols, book} : symbols);
   if (kiwoomStream?.key === key && kiwoomStream.token === token) return;
@@ -946,6 +972,15 @@ const lab=setupLab({readSymbols:labSymbols,
   loadChart,loadExecutions,canLoadChart,readStrategy,onSignIn(){returnToView="lab";selectView("account");}});
 const instrument = setupInstrument({
   orders,isSignedIn:()=>Boolean(token),
+  readSnapshot(symbol,key) {
+    if (!token || symbol!=="SOXL") return null;
+    try { return JSON.parse(watchStorage?.getItem("jm-invest:SOXL:v1:"+key) || "null"); }
+    catch { return null; }
+  },
+  writeSnapshot(symbol,key,snapshot) {
+    if (!token || symbol!=="SOXL") return;
+    try { watchStorage?.setItem("jm-invest:SOXL:v1:"+key,JSON.stringify(snapshot)); } catch {}
+  },
   async readPositionSnapshot(symbol) {
     const session = token;
     const balance = await valuationSnapshot;
@@ -1025,7 +1060,7 @@ function renderWatchlist(changed) {
   }
   if (watchHold?.active) return;
   watchEditor.renameHeading();
-  const symbols = readWatchlist();
+  const symbols = visibleWatchSymbols();
   const quotes = new Map(symbols.map(symbol => [symbol, watchMarket(symbol, session)]));
   symbols.sort((a, b) => {
     const vixFirst = Number(b === "VIX") - Number(a === "VIX");
@@ -1109,7 +1144,8 @@ function finishWatchOrder(save) {
   suppressWatchClickUntil=Date.now()+450;
   const symbols=[...watchList.children].map(item=>item.dataset.symbol);
   if (save && symbols.some((symbol,index)=>symbol!==original[index])) {
-    if (watchEditor.saveList(symbols,undefined,true)) {
+    const stored = new Set(readWatchlist());
+    if (watchEditor.saveList(symbols.filter(symbol=>stored.has(symbol)),undefined,true)) {
       sortDirection=0;
       document.getElementById("watch-sort").dataset.direction="0";
       document.getElementById("watch-sort").setAttribute("aria-label","Sort by percentage change");
@@ -1382,11 +1418,13 @@ async function loadValuation(accessToken) {
     heldWatchSymbols.clear();
     for (const holding of Array.isArray(balance?.holdings) ? balance.holdings : []) {
       const quantity = Number(holding?.quantity);
-      if (typeof holding?.symbol === "string" && Number.isFinite(quantity) && quantity !== 0) {
-        heldWatchSymbols.add(watchSymbolKey(holding.symbol));
+      const symbol = typeof holding?.symbol === "string" ? watchSymbolKey(holding.symbol) : "";
+      if (/^[A-Z][A-Z0-9-]{0,11}$/.test(symbol) && quantity > 0) {
+        heldWatchSymbols.add(symbol);
       }
     }
     renderWatchlist();
+    syncKiwoomQuotes();
     if(document.body.dataset.view==="calendar") calendar.refresh();
     if(document.body.dataset.view==="lab") lab.open();
     if (!balance) {

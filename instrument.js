@@ -1,6 +1,6 @@
 import {trendStyles} from "./assets/chart-trends.js?v=82";
 import {prepareChart, drawChart, isIntraday, visibleBars} from "./instrument-chart.js?v=144";
-import {setupStockTrades} from "./assets/stock-trades.js?v=159";
+import {setupStockTrades} from "./assets/stock-trades.js?v=160";
 import {setupExecutionFlags} from "./chart-executions.js?v=143";
 import {calculateSigma, loadWeeklyBand} from "./market-panels.js?v=104";
 
@@ -71,12 +71,27 @@ function mergeDaily(oldBars, newBars) {
   return [...days.values()].sort((a,b) => a[0] - b[0]);
 }
 
-export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,orders,readPositionSnapshot,subscribeOrderBook,canLoadChart,loadChart,loadExecutions,signIn}) {
+export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,orders,readPositionSnapshot,subscribeOrderBook,canLoadChart,loadChart,loadExecutions,readSnapshot,writeSnapshot,signIn}) {
   const dialog=get("stock-detail"), canvas=get("market-chart");
-  const executions = setupExecutionFlags(loadExecutions);
+  const executions = setupExecutionFlags(async (symbol,from,to,signal,grouped)=>{
+    if (!quote?.cachedAt || symbol!==current) {
+      try { return await loadExecutions(symbol,from,to,signal,grouped); }
+      catch(error) { if (signal.aborted || symbol!=="SOXL") throw error; }
+    }
+    const pages=readSnapshot(symbol,"trades") ?? [];
+    const records=[];
+    const seen=new Set();
+    for (const {payload} of pages) {
+      for (const record of payload.executions) {
+        if (!seen.has(record.day) && record.day>=from && record.day<=to) records.push(record);
+      }
+      for (const record of payload.executions) seen.add(record.day);
+    }
+    return records;
+  });
   let current="", quote=null, frame="day", afterClose=null, quoteRequest=0;
   const stockTrades = setupStockTrades({
-    loadExecutions, canLoadChart,
+    loadExecutions, canLoadChart, readSnapshot, writeSnapshot,
     onSignIn:()=>{const symbol=current;back(()=>signIn(symbol));},
     onShowChart:()=>draw(),
     onShowTrades:()=>{if(dialog.classList.contains("expanded"))setExpanded(false);dialog.scrollTop=0;}
@@ -386,7 +401,7 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
     get("trade-preview-symbol").textContent = displaySymbol(current);
     get("trade-company").textContent = quote?.name || nameFor(current) || "";
     tradeStatus.textContent = "";
-    setTicketQuote(quote?.price, quote?.fromKiwoom ? "최근 조회가" : "저장된 종가");
+    setTicketQuote(quote?.cachedAt ? null : quote?.price, quote?.fromKiwoom ? "최근 조회가" : "저장된 종가");
     updateTradeTotal();
     trade.showModal();
     unsubscribeBook = subscribeOrderBook(current, onBookUpdate);
@@ -843,7 +858,21 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
     chartStatus.textContent = "Loading intraday history…";
     chartStatus.hidden = false;
     try {
-      const source = quote.fromKiwoom ? (await loadChart(current, value, null, historyAbort?.signal, sessionDate.value))?.bars : await minuteBars(current);
+      const symbol=current;
+      const day=sessionDate.value;
+      const key="intraday:"+value;
+      let source;
+      if (quote.fromKiwoom) {
+        try {
+          source=(await loadChart(symbol,value,null,historyAbort?.signal,day))?.bars;
+          if (source?.length) writeSnapshot(symbol,key,{at:Date.now(),day,bars:source});
+        } catch (error) {
+          const saved=readSnapshot(symbol,key);
+          if (!saved?.bars?.length || day && saved.day!==day) throw error;
+          source=saved.bars;
+          if (id===requestId) get("stock-time").textContent="저장된 분봉 · "+new Date(saved.at).toLocaleString("ko-KR",{timeZone:"Asia/Seoul"})+" KST";
+        }
+      } else source=await minuteBars(symbol);
       if (id !== requestId) return;
       chartStatus.hidden = Boolean(source?.length);
       if (!source?.length) chartStatus.textContent = sessionDate.value ? "No intraday bars for this trading date." : "Intraday history is unavailable for this interval.";
@@ -893,7 +922,9 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
     renderQuoteSigma();
     get("stock-name").textContent = [quote.name || nameFor(current), quote.exchange === "NasdaqGS" ? "NASDAQ" : quote.exchange].filter(Boolean).join("  ");
     get("stock-chart-sign-in").hidden = isSignedIn();
-    get("stock-time").textContent = "";
+    get("stock-time").textContent = quote.cachedAt
+      ? "저장 시세 · "+new Date(quote.cachedAt).toLocaleString("ko-KR",{timeZone:"Asia/Seoul"})+" KST"
+      : "";
     const when = !quote.fromKiwoom && Number.isFinite(quote.asOf) ? dateFormat.format(quote.asOf * 1000) + " ET" : "";
     get("stock-price").title = [quote.fromKiwoom ? "Kiwoom" : quote.source || "Snapshot", when].filter(Boolean).join(" · ");
     get("stock-frames").hidden=false;
@@ -908,6 +939,11 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
     const signal = historyAbort.signal;
     let message = "Chart unavailable";
     try {
+      const snapshot = readSnapshot(symbol,"chart");
+      if (snapshot?.data?.daily?.length && !quote) {
+        quote = {...snapshot.data,cachedAt:snapshot.at};
+        renderQuote();
+      }
       const saved = await publicQuote(symbol);
       if (id !== quoteRequest) return;
       if (saved && !quote) {
@@ -920,9 +956,13 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
         const asOf = new Date().toISOString().slice(0,10);
         const cached = fullHistory.get(symbol);
         let before = cached?.asOf === asOf ? null : result.before;
-        let bars = mergeDaily(cached?.asOf === asOf ? cached.bars : saved?.daily, result.daily);
+        let bars = mergeDaily(cached?.asOf === asOf ? cached.bars : snapshot?.data?.daily ?? saved?.daily, result.daily);
+        if (quote?.cachedAt) executions.reset();
         quote = {...saved, ...result, daily:bars, fromKiwoom:!result.source};
         renderQuote(Boolean(chart));
+        const at=Date.now();
+        if (bars.length) writeSnapshot(symbol,"chart",{at,data:quote});
+        stockTrades.warm();
         while (before) {
           const part = await loadChart(symbol, "day", before, signal);
           if (id !== quoteRequest) return;
@@ -930,6 +970,7 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
           before = part.before;
           bars = mergeDaily(bars, part.bars);
           quote.daily = bars;
+          writeSnapshot(symbol,"chart",{at,data:quote});
           renderQuoteSigma();
           if (!isIntraday(frame)) finishFrame(bars, Boolean(chart));
         }
@@ -942,6 +983,7 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
       message = error.message;
       if (id === quoteRequest && quote?.daily?.length) {
         if (!isIntraday(frame)) finishFrame(quote.daily, Boolean(chart));
+        get("stock-quote-retry").hidden = !canLoadChart();
         return;
       }
     }

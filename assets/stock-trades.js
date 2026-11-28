@@ -29,7 +29,7 @@ function realizedRow(day, realized) {
   return row;
 }
 
-export function setupStockTrades({loadExecutions,canLoadChart,onSignIn,onShowChart,onShowTrades}) {
+export function setupStockTrades({loadExecutions,canLoadChart,readSnapshot,writeSnapshot,onSignIn,onShowChart,onShowTrades}) {
   const get = id => document.getElementById(id);
   const panel=get("stock-trades"), list=get("stock-trades-list"), status=get("stock-trades-status");
   const chart=get("chart-panel"), chartButton=get("stock-chart-view"), tradesButton=get("stock-trades-view");
@@ -53,12 +53,26 @@ export function setupStockTrades({loadExecutions,canLoadChart,onSignIn,onShowCha
     }
     const controller=new AbortController();
     request=controller;
-    const end=cursor;
-    const start=end-29*dayMs;
+    let end=cursor;
+    let start=end-29*dayMs;
+    const cachedPages=readSnapshot(symbol,"trades") ?? [];
     status.textContent="체결 내역 불러오는 중…";
     more.hidden=true;
     try {
-      const {executions:records, realized}=await loadExecutions(symbol,isoDay(start),isoDay(end),controller.signal,false,true);
+      let payload, savedAt;
+      try {
+        payload=await loadExecutions(symbol,isoDay(start),isoDay(end),controller.signal,false,true);
+        if(request!==controller) return;
+        if(Array.isArray(payload?.executions)){
+          const page={start,end,payload,at:Date.now()};
+          writeSnapshot(symbol,"trades",[page,...cachedPages.filter(p=>p.end!==end)].sort((a,b)=>b.end-a.end).slice(0,12));
+        }
+      } catch(error) {
+        const cached=loaded ? cachedPages.find(p=>p.end===end) : cachedPages[0];
+        if (!cached) throw error;
+        ({start,end,payload,at:savedAt}=cached);
+      }
+      const {executions:records, realized}=payload;
       if(request!==controller) return;
       if(!Array.isArray(records)) throw Error("조회 결과를 읽을 수 없습니다.");
       const byDay = new Map();
@@ -87,7 +101,8 @@ export function setupStockTrades({loadExecutions,canLoadChart,onSignIn,onShowCha
       }
       cursor=start-dayMs;
       loaded=true;
-      status.textContent=realized == null && records.some(row=>row.side==="sell")
+      status.textContent=savedAt ? "저장 내역 · "+new Date(savedAt).toLocaleString("ko-KR",{timeZone:"Asia/Seoul"})+" KST"
+        : realized == null && records.some(row=>row.side==="sell")
         ? "키움 실현손익을 불러오지 못했습니다."
         : days.length?"":isoDay(start)+" ~ "+isoDay(end)+" 체결 내역 없음";
       more.textContent="이전 30일 보기";
@@ -116,6 +131,7 @@ export function setupStockTrades({loadExecutions,canLoadChart,onSignIn,onShowCha
   more.onclick=()=>canLoadChart()?load():onSignIn();
 
   return {
+    warm(){if(symbol==="SOXL" && !loaded)load();},
     reset(next) {
       request?.abort();
       request=undefined;
