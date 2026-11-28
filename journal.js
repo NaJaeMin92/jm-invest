@@ -4,7 +4,7 @@ import {setupLab} from "./assets/lab.js?v=162";
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=114";
 import {setupWatchEditor} from "./watch-editor.js?v=146";
 import {setupOrders} from "./orders.js?v=83";
-import { setupInstrument, sparkline } from "./instrument.js?v=162";
+import { setupInstrument, sparkline } from "./instrument.js?v=163";
 import {loadWatchSentiment} from "./market-panels.js?v=104";
 import {usMarketSession} from "./watch-quotes.js?v=64";
 
@@ -702,6 +702,8 @@ const kiwoomDaily = new Map();
 const kiwoomRegular = new Map();
 const externalPrices = new Map();
 const minuteHistory = new Map(), liveMinutes = new Map(), changedSymbols = new Set();
+const changedMinutes = new Set();
+const paintedMiniCharts = new WeakMap();
 const unavailableSymbols = new Set();
 // Display-only quotes. Read them after owner authentication, never in the order ticket.
 const savedWatchQuotes = new Map();
@@ -767,6 +769,7 @@ function stopKiwoomQuotes() {
   if (token) return;
   minuteHistory.clear();
   liveMinutes.clear();
+  changedMinutes.clear();
   kiwoomTicks.clear();
   lastKiwoomPrices.clear();
   kiwoomDaily.clear();
@@ -804,7 +807,7 @@ async function syncKiwoomQuotes() {
     const ordered = [...new Set([...(book ? [book] : []), ...visible, ...symbols])];
     const response = await fetch(kiwoomEndpoint, {
       method: "POST",
-      headers: {"Content-Type": "application/json", Authorization: "Bearer " + token},
+      headers: {"Content-Type": "application/json", ...quoteReadHeaders(new URL(kiwoomEndpoint,location.href))},
       body: JSON.stringify(book ? {symbols:ordered, book} : ordered),
       signal: controller.signal
     });
@@ -836,7 +839,14 @@ async function syncKiwoomQuotes() {
           }
           if (update.book || update.bookStatus) continue;
           if (update.symbol) changedSymbols.add(update.symbol);
-          if (Array.isArray(update.series)) minuteHistory.set(update.symbol, update.series);
+          if (Array.isArray(update.series)) {
+            minuteHistory.set(update.symbol, update.series);
+            const cached=savedWatchQuotes.get(update.symbol);
+            if (cached) {
+              cached.series=update.series;
+              watchCacheTimer ??= setTimeout(flushWatchCache,1500);
+            }
+          }
           if (Array.isArray(update.unsupported)) {
             for (const symbol of update.unsupported) { unavailableSymbols.add(symbol); changedSymbols.add(symbol); }
           } else if (Array.isArray(update.daily)) {
@@ -864,6 +874,7 @@ async function syncKiwoomQuotes() {
                 const minute = Math.floor(update.tradedAt / 60) * 60;
                 let points = liveMinutes.get(update.symbol);
                 if (prior?.date !== update.date || !points) liveMinutes.set(update.symbol, points = new Map());
+                if (points.get(minute)!==update.price) changedMinutes.add(update.symbol);
                 points.set(minute, update.price);
                 while (points.keys().next().value < minute - 179 * 60) points.delete(points.keys().next().value);
               }
@@ -1301,18 +1312,15 @@ function makeWatchRow(symbol) {
   return row;
 }
 
-function paintWatchRow(row, symbol, market, session) {
-  const caption = row.querySelector(".watch-caption"), tag = caption.lastElementChild;
-  caption.firstElementChild.textContent = nameFor(symbol);
-  tag.hidden = !market;
-  tag.textContent = market?.saved ? "Saved" : market?.label || "";
-  tag.className = market?.marketType ? "session-tag futures" : "session-tag";
-  tag.title = market?.saved ? savedTime(market.at) : market && !market.marketType && ["Pre", "After"].includes(session.phase) && market.label !== session.phase
-    ? session.phase + " quote pending" : "";
-
-  const chart = row.querySelector(".mini-chart");
-  const points = new Map(token ? minuteHistory.get(symbol) ?? market?.series : []);
-  if (token) for (const [stamp, price] of liveMinutes.get(symbol) ?? []) points.set(stamp, price);
+function paintMiniChart(chart,symbol,market) {
+  const history=token ? minuteHistory.get(symbol) ?? market?.series : undefined;
+  const live=token ? liveMinutes.get(symbol) : undefined;
+  const prior=paintedMiniCharts.get(chart);
+  if (prior && prior.history===history && prior.live===live && !changedMinutes.has(symbol)) return;
+  paintedMiniCharts.set(chart,{history,live});
+  changedMinutes.delete(symbol);
+  const points=new Map(history);
+  for (const [stamp,price] of live ?? []) points.set(stamp,price);
   const samples = [...points].sort((a, b) => a[0] - b[0]);
   if (samples.length > 1) {
     const end = samples.at(-1)[0];
@@ -1325,6 +1333,18 @@ function paintWatchRow(row, symbol, market, session) {
       sparkline(visible, chart);
     } else chart.replaceChildren();
   } else chart.replaceChildren();
+}
+
+function paintWatchRow(row, symbol, market, session) {
+  const caption = row.querySelector(".watch-caption"), tag = caption.lastElementChild;
+  caption.firstElementChild.textContent = nameFor(symbol);
+  tag.hidden = !market;
+  tag.textContent = market?.saved ? "Saved" : market?.label || "";
+  tag.className = market?.marketType ? "session-tag futures" : "session-tag";
+  tag.title = market?.saved ? savedTime(market.at) : market && !market.marketType && ["Pre", "After"].includes(session.phase) && market.label !== session.phase
+    ? session.phase + " quote pending" : "";
+
+  paintMiniChart(row.querySelector(".mini-chart"),symbol,market);
 
   const quote = row.querySelector(".watch-quote"), [main, price, extra] = quote.children;
   const change = market?.change;

@@ -867,31 +867,34 @@ export function setupInstrument({isSignedIn,search,nameFor,readList,saveList,ord
       finishFrame(quote && (value === "hour" ? quote.hourly : quote.daily));
       return;
     }
-    finishFrame(null);
-    chartStatus.textContent = "Loading intraday history…";
-    chartStatus.hidden = false;
+    const symbol=current;
+    const day=sessionDate.value;
+    const key="intraday:"+value+(day ? "/"+day : "");
+    const brokerQuote=quote.fromKiwoom;
+    const cached=brokerQuote && await readSnapshot(symbol,key);
+    if (id!==requestId) return;
+    const saved=Boolean(cached?.bars?.length && (!day || cached.day===day));
+    if (saved) {
+      get("stock-time").textContent="저장된 분봉 · "+savedTime(cached.at);
+      finishFrame(cached.bars);
+    } else {
+      finishFrame(null);
+      chartStatus.textContent = "Loading intraday history…";
+      chartStatus.hidden = false;
+    }
     try {
-      const symbol=current;
-      const day=sessionDate.value;
-      const key="intraday:"+value+(day ? "/"+day : "");
-      let source;
-      if (quote.fromKiwoom) {
-        try {
-          source=(await loadChart(symbol,value,null,historyAbort?.signal,day))?.bars;
-          if (source?.length) void writeSnapshot(symbol,key,{at:Date.now(),day,bars:source});
-        } catch (error) {
-          const saved=await readSnapshot(symbol,key);
-          if (!saved?.bars?.length || day && saved.day!==day) throw error;
-          source=saved.bars;
-          if (id===requestId) get("stock-time").textContent="저장된 분봉 · "+savedTime(saved.at);
-        }
-      } else source=await minuteBars(symbol);
-      if (id !== requestId) return;
-      chartStatus.hidden = Boolean(source?.length);
-      if (!source?.length) chartStatus.textContent = sessionDate.value ? "No intraday bars for this trading date." : "Intraday history is unavailable for this interval.";
-      finishFrame(source);
+      const source=brokerQuote ? (await loadChart(symbol,value,null,historyAbort?.signal,day))?.bars : await minuteBars(symbol);
+      if (id!==requestId) return;
+      if (!source?.length) {
+        if (!saved) chartStatus.textContent = day ? "No intraday bars for this trading date." : "Intraday history is unavailable for this interval.";
+        return;
+      }
+      if (brokerQuote) void writeSnapshot(symbol,key,{at:Date.now(),day,bars:source});
+      get("stock-time").textContent=quote.cachedAt ? "저장 시세 · "+savedTime(quote.cachedAt) : "";
+      chartStatus.hidden=true;
+      finishFrame(source,saved);
     } catch {
-      if (id === requestId) chartStatus.textContent = "Intraday history is temporarily unavailable. Select another interval.";
+      if (id===requestId && !saved) chartStatus.textContent = "Intraday history is temporarily unavailable. Select another interval.";
     }
   }
   const tradingDate = new Intl.DateTimeFormat("en-CA", {
