@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-11-27T22:14:30+00:00",
+ "updatedAt": "2026-11-28T09:13:43+00:00",
  "events": [
   {
    "series": "FOMC",
@@ -7,7 +7,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "FOMC",
@@ -15,7 +15,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -23,7 +23,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "FOMC",
@@ -31,7 +31,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -39,7 +39,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -47,7 +47,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -55,7 +55,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -63,7 +63,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "FOMC",
@@ -71,7 +71,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -79,7 +79,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -87,7 +87,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "FOMC",
@@ -95,7 +95,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -103,7 +103,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -111,7 +111,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -119,7 +119,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -127,7 +127,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "FOMC",
@@ -135,7 +135,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -143,7 +143,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -151,7 +151,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "FOMC",
@@ -159,7 +159,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -167,7 +167,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -175,7 +175,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -183,7 +183,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -191,7 +191,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "FOMC",
@@ -199,7 +199,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -207,7 +207,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -215,7 +215,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "FOMC",
@@ -223,7 +223,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -231,7 +231,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -239,7 +239,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "CPI",
@@ -247,7 +247,7 @@
    "source": "뉴욕 연은",
    "url": "https://www.newyorkfed.org/research/calendars/i-nov26.html",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -255,7 +255,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -263,7 +263,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "FOMC",
@@ -271,7 +271,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/newsevents/2026-december.htm",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "CPI",
@@ -279,7 +279,7 @@
    "source": "뉴욕 연은",
    "url": "https://www.newyorkfed.org/research/calendars/i-dec26.html",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -287,7 +287,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -295,7 +295,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/full",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "CPI",
@@ -311,7 +311,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
    "estimated": true,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -319,7 +319,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -327,7 +327,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "CPI",
@@ -343,7 +343,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -351,7 +351,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "CPI",
@@ -367,7 +367,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
    "estimated": true,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -375,7 +375,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -383,7 +383,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "CPI",
@@ -399,7 +399,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
    "estimated": true,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -407,7 +407,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -415,7 +415,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "CPI",
@@ -431,7 +431,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -439,7 +439,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "FOMC",
@@ -447,7 +447,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
    "estimated": true,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "CPI",
@@ -463,7 +463,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -471,7 +471,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "CPI",
@@ -487,7 +487,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
    "estimated": true,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -495,7 +495,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -503,7 +503,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "CPI",
@@ -519,7 +519,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -527,7 +527,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "CPI",
@@ -543,7 +543,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
    "estimated": true,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -551,7 +551,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -559,7 +559,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "CPI",
@@ -575,7 +575,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -583,7 +583,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "CPI",
@@ -599,7 +599,7 @@
    "source": "Federal Reserve",
    "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
    "estimated": true,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "GDP",
@@ -607,7 +607,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -615,7 +615,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "CPI",
@@ -631,7 +631,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   },
   {
    "series": "PCE",
@@ -639,7 +639,7 @@
    "source": "BEA",
    "url": "https://www.bea.gov/news/schedule/next-year",
    "estimated": false,
-   "checkedAt": "2026-11-27T22:14:30+00:00"
+   "checkedAt": "2026-11-28T09:13:43+00:00"
   }
  ]
 }
