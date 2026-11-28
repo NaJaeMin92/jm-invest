@@ -3,7 +3,7 @@ import {usMarketSession} from "../watch-quotes.js?v=64";
 import {publicQuote} from "../instrument.js?v=112";
 import {metrics, metricsAt, matches, factors} from "./strategy.js?v=115";
 import {prepareChart} from "../instrument-chart.js?v=103";
-import {touchCandidate, windowsPerGroup} from "./lab-backtest.js?v=152";
+import {touchCandidate, windowsPerGroup} from "./lab-backtest.js?v=164";
 import {firstTouchLevels} from "./first-touch.js?v=113";
 
 const dayMs = 86400000;
@@ -67,7 +67,7 @@ export function executionWindows(first, last) {
   return ranges;
 }
 
-export {touchCandidate} from "./lab-backtest.js?v=152";
+export {touchCandidate} from "./lab-backtest.js?v=164";
 
 function replayIssue(rule) {
   if (rule.preset === "firstTouch") return rule.touch ? "" : "터치 설정이 없습니다.";
@@ -325,7 +325,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
       windows.hidden=false;
     } else if (saved.kind==="batch") {
       get("all-title").textContent=saved.title;
-      get("all-source").textContent=saved.source;
+      get("all-source").textContent=saved.source.replace("중앙 수익률","중앙 평가 수익률");
       get("all-list").replaceChildren();
       for (const {name,summary} of saved.rows) appendBatchRow(name,summary);
       all.hidden=false;
@@ -371,7 +371,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
           const entries=[...rules].filter(([id])=>canUseAs(id,"buy")).map(([,rule])=>rule);
           const seed=Math.floor(Math.random()*2**32);
           get("all-title").textContent=symbol+" · "+years+"년 전체 전략 백테스트";
-          get("all-source").textContent=source+" · 공통 매도 "+exit.nickname+" · 월별 / 무작위 중앙 수익률";
+          get("all-source").textContent=source+" · 공통 매도 "+exit.nickname+" · 월별 / 무작위 중앙 평가 수익률";
           const list=get("all-list");
           list.replaceChildren();
           all.hidden=false;
@@ -529,7 +529,7 @@ export function setupLab({readSymbols, loadChart, loadExecutions, canLoadChart, 
 function calculateWindows(bars,years,rule,signal,progress,seed){
   return new Promise((resolve,reject)=>{
     signal.throwIfAborted();
-    const worker=new Worker(new URL("./lab-backtest-worker.js?v=152",import.meta.url),{type:"module"});
+    const worker=new Worker(new URL("./lab-backtest-worker.js?v=164",import.meta.url),{type:"module"});
     const finish=()=>{worker.terminate();signal.removeEventListener("abort",abort);};
     const abort=()=>{finish();reject(signal.reason);};
     signal.addEventListener("abort",abort,{once:true});
@@ -544,6 +544,7 @@ function calculateWindows(bars,years,rule,signal,progress,seed){
   });
 }
 
+const signedUSD = new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",signDisplay:"exceptZero"});
 const percent=value=>(value>0?"+":"")+(value*100).toFixed(2)+"%";
 function medianProfit(rows) {
   const sorted=rows.map(row=>row.profit).sort((a,b)=>a-b);
@@ -554,14 +555,14 @@ function renderWindows(groups,years,rule,symbol,bars,source){
   get("window-title").textContent=(rule.nickname || "저장 전략")+" · "+years+"년 백테스트";
   get("window-source").textContent=symbol+" · "+source+" · "+dateKey(bars[0][0]*1000)+" – "+dateKey(bars.at(-1)[0]*1000);
   const budget=Number(rule.entry.allocation?.amount)||10000;
-  get("model").textContent="각 구간에서 현금 $"+budget.toLocaleString()+"로 시작합니다. 매수 후 매도 조건을 확인하고, 전량 매도 후 다시 진입할 수 있습니다. 마지막 날 남은 주식은 종가로 평가합니다. 수수료·슬리피지·배당 현금흐름은 별도 반영하지 않습니다.";
+  get("model").textContent="각 구간에서 현금 $"+budget.toLocaleString()+"로 시작합니다. 매수 후 매도 조건을 확인하고, 전량 매도 후 다시 진입할 수 있습니다. 평가 수익률은 구간 마지막의 현금과 남은 주식의 종가를 합산해 계산합니다. 실현손익은 모의 매도분의 손익입니다. 수수료·슬리피지·배당 현금흐름은 별도 반영하지 않습니다.";
   const root=get("window-groups");root.replaceChildren();
   for(const [key,title] of [["rolling","월별 슬라이딩"],["random","무작위 구간"]]){
     const rows=groups[key].filter(Boolean),section=document.createElement("section"),h=document.createElement("h3"),summary=document.createElement("p");
     section.className="lab-window-group";h.textContent=title+" · "+rows.length+"/"+windowsPerGroup;
     summary.className="lab-window-summary";
     if(rows.length){
-      summary.textContent="중앙 수익률 "+percent(medianProfit(rows))+" · 체결 발생 "+rows.filter(r=>r.filled).length+"구간";
+      summary.textContent="중앙 평가 수익률 "+percent(medianProfit(rows))+" · 체결 발생 "+rows.filter(r=>r.filled).length+"구간";
     }else summary.textContent="계산 가능한 구간이 없습니다.";
     section.append(h,summary);
     for(const [index,r] of rows.entries()){
@@ -569,10 +570,18 @@ function renderWindows(groups,years,rule,symbol,bars,source){
       item.className="lab-window-row";
       const name=key==="random"?"표본 "+(index+1):r.offset?r.offset+"개월 전":"최근";
       label.textContent=name+" · "+r.start+" ~ "+r.end;
-      value.textContent=percent(r.profit);value.toggleAttribute("data-negative",r.profit<0);
+      value.textContent="평가 "+percent(r.profit);value.toggleAttribute("data-negative",r.profit<0);
       detail.textContent="최대낙폭 "+percent(r.drawdown)+" · 단순보유 "+percent(r.benchmark)+" · "+
         "매수 "+r.buys+"회 · 매도 "+r.sells+"회 · 전량 청산 "+r.closed+"회"+(r.openShares?" · 잔여 "+r.openShares+"주":"");
-      item.append(label,value,detail);section.append(item);
+      item.append(label,value,detail);
+      const realized=r.realizedProfit ?? (r.sells===0 ? 0 : null);
+      const unrealized=r.unrealizedProfit ?? (r.sells===0 ? r.profit*budget : null);
+      if (Number.isFinite(realized) && Number.isFinite(unrealized)) {
+        const split=document.createElement("small");
+        split.textContent="실현손익 "+signedUSD.format(realized)+" · 미실현손익 "+signedUSD.format(unrealized);
+        item.append(split);
+      }
+      section.append(item);
     }
     root.append(section);
   }

@@ -1,6 +1,6 @@
 import {createDeviceCache,savedTime} from "./assets/device-cache.js?v=162";
 import {setupCalendar} from "./assets/calendar.js?v=162";
-import {setupLab} from "./assets/lab.js?v=162";
+import {setupLab} from "./assets/lab.js?v=164";
 import {setupStrategy,readStrategy,strategyPrefix,libraryDetails} from "./assets/strategy-editor.js?v=114";
 import {setupWatchEditor} from "./watch-editor.js?v=146";
 import {setupOrders} from "./orders.js?v=83";

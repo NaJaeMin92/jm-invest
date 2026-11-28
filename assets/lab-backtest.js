@@ -140,6 +140,7 @@ export function simulatePairedWindow(bars, w, entry, exit, entrySignal, exitSign
   const opening = bars[w.first][1];
   let cash = capital, shares = 0, peak = capital, drawdown = 0;
   let buys = 0, sells = 0, closed = 0, firstBuy = null;
+  let costPerShare = 0, realizedProfit = 0;
   for (let i = w.first; i <= w.last; i++) {
     const rule = shares === 0 ? entry : exit;
     const buying = shares === 0;
@@ -157,6 +158,7 @@ export function simulatePairedWindow(bars, w, entry, exit, entrySignal, exitSign
         shares = Math.min(affordable,planned);
         if (shares > 0) {
           cash -= shares*price;
+          costPerShare = price;
           buys++;
           firstBuy ??= i;
         }
@@ -164,6 +166,7 @@ export function simulatePairedWindow(bars, w, entry, exit, entrySignal, exitSign
         const quantity = Math.min(shares,Number(rule.quantity) || shares);
         shares -= quantity;
         cash += quantity*price;
+        realizedProfit += quantity*(price-costPerShare);
         sells++;
         if (shares === 0) closed++;
       }
@@ -173,7 +176,8 @@ export function simulatePairedWindow(bars, w, entry, exit, entrySignal, exitSign
     drawdown = Math.min(drawdown,equity/peak-1);
   }
   return {...w,profit:(cash+shares*bars[w.last][4])/capital-1,drawdown,
-    benchmark:bars[w.last][4]/opening-1,filled:firstBuy,buys,sells,closed,openShares:shares};
+    benchmark:bars[w.last][4]/opening-1,filled:firstBuy,buys,sells,closed,openShares:shares,
+    realizedProfit,unrealizedProfit:shares*(bars[w.last][4]-costPerShare)};
 }
 
 export function runWindows(bars,years,rule,progress=()=>{},random=Math.random) {

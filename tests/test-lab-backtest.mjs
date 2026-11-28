@@ -55,3 +55,17 @@ test("paired backtests reuse sale proceeds for reentry and value remaining share
   assert.equal(result.openShares,1650);
   assert.ok(Math.abs(result.profit-.65)<1e-9);
 });
+
+test("paired backtests separate unsold gains from profit booked by partial sales",()=>{
+  const bars=[10,12,14].map((price,index)=>[index,price,price,price,price]);
+  const window={first:0,last:2}, entry={quantity:10}, exit={quantity:3};
+  const held=simulatePairedWindow(bars,window,entry,exit,()=>true,()=>false);
+  assert.equal(held.sells,0);
+  assert.equal(held.realizedProfit,0);
+  assert.equal(held.unrealizedProfit,40);
+  const trimmed=simulatePairedWindow(bars,window,entry,exit,()=>true,i=>i===1);
+  assert.equal(trimmed.openShares,7);
+  assert.equal(trimmed.realizedProfit,6);
+  assert.equal(trimmed.unrealizedProfit,28);
+  assert.ok(Math.abs(trimmed.profit*10000-34)<1e-9);
+});
